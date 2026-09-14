@@ -1000,12 +1000,18 @@ namespace KoogleKerbinSetup
                 chkLaunch.Visible = false;
             }
             else doneText.Text = App.Name + " " + Build.Version + " está instalado en:\n" + dir;
-            // con la página oculta la etiqueta aún no se ha medido: se calcula su alto con el texto nuevo
-            int textH = doneText.GetPreferredSize(new Size(pDone.Width, 0)).Height;
-            chkLaunch.Top = doneText.Top + textH + S(22);
-            doneHint.Top = (chkLaunch.Visible ? chkLaunch.Top + chkLaunch.Height : doneText.Top + textH) + S(22);
             ShowPage(4);
             if (failed) title.Text = "No se pudo instalar";
+            // la etiqueta solo se mide bien con la página ya visible; y otra vez cuando termina de ajustarse
+            pDone.PerformLayout();
+            LayoutDone();
+            BeginInvoke((Action)LayoutDone);
+        }
+
+        void LayoutDone()
+        {
+            chkLaunch.Top = doneText.Bottom + S(22);
+            doneHint.Top = (chkLaunch.Visible ? chkLaunch.Bottom : doneText.Bottom) + S(22);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
