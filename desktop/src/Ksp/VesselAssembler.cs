@@ -209,6 +209,39 @@ namespace KerbinMaps.Ksp
                     }
                     case "ModuleProceduralFairing":
                         break;
+                    case "ModuleParachute":
+                    case "RealChuteFAR":
+                    {
+                        /* El modelo trae la campana abierta. Plegado solo se ve la tapa; al
+                           abrirse la tapa sale despedida y la campana toma la pose de su
+                           animación; cortado no queda ninguna de las dos. */
+                        string st = (saved.GetValueOrDefault("deploymentState") ?? saved.GetValueOrDefault("depState") ?? "STOWED").ToUpperInvariant();
+                        string canopy = cfg.GetValueOrDefault("canopyName") ?? "canopy";
+                        string cap = cfg.GetValueOrDefault("capName") ?? "cap";
+                        string semi = cfg.GetValueOrDefault("semiDeployedAnimation");
+                        string full = cfg.GetValueOrDefault("fullyDeployedAnimation");
+                        switch (st)
+                        {
+                            case "SEMIDEPLOYED":
+                            case "PREDEPLOYED":
+                            case "LOWDEPLOYED":
+                                hide.Add(cap);
+                                if (!string.IsNullOrEmpty(semi)) anims.Add((semi, 1));
+                                break;
+                            case "DEPLOYED":
+                                hide.Add(cap);
+                                if (!string.IsNullOrEmpty(full)) anims.Add((full, 1));
+                                break;
+                            case "CUT":
+                                hide.Add(cap);
+                                hide.Add(canopy);
+                                break;
+                            default:                 // STOWED, ACTIVE: esperando para abrirse
+                                hide.Add(canopy);
+                                break;
+                        }
+                        break;
+                    }
                     case "ModuleAnimateGeneric":
                         if (cfg.TryGetValue("animationName", out var ag) && ag.Length > 0)
                             anims.Add((ag, Math.Clamp(ParseD(saved.GetValueOrDefault("animTime"), 0), 0, 1)));

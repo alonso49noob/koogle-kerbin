@@ -176,7 +176,7 @@ namespace KerbinMaps.UI
 
             BuildTimeBar();
 
-            foreach (Control c in new Control[] { sbToggle, btn2D, btn3D, btnSky, search, searchBox, hud, banner, tbar, popup })
+            foreach (Control c in new Control[] { sbToggle, btn2D, btn3D, btnSky, search, searchBox, hud, orbHud, banner, tbar, popup })
             {
                 mapArea.Controls.Add(c);
                 c.BringToFront();
@@ -202,6 +202,7 @@ namespace KerbinMaps.UI
             searchBox.SetBounds(search.Left, search.Bottom + Theme.S(4), sw, searchList.HeightFor(sw) + 2);
             searchList.SetBounds(1, 1, sw - 2, searchBox.Height - 2);
             hud.Location = new Point(mapArea.Width - m - hud.Width, Theme.S(56));
+            PlaceOrbitInfo();
 
             LayoutTimeBar();
             int maxW = Math.Min(Theme.S(620), mapArea.Width - Theme.S(32));
@@ -515,6 +516,7 @@ namespace KerbinMaps.UI
                 case ',': CambiarWarp(-1); break;
                 case ' ': AlternarPausa(); break;
                 case 'f': case 'F': Seguir(!Following); break;
+                case 'i': case 'I': ToggleOrbitInfo(); break;
                 default: return;
             }
             e.Handled = true;
@@ -550,6 +552,7 @@ namespace KerbinMaps.UI
                 rows.Add(("hora solar", p.HasValue ? FmtSolar(Sun.LocalHours(Geo.WrapLon(p.Value.Lon), globe.SunLon)) : "—"));
             hud.SetRows(rows.ToArray());
             hud.Location = new Point(mapArea.Width - Theme.S(12) - hud.Width, Theme.S(56));
+            PlaceOrbitInfo();
         }
 
         public void Flash(string msg)

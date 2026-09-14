@@ -160,6 +160,7 @@ namespace KerbinMaps.UI
                         ("sol", Signed(sEl) + " " + RumbosHud[(int)Math.Round(sAz / 45) % 8]),
                         ("hora solar", FmtSolar(Sun.LocalHours(state.ObsLon, globe.SunLon))));
             hud.Location = new Point(mapArea.Width - Theme.S(12) - hud.Width, Theme.S(56));
+            PlaceOrbitInfo();
         }
     }
 }

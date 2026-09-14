@@ -67,14 +67,16 @@ namespace KerbinMaps.Core
             "ModuleDeployableSolarPanel", "ModuleDeployableAntenna", "ModuleDeployableRadiator", "ModuleDeployableReflector",
             "ModuleDeployablePart", "ModuleAnimateGeneric", "ModuleWheelDeployment", "ModuleAnimationGroup",
             // y los que enseñan u ocultan partes: cubiertas de motor, cofias y estructuras de interetapa
-            "ModuleJettison", "ModuleProceduralFairing", "ModuleStructuralNode", "ModuleDynamicNodes"
+            "ModuleJettison", "ModuleProceduralFairing", "ModuleStructuralNode", "ModuleDynamicNodes",
+            // paracaídas: plegados, abiertos o cortados
+            "ModuleParachute", "RealChuteFAR"
         };
 
         static readonly HashSet<string> CamposModulo = new()
         {
             "name", "moduleID", "currentSubtype", "deployState", "storedAnimationTime", "currentRotation",
             "animTime", "position", "isDeployed",
-            "activejettisonName", "isJettisoned", "shroudHideOverride", "spawnState", "visibilityState", "fsm", "NodeSetIdx"
+            "activejettisonName", "isJettisoned", "shroudHideOverride", "spawnState", "visibilityState", "fsm", "NodeSetIdx", "deploymentState", "depState"
         };
 
         sealed class Raw
@@ -366,6 +368,25 @@ namespace KerbinMaps.Core
         }
 
         public static double Periodo(Elements e) => 2 * Math.PI / Math.Sqrt(Body.Mu / Math.Pow(e.Sma, 3));
+
+        public readonly record struct Estado(double R, double V, double Nu, double TAp, double TPe, double Periodo);
+
+        /* Dónde va la nave en su órbita en el instante t: distancia al centro, velocidad
+           (vis-viva), anomalía verdadera en grados y lo que falta para el próximo
+           apoapsis y periapsis. */
+        public static Estado EstadoEn(Elements e, double t)
+        {
+            double n = Math.Sqrt(Body.Mu / Math.Pow(e.Sma, 3));
+            double M = (e.Mna + n * (t - e.Eph)) % (2 * Math.PI);
+            if (M < 0) M += 2 * Math.PI;
+            double E = ManualOrbit.EccentricAnomaly(M, e.Ecc, 1e-13);
+            double nu = 2 * Math.Atan2(Math.Sqrt(1 + e.Ecc) * Math.Sin(E / 2), Math.Sqrt(1 - e.Ecc) * Math.Cos(E / 2));
+            double r = e.Sma * (1 - e.Ecc * Math.Cos(E));
+            double v = Math.Sqrt(Math.Max(0, Body.Mu * (2 / r - 1 / e.Sma)));
+            double tPe = (2 * Math.PI - M) / n;
+            double tAp = ((Math.PI - M) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / n;
+            return new Estado(r, v, (nu * Geo.R2D + 360) % 360, tAp, tPe, 2 * Math.PI / n);
+        }
 
         /* Traza desde un instante cualquiera (el de la simulación). `porVuelta` fija la
            densidad: para dibujar todas las naves a la vez basta con menos puntos. */

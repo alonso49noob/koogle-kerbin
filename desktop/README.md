@@ -104,6 +104,8 @@ Y del estado guardado de cada pieza:
 - **Estructuras de interetapa** de las cofias (`ModuleStructuralNode`): solo si el
   juego las ha generado.
 - **Placas de motores**: solo la malla del juego de nodos elegido.
+- **Paracaídas** (de serie y RealChute de FAR): plegados solo se ve la tapa;
+  abiertos, la campana en la pose de su animación; cortados, ninguna de las dos.
 - Lo que el modelo marca como `Icon_Only` (la cofia de muestra del icono del
   editor) no se dibuja.
 
@@ -126,6 +128,7 @@ Lo que no se reproduce:
 | Información de un punto | clic en el mapa |
 | Seguir una nave | clic en ella (en el mapa, el globo o la lista) |
 | Soltarla | Esc, F, o clic otra vez en ella |
+| Datos de su órbita (altitud, velocidad, Ap/Pe y cuánto falta, periodo, elementos) | I o «Órbita» en la barra de tiempo |
 | Pausa / continuar | espacio |
 | Más rápido hacia delante / hacia atrás | `.` / `,` |
 | Salir de una herramienta o de «Elegir en el mapa» | Esc |

@@ -49,6 +49,7 @@ namespace KerbinMaps.Core
         public double SkyAz = 90, SkyEl = 25, SkyFov = 70;
         public bool SkyGrid = true, SkyForceNight;
         public bool DayNight = true;              // luz del Sol en el instante de la barra de tiempo
+        public bool ShowOrbitInfo = true;         // panel con la órbita de la nave seleccionada
         public string SavePath;                   // el persistent.sfs original de la copia guardada
         public double? SimT;                      // el instante de la barra de tiempo al cerrar
         public bool ShowVesselModels = true;      // montar la nave con las piezas de KSP al acercarse

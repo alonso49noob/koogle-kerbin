@@ -49,7 +49,8 @@ namespace KerbinMaps.UI
         List<TrackPoint> lastTrack;           // la órbita dibujada a mano en su panel
 
         OverlayPanel tbar;
-        DarkButton tNow, tBack, tPlay, tFwd, tFollow;
+        DarkButton tNow, tBack, tPlay, tFwd, tFollow, tOrb;
+        HudPanel orbHud;
         TextLabel tWarp, tFecha;
 
         static readonly Dictionary<string, string> ColorTipo = new()
@@ -99,7 +100,84 @@ namespace KerbinMaps.UI
             tFwd.Click += (s, e) => CambiarWarp(+1);
             tPlay.Click += (s, e) => AlternarPausa();
             tFollow.Click += (s, e) => Seguir(!sim.Follow);
-            tbar.Controls.AddRange(new Control[] { tNow, tBack, tPlay, tFwd, tWarp, tFecha, tFollow });
+            tOrb = new DarkButton("Órbita", small: true) { Tip = "Datos de la órbita de la nave seleccionada (I)", Visible = false };
+            tOrb.Click += (s, e) => ToggleOrbitInfo();
+            tbar.Controls.AddRange(new Control[] { tNow, tBack, tPlay, tFwd, tWarp, tFecha, tFollow, tOrb });
+            orbHud = new HudPanel { Visible = false };
+        }
+
+        /* ------------------------------------------------------------ información orbital */
+
+        /* La órbita de la nave seleccionada en el instante de la barra de tiempo, en un
+           panel bajo el HUD. Se abre y se cierra con «Órbita» o con la tecla I. */
+        void RenderOrbitInfo()
+        {
+            if (orbHud == null) return;
+            bool show = state.ShowOrbitInfo && HasVessels && sv.Sel?.Orbit != null;
+            if (Vis.Shown(orbHud) != show) Vis.Set(orbHud, show);
+            if (!show) return;
+
+            var v = sv.Sel;
+            var e = v.Orbit;
+            var st = SaveFile.EstadoEn(e, sim.T);
+            var p = SaveFile.PosicionEn(e, sim.T, sv.Ut, RotBase());
+            double R = Body.Radius;
+            double pe = e.Sma * (1 - e.Ecc) - R, ap = e.Sma * (1 + e.Ecc) - R;
+            string name = v.Name.Length > 28 ? v.Name.Substring(0, 27) + "…" : v.Name;
+            var rows = new List<(string, string)>
+            {
+                ("objeto", name),
+                ("tipo", v.Type + " · " + Situacion(v.Sit)),
+                ("altitud", Km(p.Alt)),
+                ("velocidad", Geo.F(st.V, 1) + " m/s"),
+                ("apoapsis", Km(ap)),
+                ("periapsis", Km(pe)),
+                ("tiempo a Ap", Geo.FmtTime(st.TAp)),
+                ("tiempo a Pe", Geo.FmtTime(st.TPe)),
+                ("periodo", Geo.FmtTime(st.Periodo)),
+                ("semieje mayor", Km(e.Sma)),
+                ("excentricidad", Geo.F(e.Ecc, 4)),
+                ("inclinación", Geo.F(e.Inc, 2) + "°"),
+                ("nodo asc. (LAN)", Geo.F(e.Lan, 2) + "°"),
+                ("arg. periapsis", Geo.F(e.Lpe, 2) + "°"),
+                ("anomalía verd.", Geo.F(st.Nu, 1) + "°"),
+                ("posición", Geo.FmtLat(p.Lat) + "  " + Geo.FmtLon(p.Lon))
+            };
+            if (pe < 0) rows.Add(("aviso", "Pe bajo el suelo"));
+            else if (pe < Body.Atmosphere) rows.Add(("aviso", "Pe dentro de la atmósfera"));
+            if (ap > Body.Soi - R) rows.Add(("aviso", "sale de la SOI de " + Body.Name));
+            orbHud.SetRows(rows.ToArray());
+            PlaceOrbitInfo();
+        }
+
+        static string Km(double m) => Geo.F(m / 1000, Math.Abs(m) < 1e7 ? 1 : 0) + " km";
+
+        static string Situacion(string sit) => sit switch
+        {
+            "ORBITING" => "en órbita",
+            "SUB_ORBITAL" => "suborbital",
+            "ESCAPING" => "escapando",
+            "FLYING" => "en vuelo",
+            "LANDED" => "posada",
+            "SPLASHED" => "en el agua",
+            "PRELAUNCH" => "en la rampa",
+            "DOCKED" => "acoplada",
+            _ => sit?.ToLowerInvariant() ?? "?"
+        };
+
+        void PlaceOrbitInfo()
+        {
+            if (orbHud == null || !Vis.Shown(orbHud)) return;
+            orbHud.Location = new Point(mapArea.Width - Theme.S(12) - orbHud.Width, hud.Bottom + Theme.S(8));
+        }
+
+        void ToggleOrbitInfo()
+        {
+            if (sv.Sel == null) { Flash("Pincha una nave o un satélite para ver los datos de su órbita."); return; }
+            state.ShowOrbitInfo = !state.ShowOrbitInfo;
+            SaveSettings();
+            RenderOrbitInfo();
+            RenderReloj();
         }
 
         void LayoutTimeBar()
@@ -114,6 +192,7 @@ namespace KerbinMaps.UI
                 (tWarp, tWarp.PreferredWidth), (tFecha, tFecha.PreferredWidth)
             };
             if (Vis.Shown(tFollow)) items.Add((tFollow, tFollow.PreferredWidth));
+            if (Vis.Shown(tOrb)) items.Add((tOrb, tOrb.PreferredWidth));
             int total = padX * 2 + items.Sum(i => i.w) + gap * (items.Count - 1);
             int maxW = mapArea.Width - Theme.S(32);
             if (total > maxW)
@@ -167,6 +246,8 @@ namespace KerbinMaps.UI
             tFecha.Text = Geo.FechaKerbal(sim.T) + "  (" + (dt < 0 ? "−" : "+") + Geo.FmtTime(Math.Abs(dt)) + " desde el guardado)";
             if (Vis.Shown(tFollow) != (sv.Sel != null)) Vis.Set(tFollow, sv.Sel != null);
             tFollow.Active = sim.Follow;
+            if (Vis.Shown(tOrb) != (sv.Sel != null)) Vis.Set(tOrb, sv.Sel != null);
+            tOrb.Active = state.ShowOrbitInfo;
             LayoutTimeBar();
         }
 
@@ -221,6 +302,7 @@ namespace KerbinMaps.UI
                 DibujarTrazaNave();
                 DibujarTodas();
                 RenderReloj();
+                RenderOrbitInfo();
             }
             sim.Dirty = false;
         }
@@ -437,6 +519,7 @@ namespace KerbinMaps.UI
             }
             svList.Invalidate();
             if (HasVessels) RenderReloj();
+            RenderOrbitInfo();
             RequestRender();
         }
 
