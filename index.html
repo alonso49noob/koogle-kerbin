@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerbin Maps — visor de superficie</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div id="app">
+
+  <aside id="sidebar">
+    <header class="sb-head">
+      <h1>Kerbin<span>Maps</span></h1>
+      <p class="sb-sub">Visor de superficie · KSP stock</p>
+    </header>
+
+    <div class="sb-scroll">
+
+      <details open>
+        <summary>Capas</summary>
+        <div class="panel">
+          <label class="field">
+            <span>Mapa base</span>
+            <select id="base-select"></select>
+          </label>
+
+          <div id="custom-url-wrap" class="field hidden">
+            <span>Plantilla XYZ</span>
+            <input id="custom-url" type="text" placeholder="http://localhost:8080/{z}/{x}/{y}.png" spellcheck="false">
+            <button id="custom-url-apply" class="btn btn-sm">Aplicar</button>
+          </div>
+
+          <label class="field">
+            <span>Opacidad base <b id="op-val">100%</b></span>
+            <input id="op-range" type="range" min="0" max="100" value="100">
+          </label>
+
+          <div class="checks">
+            <label><input type="checkbox" id="chk-biome"> Biomas (encima del relieve)</label>
+          </div>
+          <label class="field" id="biome-op-wrap">
+            <span>Opacidad de biomas <b id="biome-op-val">65%</b></span>
+            <input id="biome-op-range" type="range" min="0" max="100" value="65">
+          </label>
+
+          <div class="checks">
+            <label><input type="checkbox" id="chk-grid" checked> Retícula lat/lon</label>
+            <label><input type="checkbox" id="chk-landmarks" checked> Marcadores</label>
+          </div>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Datos del mapa</summary>
+        <div class="panel">
+          <p class="hint">
+            Los mapas precargados no son del proyecto: derivan de las texturas del juego.
+            El desplegable de abajo cambia entre los del catálogo
+            (<code>data/maps.json</code>). Para usar otros, suéltalos en la zona de
+            arrastre o déjalos en <code>data/</code>. Ver <code>README.md</code>.
+          </p>
+
+          <div id="preset-wrap" class="field hidden">
+            <span>Mapa predeterminado</span>
+            <select id="preset-select"></select>
+            <button id="preset-load" class="btn btn-sm">Cargar este mapa</button>
+          </div>
+          <div id="preset-note" class="readout"></div>
+
+          <div id="dropzone" class="dropzone">
+            <b>Arrastra aquí</b> una imagen equirectangular<br>
+            <small>color / bioma / altura</small>
+          </div>
+
+          <div class="slot-grid">
+            <div class="slot" data-slot="color">
+              <span class="slot-name">Color</span>
+              <span class="slot-state" data-state>vacío</span>
+              <input class="slot-off" type="number" step="5" value="0" title="Desfase de longitud en grados: gíralo si el mapa no cae donde debe">
+              <input type="file" accept="image/*" hidden>
+              <button class="btn btn-sm slot-load">Cargar</button>
+              <button class="btn btn-sm btn-ghost slot-clear" title="Quitar">&times;</button>
+            </div>
+            <div class="slot" data-slot="biome">
+              <span class="slot-name">Bioma</span>
+              <span class="slot-state" data-state>vacío</span>
+              <input class="slot-off" type="number" step="5" value="0" title="Desfase de longitud en grados: gíralo si el mapa no cae donde debe">
+              <input type="file" accept="image/*" hidden>
+              <button class="btn btn-sm slot-load">Cargar</button>
+              <button class="btn btn-sm btn-ghost slot-clear" title="Quitar">&times;</button>
+            </div>
+            <div class="slot" data-slot="height">
+              <span class="slot-name">Altura</span>
+              <span class="slot-state" data-state>vacío</span>
+              <input class="slot-off" type="number" step="5" value="0" title="Desfase de longitud en grados: gíralo si el mapa no cae donde debe">
+              <input type="file" accept="image/*" hidden>
+              <button class="btn btn-sm slot-load">Cargar</button>
+              <button class="btn btn-sm btn-ghost slot-clear" title="Quitar">&times;</button>
+            </div>
+          </div>
+          <button id="align-color" class="btn btn-sm">Alinear color con el bioma</button>
+          <p class="hint">
+            El mapa de biomas de SCANsat (720&times;360) vale tal cual: es 2:1 y se
+            pinta sin interpolar. La casilla de grados de cada fila gira el mapa en
+            longitud: no todos los que circulan por ahí usan el meridiano de origen
+            de KSP. Si cargas color y bioma, el bot&oacute;n de arriba calcula el
+            desfase solo.
+          </p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Biomas</summary>
+        <div class="panel">
+          <button id="biome-scan" class="btn">Leer la leyenda del mapa</button>
+          <div id="biome-summary" class="readout"></div>
+          <ul id="biome-legend" class="biome-legend"></ul>
+          <div class="btn-row">
+            <button id="biome-export" class="btn btn-ghost">Exportar nombres</button>
+            <button id="biome-import" class="btn btn-ghost">Importar</button>
+            <input id="biome-file" type="file" accept="application/json,.json" hidden>
+          </div>
+          <p class="hint">
+            Los nombres los pones tú: la paleta cambia entre versiones y
+            exportadores, así que el visor no adivina ninguno. Se guardan en el
+            navegador y puedes exportarlos para reutilizarlos.
+          </p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Altura (opcional)</summary>
+        <div class="panel">
+          <p class="hint">
+            El terreno de Kerbin stock es <b>procedural</b>: lo genera el PQS con ruido,
+            no hay ninguna textura de alturas dentro del juego que extraer. Esto solo
+            sirve si consigues un heightmap en escala de grises por tu cuenta, y aun
+            así el gris no trae escala: <b>hay que calibrarlo</b>.
+          </p>
+          <div class="row2">
+            <label class="field"><span>gris 0 &rarr; (m)</span><input id="h-min" type="number" value="-1000" step="50"></label>
+            <label class="field"><span>gris 255 &rarr; (m)</span><input id="h-max" type="number" value="6764" step="50"></label>
+          </div>
+          <div class="btn-row">
+            <button id="cal-a" class="btn btn-sm">Punto A&hellip;</button>
+            <button id="cal-b" class="btn btn-sm">Punto B&hellip;</button>
+            <button id="cal-reset" class="btn btn-sm btn-ghost">Reiniciar</button>
+          </div>
+          <div id="cal-out" class="readout"></div>
+          <p class="hint">
+            Para calibrar: pulsa «Punto A», haz clic en un sitio del que sepas la
+            altitud real (te la dice el juego al posarte ahí) y escríbela. Repite con
+            B en un punto de altitud bien distinta y el rango se ajusta solo.
+          </p>
+        </div>
+      </details>
+
+      <details id="globe-panel" class="hidden">
+        <summary>Vista 3D</summary>
+        <div class="panel">
+          <div class="checks">
+            <label><input type="checkbox" id="g-light" checked> Iluminación y terminador</label>
+            <label><input type="checkbox" id="g-atm" checked> Atmósfera</label>
+          </div>
+          <label class="field" id="g-relief-wrap">
+            <span>Relieve <b id="g-relief-val">×0</b></span>
+            <input id="g-relief" type="range" min="0" max="60" value="0">
+          </label>
+          <p class="hint" id="g-relief-hint">
+            El relieve necesita un mapa de alturas cargado. Exagera la altura para que
+            se note: a escala real, el pico más alto de Kerbin es un 1% del radio y no
+            se vería nada.
+          </p>
+          <p class="hint">
+            Arrastra para girar, rueda para acercarte. Los marcadores se ocultan solos
+            al pasar tras el horizonte.
+          </p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Herramientas</summary>
+        <div class="panel">
+          <div class="btn-row">
+            <button id="tool-measure" class="btn">Medir distancia</button>
+            <button id="tool-footprint" class="btn">Huella / horizonte</button>
+          </div>
+          <label class="field"><span>Altitud de la huella (km)</span><input id="fp-alt" type="number" value="100" step="10"></label>
+          <button id="tool-clear" class="btn btn-ghost">Limpiar dibujos</button>
+          <p class="hint" id="tool-hint">Ninguna herramienta activa.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Órbita · traza terrestre</summary>
+        <div class="panel">
+          <div class="row2">
+            <label class="field"><span>Periapsis (km)</span><input id="orb-pe" type="number" value="100" step="10"></label>
+            <label class="field"><span>Apoapsis (km)</span><input id="orb-ap" type="number" value="100" step="10"></label>
+          </div>
+          <div class="row2">
+            <label class="field"><span>Inclinación (°)</span><input id="orb-inc" type="number" value="0" step="1"></label>
+            <label class="field"><span>LAN (°)</span><input id="orb-lan" type="number" value="0" step="1"></label>
+          </div>
+          <div class="row2">
+            <label class="field"><span>Arg. periapsis (°)</span><input id="orb-argp" type="number" value="0" step="1"></label>
+            <label class="field"><span>Nº de órbitas</span><input id="orb-n" type="number" value="4" min="1" max="60" step="1"></label>
+          </div>
+          <div class="btn-row">
+            <button id="orb-draw" class="btn btn-primary">Dibujar traza</button>
+            <button id="orb-clear" class="btn btn-ghost">Borrar</button>
+          </div>
+          <div id="orb-out" class="readout"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Naves de una partida</summary>
+        <div class="panel">
+          <div id="sv-drop" class="dropzone">
+            <b>Arrastra aquí</b> un <code>persistent.sfs</code><br>
+            <small>saves / &lt;tu partida&gt; /</small>
+            <input type="file" id="sv-file" accept=".sfs,.loadmeta" hidden>
+          </div>
+          <div id="sv-info" class="readout"></div>
+          <div id="sv-tipos" class="checks"></div>
+          <div class="checks">
+            <label><input type="checkbox" id="sv-all"> Dibujar las órbitas de todas las naves visibles</label>
+          </div>
+          <label class="field" id="sv-orb-wrap">
+            <span>Vueltas a dibujar <b id="sv-orb-val">2</b></span>
+            <input id="sv-orbits" type="range" min="1" max="12" value="2">
+          </label>
+          <label class="field">
+            <span>Ajuste de longitud (°)</span>
+            <input id="sv-rot" type="number" step="0.5" value="0">
+          </label>
+          <ul id="sv-list" class="mk-list"></ul>
+          <p class="hint">
+            La barra de tiempo de abajo mueve todas las naves: pausa (espacio), más
+            rápido hacia delante (.) o hacia atrás (,), y «Guardado» vuelve al instante
+            de la partida. Pincha una nave para ver su traza y pulsa «Seguir» (F) para
+            que la cámara no la pierda; arrastrar lo cancela.
+            Es Kepler puro: hacia atrás ves dónde habría estado cada nave según su
+            órbita actual, sin maniobras, y una órbita que roce la atmósfera no frena.
+            El ajuste de longitud corrige todas las naves a la vez; normalmente no hace falta.
+          </p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Marcadores</summary>
+        <div class="panel">
+          <div class="btn-row">
+            <button id="mk-add" class="btn">Añadir en el centro</button>
+            <button id="mk-export" class="btn btn-ghost">Exportar</button>
+            <button id="mk-import" class="btn btn-ghost">Importar</button>
+            <input id="mk-file" type="file" accept="application/json,.json" hidden>
+          </div>
+          <ul id="mk-list" class="mk-list"></ul>
+          <p class="hint">
+            Tus marcadores se guardan en el navegador. Las anomalías del juego
+            <b>no vienen incluidas</b>: añádelas tú o importa un JSON.
+          </p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Cuerpo</summary>
+        <div class="panel">
+          <div class="readout" id="body-info"></div>
+        </div>
+      </details>
+
+    </div>
+  </aside>
+
+  <main id="map-wrap">
+    <div class="topbar">
+      <button id="sb-toggle" class="btn btn-icon" title="Ocultar panel">&#9776;</button>
+      <button id="view-toggle" class="btn" title="Cambiar entre mapa plano y globo">Ver en 3D</button>
+      <div class="search-wrap">
+        <input id="search" type="text" placeholder="Buscar: KSC, o -0.097, -74.557" spellcheck="false" autocomplete="off">
+        <div id="search-results" class="search-results hidden"></div>
+      </div>
+    </div>
+
+    <div id="map"></div>
+    <canvas id="globe" class="hidden"></canvas>
+    <div id="globe-pins" class="hidden"></div>
+
+    <div id="tbar" class="tbar hidden">
+      <button id="t-now" class="btn btn-sm" title="Volver al instante del guardado">Guardado</button>
+      <button id="t-back" class="btn btn-sm" title="Más rápido hacia atrás (,)">&#9664;&#9664;</button>
+      <button id="t-play" class="btn btn-sm" title="Continuar (espacio)">&#9654;</button>
+      <button id="t-fwd" class="btn btn-sm" title="Más rápido hacia delante (.)">&#9654;&#9654;</button>
+      <span id="t-warp" class="t-warp">&#9654; &times;1</span>
+      <span id="t-fecha" class="t-fecha"></span>
+      <button id="t-follow" class="btn btn-sm hidden" title="La cámara sigue a la nave seleccionada (F)">Seguir</button>
+    </div>
+
+    <div id="banner" class="banner hidden">
+      <span><b>Sin imágenes del mapa.</b> Estás viendo la retícula de referencia. Suelta un PNG
+      equirectangular de Kerbin en «Datos del mapa» para verlo de verdad.</span>
+      <button id="banner-close" class="btn btn-sm btn-ghost">Ocultar</button>
+    </div>
+
+    <div id="hud" class="hud">
+      <div class="hud-row"><span>lat</span><b id="hud-lat">&mdash;</b></div>
+      <div class="hud-row"><span>lon</span><b id="hud-lon">&mdash;</b></div>
+      <div class="hud-row hidden" id="hud-alt-row"><span>alt</span><b id="hud-alt">&mdash;</b></div>
+      <div class="hud-row hidden" id="hud-biome-row"><span>bioma</span><b id="hud-biome">&mdash;</b></div>
+    </div>
+  </main>
+
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="js/config.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/layers.js"></script>
+<script src="js/globe.js"></script>
+<script src="js/probe.js"></script>
+<script src="js/orbit.js"></script>
+<script src="js/savefile.js"></script>
+<script src="js/markers.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

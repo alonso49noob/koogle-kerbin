@@ -1,0 +1,99 @@
+{
+  "_que_es_esto": [
+    "Catálogo de mapas predeterminados. Cada entrada dice qué fichero va en cada",
+    "ranura y con qué desfase de longitud. El marcado en 'predeterminado' se carga",
+    "solo la primera vez que abres el visor; los demás están en el desplegable",
+    "'Mapa predeterminado' del panel 'Datos del mapa', a un clic.",
+    "",
+    "lonOffset: grados que se suman a la longitud del mapa para dar con la columna",
+    "correcta de la imagen. No todos los mapas usan el meridiano de origen de KSP.",
+    "Pon el número si lo sabes, o \"auto\" para que el visor lo mida solo comparando",
+    "la silueta de los continentes contra el mapa de biomas."
+  ],
+  "_procedencia": [
+    "Ninguna de estas imágenes es del proyecto: todas derivan de las texturas del",
+    "juego, propiedad de Squad / Private Division. Están para usar el visor en tu",
+    "máquina, dando por hecho que tienes el juego. No las redistribuyas.",
+    "Si te sobran, borra los ficheros y este catálogo: el visor arranca igual con",
+    "la retícula de referencia."
+  ],
+  "predeterminado": "detallado",
+  "presets": [
+    {
+      "id": "detallado",
+      "nombre": "Color 4096 + biomas 1800",
+      "color": {
+        "file": "Kerbin_Color_HD.jpg",
+        "lonOffset": 0,
+        "nota": [
+          "Ya viene alineado con la convención de KSP: no hay que girarlo.",
+          "Medido, no supuesto: el barrido completo de longitudes da el máximo en 0°",
+          "con 95,9% de coincidencia contra el mapa de biomas, promedio 53,6%, y los",
+          "ángulos vecinos (−1° y +1°) bajan, o sea que el pico es limpio.",
+          "Los cinco sitios conocidos caen en tierra sin girar nada; girándolo 90°,",
+          "cuatro de los cinco acaban en el mar."
+        ]
+      },
+      "biome": {
+        "file": "Kerbin_Biome.png",
+        "lonOffset": 0
+      },
+      "fuente": "aportado por el usuario (D:/Descargas/GXLlgpl.jpg, 4096x2048). Origen original desconocido.",
+      "height": {
+        "file": "Kerbin_Height.png",
+        "lonOffset": 0,
+        "hMin": -1500,
+        "hMax": 6500,
+        "nota": [
+          "Export de SCANsat con TrueGreyScale, 2048x1024.",
+          "hMin y hMax NO son estimados: salen de GameData/SCANsat/Resources/SCANcolors.cfg,",
+          "entrada Kerbin -> minHeightRange = -1500, maxHeightRange = 6500, paletteDiscrete = False.",
+          "",
+          "Verificado: el KSC lee 45 m y su altitud real ronda los 70 m, con pixeles de 1,8 km.",
+          "Alineacion comprobada por correlacion contra el mapa de biomas: 0 grados, 96,6%.",
+          "El oceano lee entre -1090 y -935 m, o sea batimetria de verdad, no un plano.",
+          "",
+          "AVISO: el 14,7% de la imagen es gris 48, que con este rango es exactamente 0 m,",
+          "y el 98,4% de esos pixeles esta por encima de |lat| 60. Son zona sin escanear",
+          "rellenada a 0 m, no terreno. Por debajo de |lat| 60 el mapa esta practicamente",
+          "completo. Si quieres los polos de verdad, escanealos y reexporta."
+        ]
+      }
+    },
+    {
+      "id": "wiki",
+      "nombre": "Wiki de KSP — color 2048 + biomas 1800",
+      "color": {
+        "file": "Kerbin_Color.png",
+        "lonOffset": 90,
+        "nota": "Este SÍ necesita girarse 90°. Medido: 94,7% de coincidencia girando 90°, entre 44% y 58% con cualquier otro ángulo."
+      },
+      "biome": {
+        "file": "Kerbin_Biome.png",
+        "lonOffset": 0,
+        "nota": "Ya viene alineado. Verificado con los cinco sitios conocidos."
+      },
+      "fuente": "wiki.kerbalspaceprogram.com",
+      "height": {
+        "file": "Kerbin_Height.png",
+        "lonOffset": 0,
+        "hMin": -1500,
+        "hMax": 6500,
+        "nota": [
+          "Export de SCANsat con TrueGreyScale, 2048x1024.",
+          "hMin y hMax NO son estimados: salen de GameData/SCANsat/Resources/SCANcolors.cfg,",
+          "entrada Kerbin -> minHeightRange = -1500, maxHeightRange = 6500, paletteDiscrete = False.",
+          "",
+          "Verificado: el KSC lee 45 m y su altitud real ronda los 70 m, con pixeles de 1,8 km.",
+          "Alineacion comprobada por correlacion contra el mapa de biomas: 0 grados, 96,6%.",
+          "El oceano lee entre -1090 y -935 m, o sea batimetria de verdad, no un plano.",
+          "",
+          "AVISO: el 14,7% de la imagen es gris 48, que con este rango es exactamente 0 m,",
+          "y el 98,4% de esos pixeles esta por encima de |lat| 60. Son zona sin escanear",
+          "rellenada a 0 m, no terreno. Por debajo de |lat| 60 el mapa esta practicamente",
+          "completo. Si quieres los polos de verdad, escanealos y reexporta."
+        ]
+      }
+    }
+  ]
+}

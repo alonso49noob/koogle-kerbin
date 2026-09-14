@@ -1,0 +1,18 @@
+# Compilados de la app de escritorio (el instalador irá en las releases)
+desktop/bin/
+desktop/obj/
+desktop/dist/
+*.user
+.vs/
+
+# Node
+node_modules/
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Mapas descargados por el usuario: la carpeta se reparte vacía
+tiles/*
+!tiles/LEEME.txt

@@ -1,0 +1,21 @@
+Carpeta para teselas ya troceadas, si prefieres esa vía en lugar de cargar la
+imagen entera desde el panel "Datos del mapa".
+
+Estructura esperada:   tiles/{z}/{x}/{y}.png
+
+Esquema de coordenadas: geográfico (EPSG:4326 / plate carrée), el mismo que usa
+Leaflet con CRS.EPSG4326. En este esquema el zoom 0 son DOS teselas, no una:
+
+    z=0  ->  x = 0..1,  y = 0        (2 x 1 teselas, 512 x 256 px)
+    z=1  ->  x = 0..3,  y = 0..1
+    z=n  ->  x = 0..2^(n+1)-1,  y = 0..2^n - 1
+
+    lon de la tesela x  =  x / (2 * 2^z) * 360 - 180
+    lat de la tesela y  =  90 - y / 2^z * 180
+
+Si tus teselas siguen el esquema de Web Mercator (una sola tesela en z=0) NO
+encajarán: este visor es equirectangular porque las texturas de KSP lo son.
+
+Para usarlas, elige "Teselas locales ./tiles" en el selector de mapa base.
+Si las sirves desde otro sitio, usa la opción "Plantilla XYZ propia" y escribe
+la URL completa, por ejemplo:  http://localhost:8080/kerbin/{z}/{x}/{y}.png

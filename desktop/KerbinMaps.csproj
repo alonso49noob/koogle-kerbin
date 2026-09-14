@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>KerbinMaps</RootNamespace>
+    <AssemblyName>KoogleKerbin</AssemblyName>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+    <SatelliteResourceLanguages>es</SatelliteResourceLanguages>
+    <Product>Koogle Kerbin</Product>
+    <AssemblyTitle>Koogle Kerbin</AssemblyTitle>
+    <Description>Visor de superficie y órbitas de Kerbin (KSP stock)</Description>
+    <Version>1.0.0</Version>
+    <!-- WFO1000 es para el diseñador de formularios, que aquí no se usa: la interfaz se monta en código -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
+    <ApplicationIcon Condition="Exists('assets\app.ico')">assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- Los mapas y catálogos van en una carpeta data/ junto al .exe, igual que en la
+       versión web: se pueden cambiar sin recompilar. Las imágenes de prueba no. -->
+  <ItemGroup>
+    <None Include="..\data\**\*" Exclude="..\data\test-*;..\data\_tmp*" LinkBase="data"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\tiles\LEEME.txt" Link="tiles\LEEME.txt"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

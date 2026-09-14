@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bandas → heightmap</title>
+<style>
+  :root {
+    --bg:#0b1017; --bg2:#121a25; --bg3:#1a2432; --line:#263444;
+    --fg:#dbe6f2; --dim:#8a9bb0; --acc:#4ea3ff; --ok:#7ee787; --warn:#ffb454;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:28px; background:var(--bg); color:var(--fg);
+         font:14px/1.5 system-ui,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:980px; margin:0 auto; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h1 span { color:var(--acc); }
+  .sub { color:var(--dim); font-size:13px; margin:0 0 20px; }
+  .card { background:var(--bg2); border:1px solid var(--line); border-radius:8px;
+          padding:16px; margin-bottom:14px; }
+  .drop { border:2px dashed var(--line); border-radius:8px; padding:34px; text-align:center;
+          color:var(--dim); cursor:pointer; transition:.15s; }
+  .drop.over, .drop:hover { border-color:var(--acc); background:rgba(78,163,255,.07); color:var(--fg); }
+  label { display:block; font-size:12px; color:var(--dim); margin-bottom:4px; }
+  input, textarea, select { background:var(--bg); border:1px solid var(--line); color:var(--fg);
+          border-radius:6px; padding:7px 9px; font-size:13px; width:100%; font-family:inherit; }
+  textarea { font-family:var(--mono); font-size:11.5px; min-height:150px; white-space:pre; }
+  input:focus, textarea:focus { outline:none; border-color:var(--acc); }
+  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  button { background:var(--bg3); border:1px solid var(--line); color:var(--fg); border-radius:6px;
+           padding:9px 15px; font-size:13px; cursor:pointer; font-family:inherit; }
+  button:hover:not(:disabled) { border-color:var(--acc); color:#fff; }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#04121f; font-weight:600; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  .out { font-family:var(--mono); font-size:12px; white-space:pre-wrap; color:var(--dim);
+         background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:10px 12px; }
+  .out b { color:var(--fg); } .out .ok { color:var(--ok); } .out .warn { color:var(--warn); }
+  canvas { max-width:100%; border:1px solid var(--line); border-radius:6px; display:block;
+           image-rendering:pixelated; background:#000; }
+  .note { font-size:12px; color:var(--dim); line-height:1.6; }
+  .note b { color:var(--fg); }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Bandas &rarr; <span>heightmap</span></h1>
+<p class="sub">Convierte una figura de elevación coloreada por bandas en un PNG en escala de grises
+que el visor pueda sondear.</p>
+
+<div class="card note">
+  <p style="margin-top:0">
+    Sirve para figuras tipo «mapa de elevación» con leyenda: zonas de color plano, cada color
+    con una altitud asociada. Lo que sale es un heightmap <b>cuantizado</b>: tiene tantos
+    escalones como bandas tenga la figura, no una superficie continua. Para saber si un punto
+    está por encima de 500 m va sobrado; para la altitud exacta de una ladera, no.
+  </p>
+  <p style="margin-bottom:0">
+    La leyenda de abajo viene rellenada con la de la figura <code>Kerbin heightmap.jpg</code> de la
+    wiki de KSP. Si usas otra figura, cambia los valores y los colores.
+  </p>
+</div>
+
+<div class="card">
+  <div class="drop" id="drop">
+    <b>Arrastra aquí la figura</b><br><small>o haz clic para elegirla</small>
+    <input type="file" id="file" accept="image/*" hidden>
+  </div>
+  <div id="srcInfo" class="out hidden" style="margin-top:12px"></div>
+</div>
+
+<div class="card">
+  <label>Bandas: metros y color RGB, una por línea</label>
+  <textarea id="legend">-1000  0 3 106
+-500   1 1 185
+-1     46 111 241
+1      84 254 254
+100    7 168 126
+200    5 159 3
+500    2 108 10
+1000   170 169 0
+1500   128 90 41
+2000   198 148 75
+2500   200 195 163
+3000   231 151 220
+4000   255 0 128</textarea>
+
+  <div class="row" style="margin-top:12px">
+    <div><label>Ancho de salida (px)</label><input type="number" id="outW" value="1440" step="120"></div>
+    <div><label>Tolerancia de color</label><input type="number" id="tol" value="60" step="5"></div>
+    <div><label>Recorte del marco</label>
+      <select id="crop"><option value="auto">automático</option><option value="none">la imagen entera</option></select>
+    </div>
+  </div>
+
+  <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap">
+    <button id="go" class="primary" disabled>Convertir</button>
+    <button id="save" disabled>Descargar PNG</button>
+  </div>
+</div>
+
+<div class="card hidden" id="resCard">
+  <div id="res" class="out" style="margin-bottom:12px"></div>
+  <canvas id="prev"></canvas>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let srcBmp = null, outCanvas = null;
+
+/* ---------- carga ---------- */
+
+$('drop').addEventListener('click', () => $('file').click());
+['dragenter','dragover'].forEach(e => $('drop').addEventListener(e, ev => {
+  ev.preventDefault(); $('drop').classList.add('over');
+}));
+['dragleave','drop'].forEach(e => $('drop').addEventListener(e, ev => {
+  ev.preventDefault(); $('drop').classList.remove('over');
+}));
+$('drop').addEventListener('drop', ev => {
+  const f = [...ev.dataTransfer.files].find(f => f.type.startsWith('image/'));
+  if (f) load(f);
+});
+$('file').addEventListener('change', () => { if ($('file').files[0]) load($('file').files[0]); });
+
+async function load(file) {
+  srcBmp = await createImageBitmap(file);
+  $('srcInfo').classList.remove('hidden');
+  $('srcInfo').innerHTML = '<b>' + file.name + '</b>  ' + srcBmp.width + '×' + srcBmp.height;
+  $('go').disabled = false;
+}
+
+/* ---------- utilidades ---------- */
+
+function parseLegend() {
+  return $('legend').value.trim().split('\n').map(l => {
+    const n = l.trim().split(/[\s,]+/).map(Number);
+    if (n.length < 4 || n.some(isNaN)) return null;
+    return { m: n[0], c: [n[1], n[2], n[3]] };
+  }).filter(Boolean);
+}
+
+/* El contenido del mapa es color saturado; los márgenes de la figura son blancos
+   y los ejes, texto negro. Eso basta para aislar el marco. */
+function detectFrame(d, W, H) {
+  const sat = i => {
+    const r = d[i], g = d[i+1], b = d[i+2];
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    return (mx - mn) > 45 && mx > 70;
+  };
+  const col = [], row = [];
+  for (let x = 0; x < W; x++) { let n = 0; for (let y = 0; y < H; y += 3) if (sat((y*W+x)*4)) n++; col.push(n); }
+  for (let y = 0; y < H; y++) { let n = 0; for (let x = (W*0.2)|0; x < W; x += 3) if (sat((y*W+x)*4)) n++; row.push(n); }
+  const cM = Math.max(...col), rM = Math.max(...row);
+  const x0 = col.findIndex(v => v > cM*0.7);
+  const x1 = col.length - 1 - [...col].reverse().findIndex(v => v > cM*0.7);
+  const y0 = row.findIndex(v => v > rM*0.7);
+  const y1 = row.length - 1 - [...row].reverse().findIndex(v => v > rM*0.7);
+  return { x0, x1, y0, y1 };
+}
+
+/* ---------- conversión ---------- */
+
+$('go').addEventListener('click', () => {
+  const bands = parseLegend();
+  if (bands.length < 2) { alert('La leyenda necesita al menos dos bandas.'); return; }
+
+  const W = srcBmp.width, H = srcBmp.height;
+  const sc = document.createElement('canvas'); sc.width = W; sc.height = H;
+  const sg = sc.getContext('2d', { willReadFrequently: true });
+  sg.drawImage(srcBmp, 0, 0);
+  const d = sg.getImageData(0, 0, W, H).data;
+
+  let fr = { x0: 0, x1: W-1, y0: 0, y1: H-1 };
+  if ($('crop').value === 'auto') fr = detectFrame(d, W, H);
+  const CW = fr.x1 - fr.x0 + 1, CH = fr.y1 - fr.y0 + 1;
+  const ratio = CW / CH;
+
+  const outW = Math.max(64, parseInt($('outW').value, 10) || 1440);
+  const outH = Math.round(outW / 2);
+  const tol2 = Math.pow(parseFloat($('tol').value) || 60, 2);
+
+  /* Cada píxel de salida vota entre varias muestras del original. Así la rejilla
+     y los bordes con artefactos JPEG quedan en minoría y no contaminan. */
+  const idx = new Int16Array(outW * outH).fill(-1);
+  const votes = new Int32Array(bands.length);
+  let clean = 0, holes = 0;
+
+  for (let oy = 0; oy < outH; oy++) {
+    for (let ox = 0; ox < outW; ox++) {
+      votes.fill(0);
+      let any = 0;
+      for (let sy = 0; sy < 3; sy++) {
+        for (let sx = 0; sx < 3; sx++) {
+          const px = fr.x0 + Math.min(CW-1, Math.floor((ox + (sx+0.5)/3) / outW * CW));
+          const py = fr.y0 + Math.min(CH-1, Math.floor((oy + (sy+0.5)/3) / outH * CH));
+          const i = (py*W + px) * 4;
+          const r = d[i], g = d[i+1], b = d[i+2];
+          let bi = -1, bd = Infinity;
+          for (let k = 0; k < bands.length; k++) {
+            const c = bands[k].c;
+            const dd = (r-c[0])**2 + (g-c[1])**2 + (b-c[2])**2;
+            if (dd < bd) { bd = dd; bi = k; }
+          }
+          if (bd <= tol2) { votes[bi]++; any++; }
+        }
+      }
+      if (!any) { holes++; continue; }
+      let best = 0;
+      for (let k = 1; k < bands.length; k++) if (votes[k] > votes[best]) best = k;
+      idx[oy*outW + ox] = best;
+      clean++;
+    }
+  }
+
+  /* Los huecos que queden (una línea de rejilla que tape la celda entera) se
+     rellenan con la banda más común entre los vecinos ya resueltos. */
+  let pend = holes, pasadas = 0;
+  while (pend > 0 && pasadas < 12) {
+    const snapshot = Int16Array.from(idx);
+    let quedan = 0;
+    for (let y = 0; y < outH; y++) {
+      for (let x = 0; x < outW; x++) {
+        if (snapshot[y*outW + x] !== -1) continue;
+        votes.fill(0);
+        let any = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const ny = y + dy, nx = (x + dx + outW) % outW;   // envuelve en longitud
+            if (ny < 0 || ny >= outH) continue;
+            const v = snapshot[ny*outW + nx];
+            if (v !== -1) { votes[v]++; any++; }
+          }
+        }
+        if (!any) { quedan++; continue; }
+        let best = 0;
+        for (let k = 1; k < bands.length; k++) if (votes[k] > votes[best]) best = k;
+        idx[y*outW + x] = best;
+      }
+    }
+    pend = quedan; pasadas++;
+  }
+
+  /* Gris lineal en metros, para que el visor lo lea con su rango sin más cuentas. */
+  const minM = Math.min(...bands.map(b => b.m));
+  const maxM = Math.max(...bands.map(b => b.m));
+  outCanvas = document.createElement('canvas');
+  outCanvas.width = outW; outCanvas.height = outH;
+  const og = outCanvas.getContext('2d');
+  const img = og.createImageData(outW, outH);
+  const usados = new Set();
+  for (let i = 0; i < outW*outH; i++) {
+    const k = idx[i] === -1 ? 0 : idx[i];
+    const v = Math.round((bands[k].m - minM) / (maxM - minM) * 255);
+    usados.add(v);
+    img.data[i*4] = img.data[i*4+1] = img.data[i*4+2] = v;
+    img.data[i*4+3] = 255;
+  }
+  og.putImageData(img, 0, 0);
+
+  const prev = $('prev');
+  prev.width = outW; prev.height = outH;
+  prev.getContext('2d').drawImage(outCanvas, 0, 0);
+
+  const pct = (clean / (outW*outH) * 100);
+  $('resCard').classList.remove('hidden');
+  $('res').innerHTML =
+    'Marco detectado  <b>' + CW + '×' + CH + '</b>  (proporción ' + ratio.toFixed(3) +
+      (Math.abs(ratio - 2) < 0.05 ? ' <span class="ok">— 2:1, correcto</span>'
+                                  : ' <span class="warn">— debería ser 2:1; revisa el recorte</span>') + ')\n' +
+    'Salida           <b>' + outW + '×' + outH + '</b>, ' + usados.size + ' niveles de gris\n' +
+    'Clasificado      <b>' + pct.toFixed(1) + '%</b> directo, el resto rellenado por vecinos' +
+      (pend ? ' <span class="warn">(' + pend + ' celdas sin resolver)</span>' : '') + '\n' +
+    '\nEn el visor, panel <b>Altura</b>:  gris 0 = <b>' + minM + '</b> m,  gris 255 = <b>' + maxM + '</b> m';
+
+  $('save').disabled = false;
+});
+
+$('save').addEventListener('click', () => {
+  outCanvas.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = 'Kerbin_Height.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  }, 'image/png');
+});
+</script>
+</div>
+</body>
+</html>
