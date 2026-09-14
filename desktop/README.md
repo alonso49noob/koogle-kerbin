@@ -11,9 +11,32 @@ dibujados a mano para copiar el tema oscuro de la web, y el mapa, el globo y el
 cielo se pintan con **OpenGL 3.3** llamado directamente. No usa ningún paquete
 externo: compila sin conexión.
 
+## Instalarla
+
+Descarga `KoogleKerbin-Setup-<versión>.exe` de las *releases* del repositorio y
+ábrelo. El asistente:
+
+1. comprueba que el equipo tiene Windows de 64 bits y el **runtime de escritorio de
+   .NET 10**; si falta, abre la página de descarga de Microsoft y detecta solo cuando
+   lo has instalado;
+2. instala para tu usuario, sin pedir administrador, en
+   `%LOCALAPPDATA%\Programs\Koogle Kerbin` (o donde elijas), con accesos directos en
+   el escritorio y el menú Inicio;
+3. añade Koogle Kerbin a *Configuración › Aplicaciones* para desinstalarlo. Al
+   desinstalar se borra solo lo que se instaló; tus ajustes y la partida guardada se
+   conservan salvo que marques borrarlos.
+
+Si ya estaba instalado, el asistente actualiza en la misma carpeta. Como el
+instalador no está firmado, Windows SmartScreen puede avisar la primera vez: «Más
+información › Ejecutar de todas formas».
+
+Opciones para instalar sin ventanas: `/silent`, `/dir=<carpeta>`, `/noshortcuts`,
+`/noregistry`; y `desinstalar.exe /uninstall /silent` para quitarlo.
+
 ## Usarla
 
-Abre `dist\KoogleKerbin\KoogleKerbin.exe`. Junto al `.exe` va la carpeta `data\`
+Abre Koogle Kerbin desde su acceso directo, o `dist\KoogleKerbin\KoogleKerbin.exe` si
+lo has compilado tú. Junto al `.exe` va la carpeta `data\`
 con los mapas y catálogos, los mismos ficheros que usa la web: puedes cambiarlos
 sin recompilar.
 
@@ -156,7 +179,17 @@ Con el SDK de .NET 10:
 powershell -ExecutionPolicy Bypass -File publicar.ps1
 ```
 
-Deja el resultado en `dist\KoogleKerbin`. Para depurar basta con
+Deja el resultado en `dist\KoogleKerbin`. El instalador se construye encima:
+
+```bash
+powershell -ExecutionPolicy Bypass -File installer\construir.ps1
+```
+
+Publica, mete `dist\KoogleKerbin` en un zip dentro del instalador y lo compila
+(`installer\Instalador.cs`) contra .NET Framework 4.8 con el compilador de C# del SDK,
+sin descargar nada: queda en `dist\KoogleKerbin-Setup-<versión>.exe`. Va sobre .NET
+Framework, que ya trae Windows, para poder arrancar en un equipo sin .NET 10 y
+avisar de que falta. Para depurar basta con
 `dotnet build` y ejecutar lo que queda en `bin\Debug\net10.0-windows`; mientras
 se desarrolla, la app encuentra `data\` subiendo carpetas hasta la raíz del
 proyecto.

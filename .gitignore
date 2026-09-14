@@ -2,6 +2,7 @@
 desktop/bin/
 desktop/obj/
 desktop/dist/
+desktop/installer/obj/
 *.user
 .vs/
 
