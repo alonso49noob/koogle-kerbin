@@ -128,7 +128,14 @@ namespace KerbinMaps.UI
             surface.MouseUp += SurfaceMouseUp;
             surface.MouseDoubleClick += SurfaceDoubleClick;
             surface.MouseWheel += SurfaceWheel;
-            surface.MouseLeave += (s, e) => { if (!mouseDown) { map.Hover = null; UpdateHud(null); RequestRender(); } };
+            surface.MouseLeave += (s, e) =>
+            {
+                if (mouseDown) return;
+                map.Hover = null;
+                // en el cielo el HUD es el del cielo, no el de la posición bajo el cursor
+                if (isSky) RefreshSkyHud(); else UpdateHud(null);
+                RequestRender();
+            };
             surface.Resize += (s, e) => RequestRender();
             surface.DragEnter += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
             surface.DragDrop += (s, e) => { if (e.Data.GetData(DataFormats.FileDrop) is string[] f) _ = OpenFiles(f); };

@@ -22,6 +22,8 @@ namespace KerbinMaps.Gfx
         public const uint BLEND = 0x0BE2, DEPTH_TEST = 0x0B71, CULL_FACE = 0x0B44, SCISSOR_TEST = 0x0C11,
                           MULTISAMPLE = 0x809D, PROGRAM_POINT_SIZE = 0x8642;
         public const uint ZERO = 0, ONE = 1, SRC_ALPHA = 0x0302, ONE_MINUS_SRC_ALPHA = 0x0303;
+        // segunda salida del fragment shader como factor de mezcla (GL 3.3): luz añadida y transmitancia a la vez
+        public const uint SRC1_COLOR = 0x88F9;
         public const uint FRONT = 0x0404, BACK = 0x0405;
         public const uint TEXTURE_2D = 0x0DE1, TEXTURE0 = 0x84C0;
         public const uint RGBA = 0x1908, RGBA8 = 0x8058, UNSIGNED_BYTE = 0x1401, UNSIGNED_INT = 0x1405, FLOAT = 0x1406;

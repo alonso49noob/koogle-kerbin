@@ -303,6 +303,7 @@ namespace KerbinMaps.UI
                 DibujarTodas();
                 RenderReloj();
                 RenderOrbitInfo();
+                RefreshSkyHud();
             }
             sim.Dirty = false;
         }

@@ -151,8 +151,21 @@ namespace KerbinMaps.UI
 
         static string Signed(double v) => (v >= 0 ? "+" : "−") + Geo.F(Math.Abs(v), 1) + "°";
 
+        double skyHudAz = double.NaN, skyHudEl;
+
+        /* Las filas del Sol cambian con el tiempo aunque no se mueva el ratón (y la partida
+           se carga después de abrir la vista): se repinta con la última dirección mirada. */
+        void RefreshSkyHud()
+        {
+            if (!isSky) return;
+            if (double.IsNaN(skyHudAz)) UpdateSkyHud(globe.SkyAz, globe.SkyEl);
+            else UpdateSkyHud(skyHudAz, skyHudEl);
+        }
+
         void UpdateSkyHud(double az, double el)
         {
+            skyHudAz = az;
+            skyHudEl = el;
             var (sAz, sEl) = globe.SunAltAz();
             hud.SetRows(("acimut", Geo.F(az, 1) + "° " + RumbosHud[(int)Math.Round(az / 45) % 8]),
                         ("altura", Signed(el)),

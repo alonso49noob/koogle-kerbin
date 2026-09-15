@@ -88,6 +88,29 @@ las posiciones de las naves. Sin partida cargada se toma el comienzo del juego
 «Forzar la noche» lo deja de noche para seguir mejor las naves. Las estrellas son
 decorativas, pero giran con Kerbin como lo harían las de verdad.
 
+## Atmósfera y superficie
+
+El globo y la vista del cielo usan el mismo modelo de luz, con base física:
+
+- **Dispersión atmosférica** de Rayleigh (el azul del cielo y el rojo de los
+  atardeceres) y de Mie (la bruma y el halo del Sol), integrada a lo largo de cada
+  rayo sobre los 70 km de atmósfera de Kerbin. Desde órbita se ve el borde azul del
+  planeta y la bruma que come contraste hacia el limbo; desde el suelo, el cielo
+  degradado, el horizonte encendido al ponerse el Sol y el paso a espacio al subir.
+- **La luz del Sol llega filtrada** por el aire que atraviesa: la profundidad óptica
+  sale de la aproximación de Schüler a la función de Chapman, que da también la
+  sombra del planeta con su penumbra.
+- **Relieve por píxel** a partir del mapa de alturas: las laderas se sombrean con
+  más detalle que la malla, aunque el relieve exagerado esté a cero.
+- **Agua** reconocida por el color del mapa (o por la cota cero si no hay mapa de
+  color), lisa, con Fresnel y el brillo del Sol reflejado.
+- **Estrellas** de fondo también en el globo; un cielo luminoso las tapa.
+- La luz se calcula en lineal y se lleva a pantalla con un tonemapping filmic
+  (ACES), así que ni el cielo ni el reflejo del mar se queman.
+
+Con «Día y noche» apagado se vuelve a la vista plana de siempre, y con «Atmósfera»
+apagada se quita el aire (sin bruma ni cielo sobre el globo).
+
 ## Las naves con sus piezas
 
 Al seguir una nave en el globo, si te acercas lo suficiente se ve la nave de

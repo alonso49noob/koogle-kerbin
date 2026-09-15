@@ -30,4 +30,10 @@
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- El instalador es otro programa (installer/construir.ps1), no parte de la app. -->
+  <ItemGroup>
+    <Compile Remove="installer\**" />
+    <None Remove="installer\**" />
+  </ItemGroup>
+
 </Project>

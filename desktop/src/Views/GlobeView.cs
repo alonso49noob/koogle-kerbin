@@ -109,6 +109,7 @@ uniform float uRelief, uHeightOff, uHMin, uHMax, uRadius, uScale;
 out vec2 vUv;
 out vec3 vNormal;
 out vec3 vDir;
+out vec3 vWorld;
 const float PI = 3.14159265;
 
 vec3 dirOf(vec2 uv) {
@@ -141,17 +142,20 @@ void main() {
   } else {
     vNormal = aPos;
   }
-  gl_Position = uProj * uView * vec4(aPos * r, 1.0);
+  vWorld = aPos * r;
+  gl_Position = uProj * uView * vec4(vWorld, 1.0);
 }";
 
-        const string FS = @"#version 330 core
+        const string FS = Header + AtmosphereGlsl + @"
 in vec2 vUv;
 in vec3 vNormal;
 in vec3 vDir;
-uniform sampler2D uColor, uBiome;
-uniform float uColorOff, uBiomeOff, uBiomeAmt;
-uniform int uHasColor, uHasBiome, uLit;
-uniform vec3 uLightDir;
+in vec3 vWorld;
+uniform sampler2D uColor, uBiome, uHeight;
+uniform float uColorOff, uBiomeOff, uBiomeAmt, uHeightOff, uHMin, uHMax, uRadius, uBump;
+uniform vec2 uHeightSize;
+uniform int uHasColor, uHasBiome, uHasHeight, uLit;
+uniform vec3 uLightDir, uCamPos;
 out vec4 frag;
 
 /* Con fract() la u se envuelve, pero eso dispara las derivadas en la costura y el
@@ -160,45 +164,89 @@ vec3 shifted(sampler2D t, float off) {
   return textureGrad(t, vec2(fract(vUv.x + off), vUv.y), dFdx(vUv), dFdy(vUv)).rgb;
 }
 
+// altitud en metros según la calibración del mapa de alturas
+float heightAt(vec2 uv) {
+  float lum = dot(textureGrad(uHeight, uv, dFdx(vUv), dFdy(vUv)).rgb, vec3(0.2126, 0.7152, 0.0722));
+  return uHMin + lum * (uHMax - uHMin);
+}
+
 void main() {
   vec3 base = vec3(0.10, 0.13, 0.18);
   if (uHasColor != 0) base = shifted(uColor, uColorOff);
+  vec3 ground = base;
   if (uHasBiome != 0 && uBiomeAmt > 0.0) base = mix(base, shifted(uBiome, uBiomeOff), uBiomeAmt);
   if (uLit == 0) { frag = vec4(base, 1.0); return; }
-  /* Día y noche. El terminador se decide con la esfera (vDir) y no con la normal del
-     relieve, que haría de noche las laderas en sombra en pleno día. Cerca del terminador
-     el Sol entra rasante y rojizo; en la cara de noche queda un poco de luz fría para
-     adivinar el terreno. */
-  float mu = dot(normalize(vDir), uLightDir);
-  float day = smoothstep(-0.09, 0.07, mu);
-  float direct = max(dot(normalize(vNormal), uLightDir), 0.0) * smoothstep(-0.03, 0.05, mu);
-  vec3 sunCol = mix(vec3(1.0, 0.58, 0.34), vec3(1.0), smoothstep(0.02, 0.32, mu));
-  vec3 dayLight = sunCol * (0.12 + 0.92 * direct);
-  vec3 nightLight = vec3(0.060, 0.075, 0.115);
-  frag = vec4(base * mix(nightLight, dayLight, day), 1.0);
+
+  vec3 up = normalize(vDir);
+  vec3 n = up;
+  float water = 0.0;
+  // el mar por el color (azul que domina sobre rojo y verde), que tiene más resolución que las alturas
+  if (uHasColor != 0) water = smoothstep(0.03, 0.08, ground.b - max(ground.r, ground.g));
+  if (uHasHeight != 0) {
+    /* Relieve por píxel: la pendiente del mapa de alturas inclina la normal, con más
+       detalle que la malla. Se mide a texel y medio porque un mapa de 8 bits escalona
+       las pendientes de un texel. En el agua la superficie queda lisa. */
+    vec2 uvh = vec2(fract(vUv.x + uHeightOff), vUv.y);
+    vec2 e = 1.5 / uHeightSize;
+    if (uHasColor == 0) water = 1.0 - smoothstep(-20.0, 20.0, heightAt(uvh));
+    float hE = heightAt(uvh + vec2(e.x, 0.0)), hW = heightAt(uvh - vec2(e.x, 0.0));
+    float hN = heightAt(uvh - vec2(0.0, e.y)), hS = heightAt(uvh + vec2(0.0, e.y));
+    float cosLat = max(sqrt(1.0 - up.y * up.y), 0.05);
+    float sx = (hE - hW) / (uRadius * cosLat * 4.0 * PI * e.x);
+    float sy = (hN - hS) / (uRadius * 2.0 * PI * e.y);
+    vec3 east = normalize(vec3(up.z, 0.0, -up.x) + vec3(1e-6, 0.0, 0.0));
+    vec3 north = cross(up, east);
+    n = normalize(up - uBump * (sx * east + sy * north) * (1.0 - water));
+  }
+
+  vec3 albedo = pow(base, vec3(2.2));
+  vec3 v = normalize(uCamPos - vWorld);
+  vec3 L = shadeGround(vWorld, n, v, uLightDir, albedo, water);
+  if (uAtmos != 0) {
+    // perspectiva aérea: el aire entre la cámara y el suelo añade bruma y se come contraste
+    vec3 d = -v;
+    vec2 ta = raySphere(uCamPos, d, ATM_TOP);
+    float t0 = max(ta.x, 0.0), t1 = min(length(uCamPos - vWorld), ta.y);
+    if (t1 > t0) {
+      vec3 tr;
+      vec3 ins = inscatter(uCamPos, d, t0, t1, uLightDir, ign(gl_FragCoord.xy), tr);
+      L = L * tr + ins;
+    }
+  }
+  frag = vec4(toneMap(L), 1.0);
 }";
 
-        const string AtmFS = @"#version 330 core
+        /* La capa de aire sobre el espacio: solo los rayos que no tocan el planeta (los que
+           lo tocan ya llevan su bruma en el shader del suelo). Dos salidas: la luz que se
+           suma y la transmitancia que multiplica lo que hay detrás, para que un cielo
+           luminoso tape las estrellas. */
+        const string AtmFS = Header + AtmosphereGlsl + @"
 in vec3 vNormal;
 in vec2 vUv;
 uniform vec3 uCamPos, uLightDir;
 uniform float uAtmScale;
 uniform int uLit;
-out vec4 frag;
+layout(location = 0, index = 0) out vec4 frag;
+layout(location = 0, index = 1) out vec4 fragTrans;
 void main() {
   vec3 n = normalize(vNormal);
-  vec3 viewDir = normalize(uCamPos - n * uAtmScale);
-  float f = pow(1.0 - abs(dot(n, viewDir)), 3.0);   // el aire se ve de refilón
-  vec3 col = vec3(0.36, 0.60, 1.0);
-  if (uLit != 0) {
-    /* El aire iluminado llega algo más allá del terminador (el Sol aún le da desde
-       arriba) y allí se ve anaranjado; en la cara de noche apenas queda un rastro. */
-    float mu = dot(n, uLightDir);
-    float lit = smoothstep(-0.28, 0.12, mu);
-    col = mix(vec3(1.0, 0.46, 0.20), col, smoothstep(-0.06, 0.30, mu));
-    f *= mix(0.05, 1.0, lit);
+  if (uLit == 0) {
+    // sin día y noche: un halo que se ve de refilón
+    vec3 viewDir = normalize(uCamPos - n * uAtmScale);
+    float f = pow(1.0 - abs(dot(n, viewDir)), 3.0);
+    frag = vec4(vec3(0.36, 0.60, 1.0) * f * 0.9, 1.0);
+    fragTrans = vec4(1.0);
+    return;
   }
-  frag = vec4(col * f, f * 0.9);
+  vec3 d = normalize(n * uAtmScale - uCamPos);
+  if (raySphere(uCamPos, d, 1.0).x > 0.0) discard;
+  vec2 ta = raySphere(uCamPos, d, ATM_TOP);
+  float t0 = max(ta.x, 0.0), t1 = ta.y;
+  if (t1 <= t0) discard;
+  vec3 tr;
+  vec3 col = toneMap(inscatter(uCamPos, d, t0, t1, uLightDir, ign(gl_FragCoord.xy), tr));
+  frag = vec4(col, 1.0);
+  fragTrans = vec4(tr * clamp(1.0 - 1.6 * dot(col, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0), 1.0);
 }";
 
         /* Dirección unitaria + radio por separado: el shader puede levantar la línea
@@ -756,7 +804,7 @@ void main() {
             }
 
             GL.Viewport(0, 0, W, H);
-            GL.ClearColor(0.027f, 0.043f, 0.067f, 1);
+            GL.ClearColor(0.004f, 0.006f, 0.010f, 1);
             GL.Clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
             /* Planos de recorte según la distancia: con el cercano fijo y la cámara a
@@ -768,6 +816,7 @@ void main() {
             double far = Len(cam.Eye) + SceneR + 1;
             SetupCamera(cam, near, far);
             var eye = cam.Eye;
+            DrawStars();
 
             var lightDir = SunDir;
             GL.Enable(GL.DEPTH_TEST);
@@ -794,6 +843,11 @@ void main() {
             prog.Int("uHasBiome", BiomeTex != null ? 1 : 0);
             prog.Vec3("uLightDir", lightDir[0], lightDir[1], lightDir[2]);
             prog.Int("uLit", Light ? 1 : 0);
+            prog.Int("uHasHeight", HeightTex != null ? 1 : 0);
+            // el relieve por píxel se exagera como la malla, con un mínimo para que se note sin ella
+            prog.Float("uBump", Math.Max(Relief, 4));
+            prog.Vec3("uCamPos", eye[0], eye[1], eye[2]);
+            AtmosUniforms(prog, 16);
             BindTex(0, ColorTex); prog.Int("uColor", 0);
             BindTex(1, BiomeTex); prog.Int("uBiome", 1);
             BindTex(2, HeightTex); prog.Int("uHeight", 2);
@@ -814,9 +868,10 @@ void main() {
                 atmProg.Vec3("uCamPos", eye[0], eye[1], eye[2]);
                 atmProg.Vec3("uLightDir", lightDir[0], lightDir[1], lightDir[2]);
                 atmProg.Int("uLit", Light ? 1 : 0);
+                AtmosUniforms(atmProg, 16);
                 GL.BindVertexArray(vao);
                 GL.Enable(GL.BLEND);
-                GL.BlendFunc(GL.SRC_ALPHA, GL.ONE);      // aditivo: es luz dispersa
+                GL.BlendFunc(GL.ONE, GL.SRC1_COLOR);     // luz dispersa sumada, fondo atenuado
                 GL.CullFace(Len(eye) > scale ? GL.FRONT : GL.BACK);  // dentro de la atmósfera, la cara que se ve es la interior
                 GL.DepthMask(false);
                 GL.DrawElements(GL.TRIANGLES, count, GL.UNSIGNED_INT, 0);
