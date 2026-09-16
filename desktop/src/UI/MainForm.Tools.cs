@@ -405,17 +405,17 @@ namespace KerbinMaps.UI
             double vEsc = Math.Sqrt(2 * Body.Mu / Body.Radius);
             double vLow = Math.Sqrt(Body.Mu / (Body.Radius + 75000));
             bodyInfo.SetText(string.Join("\n",
-                "Radio            <b>" + Geo.F(Body.Radius / 1000, 0) + " km</b>",
-                "Circunf. ecuador <b>" + Geo.F(circ / 1000, 1) + " km</b>",
-                "g en superficie  <b>" + Geo.F(g0, 3) + " m/s²</b>",
-                "Día sidéreo      <b>" + Geo.FmtTime(Body.SiderealDay) + "</b>",
-                "Día solar        <b>6 h exactas</b>",
-                "v de rotación    <b>" + Geo.F(vRot, 1) + " m/s</b> en el ecuador",
-                "Atmósfera hasta  <b>" + Geo.F(Body.Atmosphere / 1000, 0) + " km</b>",
-                "Órbita síncrona  <b>" + Geo.F(Body.SynchronousAlt / 1000, 0) + " km</b> de altitud",
-                "v órbita 75 km   <b>" + Geo.F(vLow, 0) + " m/s</b>",
-                "v de escape      <b>" + Geo.F(vEsc, 0) + " m/s</b>",
-                "SOI              <b>" + Geo.F(Body.Soi / 1000, 0) + " km</b>"));
+                Lang.F("Radio            <b>{0} km</b>", Geo.F(Body.Radius / 1000, 0)),
+                Lang.F("Circunf. ecuador <b>{0} km</b>", Geo.F(circ / 1000, 1)),
+                Lang.F("g en superficie  <b>{0} m/s²</b>", Geo.F(g0, 3)),
+                Lang.F("Día sidéreo      <b>{0}</b>", Geo.FmtTime(Body.SiderealDay)),
+                Lang.T("Día solar        <b>6 h exactas</b>"),
+                Lang.F("v de rotación    <b>{0} m/s</b> en el ecuador", Geo.F(vRot, 1)),
+                Lang.F("Atmósfera hasta  <b>{0} km</b>", Geo.F(Body.Atmosphere / 1000, 0)),
+                Lang.F("Órbita síncrona  <b>{0} km</b> de altitud", Geo.F(Body.SynchronousAlt / 1000, 0)),
+                Lang.F("v órbita 75 km   <b>{0} m/s</b>", Geo.F(vLow, 0)),
+                Lang.F("v de escape      <b>{0} m/s</b>", Geo.F(vEsc, 0)),
+                Lang.F("SOI              <b>{0} km</b>", Geo.F(Body.Soi / 1000, 0))));
         }
     }
 }

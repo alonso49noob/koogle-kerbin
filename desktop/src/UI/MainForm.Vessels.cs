@@ -241,9 +241,9 @@ namespace KerbinMaps.UI
         void RenderReloj()
         {
             tPlay.Text = sim.Running ? "❚❚" : "▶";
-            tWarp.Text = (sim.Warp < 0 ? "◀ ×" : "▶ ×") + Geo.FmtIntEs((long)Math.Abs(sim.Warp)) + (sim.Running ? "" : " · pausa");
+            tWarp.Text = (sim.Warp < 0 ? "◀ ×" : "▶ ×") + Geo.FmtIntEs((long)Math.Abs(sim.Warp)) + (sim.Running ? "" : Lang.T(" · pausa"));
             double dt = sim.T - sv.Ut;
-            tFecha.Text = Geo.FechaKerbal(sim.T) + "  (" + (dt < 0 ? "−" : "+") + Geo.FmtTime(Math.Abs(dt)) + " desde el guardado)";
+            tFecha.Text = Lang.F("{0}  ({1}{2} desde el guardado)", Geo.FechaKerbal(sim.T), dt < 0 ? "−" : "+", Geo.FmtTime(Math.Abs(dt)));
             if (Vis.Shown(tFollow) != (sv.Sel != null)) Vis.Set(tFollow, sv.Sel != null);
             tFollow.Active = sim.Follow;
             if (Vis.Shown(tOrb) != (sv.Sel != null)) Vis.Set(tOrb, sv.Sel != null);
@@ -397,7 +397,7 @@ namespace KerbinMaps.UI
             }
 
             svRot.SetNumber(0);
-            RenderSaveInfo(restoring ? Path.GetFileName(state.SavePath ?? path) + " · copia guardada" : Path.GetFileName(path), d.Vessels.Count, otras);
+            RenderSaveInfo(restoring ? Lang.F("{0} · copia guardada", Path.GetFileName(state.SavePath ?? path)) : Path.GetFileName(path), d.Vessels.Count, otras);
             svTipos.SetItems(sv.Tipos.Keys);
             RenderNaves();
             Vis.Set(tbar, true);
@@ -413,20 +413,22 @@ namespace KerbinMaps.UI
             var lineas = new List<string>
             {
                 nombre,
-                "UT " + Geo.F(sv.Ut, 0) + " s  (día " + Geo.FmtIntEs((long)Math.Floor(dias)) + ")",
-                total + " naves en la partida · " + sv.Naves.Count + " orbitando " + Body.Name + (otras > 0 ? " · " + otras + " en otros cuerpos" : "")
+                Lang.F("UT {0} s  (día {1})", Geo.F(sv.Ut, 0), Geo.FmtIntEs((long)Math.Floor(dias))),
+                Lang.F("{0} naves en la partida · {1} orbitando {2}", total, sv.Naves.Count, Body.Name) +
+                    (otras > 0 ? Lang.F(" · {0} en otros cuerpos", otras) : "")
             };
             if (c != null && c.N >= 3)
             {
                 /* Dispersión mediana y no desviación típica: la típica se infla con la
                    única nave rara que se cuele y da una idea falsa de la fiabilidad. */
-                lineas.Add("Rotación medida con " + c.N + " naves: " + Geo.F(c.Rot, 2) + "°  (dispersión mediana " + Geo.F(c.Mad, 2) + "°" +
-                           (c.Descartadas > 0 ? ", " + c.Descartadas + " descartada" + (c.Descartadas > 1 ? "s" : "") + " por incoherente" + (c.Descartadas > 1 ? "s" : "") : "") + ")");
+                lineas.Add(Lang.F("Rotación medida con {0} naves: {1}°  (dispersión mediana {2}°{3})",
+                    c.N, Geo.F(c.Rot, 2), Geo.F(c.Mad, 2),
+                    c.Descartadas > 0 ? Lang.F(", {0} descartadas por incoherentes", c.Descartadas) : ""));
             }
             else if (c != null && c.N > 0)
-                lineas.Add("Rotación medida con solo " + c.N + " nave(s): poco fiable, ajústala a mano si las trazas no cuadran.");
+                lineas.Add(Lang.F("Rotación medida con solo {0} nave(s): poco fiable, ajústala a mano si las trazas no cuadran.", c.N));
             else
-                lineas.Add("Ninguna nave con posición y época sincronizadas: no se pudo medir la rotación. Las longitudes serán arbitrarias hasta que la ajustes.");
+                lineas.Add(Lang.T("Ninguna nave con posición y época sincronizadas: no se pudo medir la rotación. Las longitudes serán arbitrarias hasta que la ajustes."));
             svInfo.SetText(RichLabel.Esc(string.Join("\n", lineas)));
         }
 

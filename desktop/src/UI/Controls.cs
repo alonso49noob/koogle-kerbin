@@ -49,11 +49,11 @@ namespace KerbinMaps.UI
         public bool Small { get => small; set { small = value; Height = PreferredHeight; Invalidate(); } }
         public bool Active { get => active; set { if (active != value) { active = value; Invalidate(); } } }
         public Font IconFont;
-        public string Tip { set => new ToolTip { InitialDelay = 500 }.SetToolTip(this, value); }
+        public string Tip { set => new ToolTip { InitialDelay = 500 }.SetToolTip(this, Core.Lang.T(value)); }
 
         public DarkButton(string text, ButtonVariant v = ButtonVariant.Normal, bool small = false)
         {
-            Text = text; variant = v; this.small = small;
+            Text = Core.Lang.T(text); variant = v; this.small = small;
             Cursor = Cursors.Hand;
             Height = PreferredHeight;
         }
@@ -117,7 +117,7 @@ namespace KerbinMaps.UI
 
         public DarkCheck(string text, bool check = false)
         {
-            Text = text; isChecked = check;
+            Text = Core.Lang.T(text); isChecked = check;
             Cursor = Cursors.Hand;
             Height = Theme.S(22);
         }
@@ -291,7 +291,7 @@ namespace KerbinMaps.UI
             set { Inner.Text = value ?? ""; committed = Inner.Text; }
         }
 
-        public string Placeholder { set => Inner.PlaceholderText = value; }
+        public string Placeholder { set => Inner.PlaceholderText = Core.Lang.T(value); }
         public HorizontalAlignment TextAlign { set => Inner.TextAlign = value; }
 
         public double NumberOr(double fallback)
@@ -367,7 +367,7 @@ namespace KerbinMaps.UI
         public void SetItems(IEnumerable<(string id, string label)> list)
         {
             items.Clear();
-            items.AddRange(list);
+            foreach (var (id, label) in list) items.Add((id, Core.Lang.T(label)));
             if (index >= items.Count) index = items.Count - 1;
             Invalidate();
         }
@@ -425,7 +425,7 @@ namespace KerbinMaps.UI
 
         public FieldHeader(string text, string value = "")
         {
-            Text = text; this.value = value;
+            Text = Core.Lang.T(text); this.value = value;
             Height = Theme.S(18);
         }
 

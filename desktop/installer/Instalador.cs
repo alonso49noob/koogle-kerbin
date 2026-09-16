@@ -24,6 +24,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -62,7 +63,7 @@ namespace KoogleKerbinSetup
     sealed class Options
     {
         public bool Uninstall, Silent, NoShortcuts, NoRegistry, NoLaunch, FromTemp;
-        public string Dir;
+        public string Dir, Lang;
 
         public static Options Parse(string[] args)
         {
@@ -77,9 +78,121 @@ namespace KoogleKerbinSetup
                 else if (l == "/nolaunch") o.NoLaunch = true;
                 else if (l == "/fromtemp") o.FromTemp = true;
                 else if (l.StartsWith("/dir=")) o.Dir = a.Substring(5).Trim('"');
+                else if (l.StartsWith("/lang=")) o.Lang = l.Substring(6).Trim('"');
             }
             return o;
         }
+    }
+
+    /* Idioma del asistente. Va dentro del ejecutable porque el instalador no tiene todavía
+       carpeta de datos: la clave es el texto en español y lo que falte se queda en español.
+       Al empezar se toma el idioma de Windows, y el asistente deja cambiarlo. */
+    static class L
+    {
+        public static string Code = "es";
+
+        public static void Use(string code) { Code = code == "en" || code == "es" ? code : "es"; }
+
+        public static void Detect(string forced)
+        {
+            if (!string.IsNullOrEmpty(forced)) { Use(forced); return; }
+            Use(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "es" ? "es" : "en");
+        }
+
+        public static string T(string es)
+        {
+            if (Code == "es" || string.IsNullOrEmpty(es)) return es;
+            string t;
+            return En.TryGetValue(es, out t) ? t : es;
+        }
+
+        public static string F(string es, params object[] args)
+        {
+            try { return string.Format(T(es), args); }
+            catch (FormatException) { return T(es); }
+        }
+
+        static readonly Dictionary<string, string> En = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            { "Instalar {0}", "Install {0}" },
+            { "Bienvenida", "Welcome" },
+            { "Requisitos", "Requirements" },
+            { "Opciones", "Options" },
+            { "Instalación", "Installation" },
+            { "Listo", "Done" },
+            { "Te damos la bienvenida", "Welcome" },
+            { "Requisitos del equipo", "System requirements" },
+            { "Dónde instalarlo", "Where to install it" },
+            { "Instalando…", "Installing…" },
+            { "Instalación completada", "Installation complete" },
+            { "No se pudo instalar", "Installation failed" },
+            { "Versión {0}", "Version {0}" },
+
+            { "Este asistente instala {0} {1}, un visor de Kerbin para Kerbal Space Program: mapa plano, globo 3D, vista del cielo con día y noche, y las naves de tu partida con sus órbitas y sus modelos.",
+              "This wizard installs {0} {1}, a Kerbin viewer for Kerbal Space Program: flat map, 3D globe, sky view with day and night, and the vessels from your save with their orbits and their models." },
+            { "Ya tienes instalada la versión {0}. Se actualizará en la misma carpeta; tus ajustes, marcadores y la partida guardada se conservan.",
+              "You already have version {0} installed. It will be updated in the same folder; your settings, markers and saved game are kept." },
+            { "Se instala solo para tu usuario y no pide permisos de administrador. Necesita Windows de 64 bits y el runtime de escritorio de .NET 10, que se comprueba en el paso siguiente.",
+              "It installs for your user only and does not ask for administrator rights. It needs 64-bit Windows and the .NET 10 desktop runtime, which is checked on the next step." },
+            { "{0} es un proyecto de aficionados, sin relación con Squad ni con Take-Two.",
+              "{0} is a fan project, with no connection to Squad or Take-Two." },
+
+            { "Windows de 64 bits", "64-bit Windows" },
+            { "✔  .NET 10 Desktop Runtime {0}", "✔  .NET 10 Desktop Runtime {0}" },
+            { "✘  Falta .NET 10 Desktop Runtime", "✘  .NET 10 Desktop Runtime is missing" },
+            { "{0} necesita el runtime de escritorio de .NET 10, de Microsoft y gratuito. En la página de descarga elige «.NET Desktop Runtime 10» para Windows x64, instálalo y vuelve aquí: este paso lo detecta solo.",
+              "{0} needs Microsoft's .NET 10 desktop runtime, which is free. On the download page pick «.NET Desktop Runtime 10» for Windows x64, install it and come back here: this step detects it on its own." },
+            { "{0} solo funciona en Windows de 64 bits.", "{0} only runs on 64-bit Windows." },
+            { "Descargar .NET 10", "Download .NET 10" },
+            { "Comprobar de nuevo", "Check again" },
+
+            { "Carpeta de instalación", "Installation folder" },
+            { "Examinar…", "Browse…" },
+            { "Espacio necesario: {0}", "Space needed: {0}" },
+            { "     ·     libre en {0}: {1}", "     ·     free on {0}: {1}" },
+            { "Crear un acceso directo en el escritorio", "Create a desktop shortcut" },
+            { "Crear un acceso directo en el menú Inicio", "Create a Start menu shortcut" },
+            { "Tus ajustes, marcadores y la partida guardada van aparte, en %APPDATA% y %LOCALAPPDATA%\\KoogleKerbin, y no dependen de esta carpeta.",
+              "Your settings, markers and saved game live apart, in %APPDATA% and %LOCALAPPDATA%\\KoogleKerbin, and do not depend on this folder." },
+            { "Elige dónde instalar {0}", "Choose where to install {0}" },
+
+            { "Copiando los ficheros de {0}…", "Copying {0}'s files…" },
+            { "{0} {1} está instalado en:\n{2}", "{0} {1} is installed in:\n{2}" },
+            { "Abrir {0} ahora", "Open {0} now" },
+            { "Para desinstalarlo: Configuración › Aplicaciones › Aplicaciones instaladas › {0}.",
+              "To uninstall it: Settings › Apps › Installed apps › {0}." },
+            { "No se pudo completar la instalación:\n\n{0}\n\nLos detalles quedan en {1}.",
+              "The installation could not be completed:\n\n{0}\n\nThe details are in {1}." },
+
+            { "Siguiente  ›", "Next  ›" },
+            { "‹  Atrás", "‹  Back" },
+            { "Cancelar", "Cancel" },
+            { "Instalar", "Install" },
+            { "Finalizar", "Finish" },
+
+            { "¿Salir del instalador? {0} no se instalará.", "Leave the installer? {0} will not be installed." },
+            { "Escribe una ruta completa, por ejemplo {0}.", "Type a full path, for example {0}." },
+            { "Elige una carpeta, no la raíz de una unidad.", "Pick a folder, not the root of a drive." },
+            { "La carpeta «{0}» ya tiene otros ficheros.\n\n{1} se instalará junto a ellos y, al desinstalar, solo se borrará lo que haya instalado. ¿Continuar?",
+              "The folder «{0}» already has other files.\n\n{1} will be installed alongside them and, when uninstalling, only what it installed will be deleted. Continue?" },
+            { "No se puede escribir en esa carpeta ({0}).\n\nElige una de tu usuario, como la que viene propuesta.",
+              "That folder cannot be written to ({0}).\n\nPick one of your own, such as the one suggested." },
+            { "{0} está abierto desde esa carpeta. Ciérralo y pulsa «Reintentar».", "{0} is open from that folder. Close it and press «Retry»." },
+            { "{0} está abierto. Ciérralo y pulsa «Reintentar».", "{0} is open. Close it and press «Retry»." },
+            { "No se puede reemplazar {0}. ¿Está abierta la aplicación?", "{0} cannot be replaced. Is the application open?" },
+            { "Este ejecutable no lleva dentro los ficheros de la aplicación.", "This executable does not carry the application's files inside." },
+
+            { "Desinstalar {0}", "Uninstall {0}" },
+            { "Se quitará {0} de:", "{0} will be removed from:" },
+            { "Tus ajustes, marcadores, mapas cargados y la copia de la partida se guardan aparte y se conservan, salvo que marques la casilla.",
+              "Your settings, markers, loaded maps and the copy of your save are kept apart and stay, unless you tick the box." },
+            { "Borrar también mis ajustes y datos de {0}", "Also delete my {0} settings and data" },
+            { "No encuentro una instalación de {0} en:\n{1}", "I cannot find a {0} installation in:\n{1}" },
+            { "{0} se ha desinstalado.", "{0} has been uninstalled." },
+            { "{0} se ha desinstalado. La carpeta\n{1}\nse queda porque contiene otros ficheros.",
+              "{0} has been uninstalled. The folder\n{1}\nis left because it contains other files." },
+            { "Visor de Kerbin para Kerbal Space Program", "Kerbin viewer for Kerbal Space Program" }
+        };
     }
 
     static class Program
@@ -88,6 +201,7 @@ namespace KoogleKerbinSetup
         static int Main(string[] args)
         {
             var o = Options.Parse(args);
+            L.Detect(o.Lang);
             // desinstalar.exe es este mismo ejecutable: abierto con doble clic, desinstala
             string self = Path.GetFileName(Assembly.GetExecutingAssembly().Location);
             if (string.Equals(self, App.Uninstaller, StringComparison.OrdinalIgnoreCase)) o.Uninstall = true;
@@ -99,11 +213,18 @@ namespace KoogleKerbinSetup
                 if (o.Uninstall) return Uninstaller.Run(o);
                 if (!Payload.Present)
                 {
-                    if (!o.Silent) MessageBox.Show("Este ejecutable no lleva dentro los ficheros de la aplicación.", App.Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    if (!o.Silent) MessageBox.Show(L.T("Este ejecutable no lleva dentro los ficheros de la aplicación."), App.Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 2;
                 }
                 if (o.Silent) return SilentInstall(o);
-                Application.Run(new Wizard(o));
+                // cambiar de idioma rehace el asistente: los textos se traducen al crear los controles
+                while (true)
+                {
+                    var w = new Wizard(o);
+                    Application.Run(w);
+                    if (string.IsNullOrEmpty(w.NuevoIdioma)) break;
+                    L.Use(w.NuevoIdioma);
+                }
                 return 0;
             }
             catch (Exception ex)
@@ -291,6 +412,18 @@ namespace KoogleKerbinSetup
             if (StartMenu) shortcuts.Add(Shortcut.Create(Environment.GetFolderPath(Environment.SpecialFolder.Programs), exe));
             InstallManifest.Write(dir, files, shortcuts);
 
+            // la primera vez, el visor arranca en el idioma que se eligió aquí
+            try
+            {
+                string cfg = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KoogleKerbin", "settings.json");
+                if (!File.Exists(cfg))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(cfg));
+                    File.WriteAllText(cfg, "{\r\n  \"Lang\": \"" + L.Code + "\"\r\n}\r\n");
+                }
+            }
+            catch (Exception ex) { Util.Log(ex); }
+
             if (Register)
             {
                 long bytes = files.Select(f => Path.Combine(dir, f)).Where(File.Exists).Sum(f => new FileInfo(f).Length);
@@ -311,7 +444,7 @@ namespace KoogleKerbinSetup
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
                     Util.TryDelete(tmp);
-                    throw new IOException("No se puede reemplazar " + Path.GetFileName(dest) + ". ¿Está abierta la aplicación?", ex);
+                    throw new IOException(L.F("No se puede reemplazar {0}. ¿Está abierta la aplicación?", Path.GetFileName(dest)), ex);
                 }
             }
             File.Move(tmp, dest);
@@ -506,11 +639,11 @@ namespace KoogleKerbinSetup
 
         static int Remove(Options o, string dir, List<string> pending)
         {
-            string caption = "Desinstalar " + App.Name;
+            string caption = L.F("Desinstalar {0}", App.Name);
             var man = InstallManifest.Read(dir);
             if (man.Files.Count == 0)
             {
-                if (!o.Silent) MessageBox.Show("No encuentro una instalación de " + App.Name + " en:\n" + dir, caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (!o.Silent) MessageBox.Show(L.F("No encuentro una instalación de {0} en:\n{1}", App.Name, dir), caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return 2;
             }
 
@@ -526,7 +659,7 @@ namespace KoogleKerbinSetup
             while (Util.RunningIn(dir).Count > 0)
             {
                 if (o.Silent) return 4;
-                if (MessageBox.Show(App.Name + " está abierto. Ciérralo y pulsa «Reintentar».", caption, MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning) != DialogResult.Retry) return 3;
+                if (MessageBox.Show(L.F("{0} está abierto. Ciérralo y pulsa «Reintentar».", App.Name), caption, MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning) != DialogResult.Retry) return 3;
             }
 
             foreach (var rel in man.Files)
@@ -553,8 +686,8 @@ namespace KoogleKerbinSetup
                 bool others = Directory.Exists(dir) && Directory.EnumerateFileSystemEntries(dir, "*", SearchOption.AllDirectories)
                     .Any(f => !pending.Contains(f, StringComparer.OrdinalIgnoreCase) && File.Exists(f));
                 MessageBox.Show(others
-                        ? App.Name + " se ha desinstalado. La carpeta\n" + dir + "\nse queda porque contiene otros ficheros."
-                        : App.Name + " se ha desinstalado.",
+                        ? L.F("{0} se ha desinstalado. La carpeta\n{1}\nse queda porque contiene otros ficheros.", App.Name, dir)
+                        : L.F("{0} se ha desinstalado.", App.Name),
                     caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             return 0;
@@ -595,7 +728,7 @@ namespace KoogleKerbinSetup
         {
             var b = new Button
             {
-                Text = text,
+                Text = L.T(text),
                 FlatStyle = FlatStyle.Flat,
                 UseVisualStyleBackColor = false,
                 BackColor = primary ? Accent : Bg2,
@@ -613,7 +746,7 @@ namespace KoogleKerbinSetup
         {
             var l = new Label
             {
-                Text = text,
+                Text = L.T(text),
                 AutoSize = true,
                 MaximumSize = new Size(width, 0),
                 Location = new Point(x, y),
@@ -630,7 +763,7 @@ namespace KoogleKerbinSetup
         {
             var c = new CheckBox
             {
-                Text = text, Checked = on, AutoSize = true, Location = new Point(x, y),
+                Text = L.T(text), Checked = on, AutoSize = true, Location = new Point(x, y),
                 ForeColor = Fg, BackColor = Color.Transparent, Font = new Font("Segoe UI", 9.5f), UseMnemonic = false
             };
             parent.Controls.Add(c);
@@ -663,6 +796,7 @@ namespace KoogleKerbinSetup
         int page;
         bool reqOk, installing, finished, failed;
         string installedDir;
+        public string NuevoIdioma;               // el asistente se rehace en ese idioma
 
         int S(double v) { return (int)Math.Round(v * k); }
 
@@ -675,7 +809,7 @@ namespace KoogleKerbinSetup
         {
             opts = o;
             k = Ui.DpiScale(this);
-            Text = "Instalar " + App.Name;
+            Text = L.F("Instalar {0}", App.Name);
             AutoScaleMode = AutoScaleMode.None;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -698,6 +832,17 @@ namespace KoogleKerbinSetup
             side.Paint += PaintSide;
             Controls.Add(side);
 
+            // idioma: al cambiarlo se rehace el asistente, porque los textos se traducen al crear los controles
+            var bEs = Ui.Btn("Español", L.Code == "es", k);
+            var bEn = Ui.Btn("English", L.Code == "en", k);
+            bEs.Size = bEn.Size = new Size(S(76), S(26));
+            bEs.Location = new Point(S(24), side.Height - S(52));
+            bEn.Location = new Point(bEs.Right + S(8), bEs.Top);
+            bEs.Click += (s, e) => PedirIdioma("es");
+            bEn.Click += (s, e) => PedirIdioma("en");
+            side.Controls.Add(bEs);
+            side.Controls.Add(bEn);
+
             title = new Label { AutoSize = true, Location = new Point(S(224), S(26)), Font = new Font("Segoe UI Semibold", 15f), ForeColor = Ui.Fg };
             Controls.Add(title);
 
@@ -716,23 +861,23 @@ namespace KoogleKerbinSetup
 
             /* Bienvenida */
             pWelcome = NewPage();
-            int y = Para(pWelcome, "Este asistente instala " + App.Name + " " + Build.Version + ", un visor de Kerbin para Kerbal Space " +
-                                   "Program: mapa plano, globo 3D, vista del cielo con día y noche, y las naves de tu partida con sus " +
-                                   "órbitas y sus modelos.", 0).Bottom + S(14);
+            int y = Para(pWelcome, L.F("Este asistente instala {0} {1}, un visor de Kerbin para Kerbal Space Program: mapa plano, " +
+                                       "globo 3D, vista del cielo con día y noche, y las naves de tu partida con sus órbitas y sus modelos.",
+                                       App.Name, Build.Version), 0).Bottom + S(14);
             if (existingVersion != null)
-                y = Para(pWelcome, "Ya tienes instalada la versión " + existingVersion + ". Se actualizará en la misma carpeta; tus " +
-                                   "ajustes, marcadores y la partida guardada se conservan.", y, Ui.Accent).Bottom + S(14);
+                y = Para(pWelcome, L.F("Ya tienes instalada la versión {0}. Se actualizará en la misma carpeta; tus ajustes, marcadores " +
+                                       "y la partida guardada se conservan.", existingVersion), y, Ui.Accent).Bottom + S(14);
             y = Para(pWelcome, "Se instala solo para tu usuario y no pide permisos de administrador. Necesita Windows de 64 bits y " +
                                "el runtime de escritorio de .NET 10, que se comprueba en el paso siguiente.", y, Ui.Dim).Bottom + S(14);
-            Para(pWelcome, App.Name + " es un proyecto de aficionados, sin relación con Squad ni con Take-Two.", y, Ui.Dim);
+            Para(pWelcome, L.F("{0} es un proyecto de aficionados, sin relación con Squad ni con Take-Two.", App.Name), y, Ui.Dim);
 
             /* Requisitos */
             pReq = NewPage();
             reqOs = Para(pReq, " ", 0, null, 10.5f);
             reqNet = Para(pReq, " ", S(32), null, 10.5f);
-            reqHelp = Para(pReq, App.Name + " necesita el runtime de escritorio de .NET 10, de Microsoft y gratuito. En la página de " +
-                                 "descarga elige «.NET Desktop Runtime 10» para Windows x64, instálalo y vuelve aquí: este paso lo " +
-                                 "detecta solo.", S(78), Ui.Dim);
+            reqHelp = Para(pReq, L.F("{0} necesita el runtime de escritorio de .NET 10, de Microsoft y gratuito. En la página de descarga " +
+                                     "elige «.NET Desktop Runtime 10» para Windows x64, instálalo y vuelve aquí: este paso lo detecta solo.",
+                                     App.Name), S(78), Ui.Dim);
             reqDownload = Ui.Btn("Descargar .NET 10", true, k);
             reqRetry = Ui.Btn("Comprobar de nuevo", false, k);
             reqDownload.Width = reqRetry.Width = S(160);
@@ -769,7 +914,7 @@ namespace KoogleKerbinSetup
 
             /* Progreso */
             pProgress = NewPage();
-            var pl = Para(pProgress, "Copiando los ficheros de " + App.Name + "…", 0);
+            var pl = Para(pProgress, L.F("Copiando los ficheros de {0}…", App.Name), 0);
             bar = new ProgressBar
             {
                 Location = new Point(0, pl.Bottom + S(16)), Size = new Size(pProgress.Width, S(16)),
@@ -781,8 +926,8 @@ namespace KoogleKerbinSetup
             /* Final */
             pDone = NewPage();
             doneText = Para(pDone, " ", 0, null, 10f);
-            chkLaunch = Ui.Check(pDone, "Abrir " + App.Name + " ahora", 0, S(80), !o.NoLaunch);
-            doneHint = Para(pDone, "Para desinstalarlo: Configuración › Aplicaciones › Aplicaciones instaladas › " + App.Name + ".", S(120), Ui.Dim, 9f);
+            chkLaunch = Ui.Check(pDone, L.F("Abrir {0} ahora", App.Name), 0, S(80), !o.NoLaunch);
+            doneHint = Para(pDone, L.F("Para desinstalarlo: Configuración › Aplicaciones › Aplicaciones instaladas › {0}.", App.Name), S(120), Ui.Dim, 9f);
 
             ShowPage(0);
         }
@@ -805,11 +950,11 @@ namespace KoogleKerbinSetup
             page = i;
             var pages = new[] { pWelcome, pReq, pOptions, pProgress, pDone };
             for (int j = 0; j < pages.Length; j++) pages[j].Visible = j == i;
-            title.Text = Titles[i];
+            title.Text = L.T(Titles[i]);
             back.Visible = i < 3;
             back.Enabled = i == 1 || i == 2;
             cancel.Visible = i < 3;
-            next.Text = i == 2 ? "Instalar" : i == 4 ? "Finalizar" : "Siguiente  ›";
+            next.Text = L.T(i == 2 ? "Instalar" : i == 4 ? "Finalizar" : "Siguiente  ›");
             next.Enabled = i != 3;
             reqTimer.Enabled = i == 1;
             if (i == 1) CheckRequirements();
@@ -832,7 +977,7 @@ namespace KoogleKerbinSetup
                 TextRenderer.DrawText(g, "Koogle", f, new Point(S(24), S(90)), Ui.Fg, flags);
                 TextRenderer.DrawText(g, "Kerbin", f, new Point(S(24) + w, S(90)), Ui.Accent, flags);
             }
-            TextRenderer.DrawText(g, "Versión " + Build.Version, Font, new Point(S(24), S(124)), Ui.Dim, flags);
+            TextRenderer.DrawText(g, L.F("Versión {0}", Build.Version), Font, new Point(S(24), S(124)), Ui.Dim, flags);
             int sy = S(176);
             for (int i = 0; i < Steps.Length; i++)
             {
@@ -840,7 +985,7 @@ namespace KoogleKerbinSetup
                 using (var f = new Font("Segoe UI", 9.5f, i == page ? FontStyle.Bold : FontStyle.Regular))
                 {
                     TextRenderer.DrawText(g, i < page ? "✓" : i == page ? "›" : "•", f, new Point(S(24), sy), c, flags);
-                    TextRenderer.DrawText(g, Steps[i], f, new Point(S(44), sy), c, flags);
+                    TextRenderer.DrawText(g, L.T(Steps[i]), f, new Point(S(44), sy), c, flags);
                 }
                 sy += S(30);
             }
@@ -858,15 +1003,15 @@ namespace KoogleKerbinSetup
         {
             bool os = Requirements.Os64;
             var rt = Requirements.DesktopRuntime();
-            reqOs.Text = (os ? "✔  " : "✘  ") + "Windows de 64 bits";
+            reqOs.Text = (os ? "✔  " : "✘  ") + L.T("Windows de 64 bits");
             reqOs.ForeColor = os ? Ui.Ok : Ui.Bad;
-            reqNet.Text = rt != null ? "✔  .NET 10 Desktop Runtime " + rt : "✘  Falta .NET 10 Desktop Runtime";
+            reqNet.Text = rt != null ? L.F("✔  .NET 10 Desktop Runtime {0}", rt) : L.T("✘  Falta .NET 10 Desktop Runtime");
             reqNet.ForeColor = rt != null ? Ui.Ok : Ui.Bad;
             reqOk = os && rt != null;
             reqHelp.Visible = reqDownload.Visible = reqRetry.Visible = rt == null && os;
             if (!os)
             {
-                reqHelp.Text = App.Name + " solo funciona en Windows de 64 bits.";
+                reqHelp.Text = L.F("{0} solo funciona en Windows de 64 bits.", App.Name);
                 reqHelp.Visible = true;
             }
             if (page == 1) next.Enabled = reqOk;
@@ -874,11 +1019,11 @@ namespace KoogleKerbinSetup
 
         void UpdateSpace()
         {
-            string text = "Espacio necesario: " + Util.Size(needBytes);
+            string text = L.F("Espacio necesario: {0}", Util.Size(needBytes));
             try
             {
                 string root = Path.GetPathRoot(Path.GetFullPath(dirBox.Text.Trim()));
-                text += "     ·     libre en " + root.TrimEnd('\\') + ": " + Util.Size(new DriveInfo(root).AvailableFreeSpace);
+                text += L.F("     ·     libre en {0}: {1}", root.TrimEnd('\\'), Util.Size(new DriveInfo(root).AvailableFreeSpace));
             }
             catch { }
             spaceLabel.Text = text;
@@ -886,7 +1031,7 @@ namespace KoogleKerbinSetup
 
         void Browse()
         {
-            using (var d = new FolderBrowserDialog { Description = "Elige dónde instalar " + App.Name, ShowNewFolderButton = true })
+            using (var d = new FolderBrowserDialog { Description = L.F("Elige dónde instalar {0}", App.Name), ShowNewFolderButton = true })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 string chosen = d.SelectedPath;
@@ -895,6 +1040,14 @@ namespace KoogleKerbinSetup
                 if (!ours && Directory.Exists(chosen) && Directory.EnumerateFileSystemEntries(chosen).Any()) chosen = Path.Combine(chosen, App.Name);
                 dirBox.Text = chosen;
             }
+        }
+
+        void PedirIdioma(string code)
+        {
+            if (installing || code == L.Code) return;
+            NuevoIdioma = code;
+            finished = true;                      // no preguntar si se sale
+            Close();
         }
 
         void Warn(string msg)
@@ -912,18 +1065,18 @@ namespace KoogleKerbinSetup
             }
             catch
             {
-                Warn("Escribe una ruta completa, por ejemplo " + App.DefaultDir + ".");
+                Warn(L.F("Escribe una ruta completa, por ejemplo {0}.", App.DefaultDir));
                 return false;
             }
             if (string.Equals(Path.GetPathRoot(dir).TrimEnd('\\'), dir, StringComparison.OrdinalIgnoreCase))
             {
-                Warn("Elige una carpeta, no la raíz de una unidad.");
+                Warn(L.T("Elige una carpeta, no la raíz de una unidad."));
                 return false;
             }
             bool existed = Directory.Exists(dir);
             if (existed && Directory.EnumerateFileSystemEntries(dir).Any() && !File.Exists(Path.Combine(dir, App.Manifest)) &&
-                MessageBox.Show(this, "La carpeta «" + dir + "» ya tiene otros ficheros.\n\n" + App.Name + " se instalará junto a ellos y, al " +
-                                      "desinstalar, solo se borrará lo que haya instalado. ¿Continuar?",
+                MessageBox.Show(this, L.F("La carpeta «{0}» ya tiene otros ficheros.\n\n{1} se instalará junto a ellos y, al desinstalar, " +
+                                          "solo se borrará lo que haya instalado. ¿Continuar?", dir, App.Name),
                     Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return false;
 
@@ -938,11 +1091,11 @@ namespace KoogleKerbinSetup
             }
             catch (Exception ex)
             {
-                Warn("No se puede escribir en esa carpeta (" + ex.Message + ").\n\nElige una de tu usuario, como la que viene propuesta.");
+                Warn(L.F("No se puede escribir en esa carpeta ({0}).\n\nElige una de tu usuario, como la que viene propuesta.", ex.Message));
                 return false;
             }
             while (Util.RunningIn(dir).Count > 0)
-                if (MessageBox.Show(this, App.Name + " está abierto desde esa carpeta. Ciérralo y pulsa «Reintentar».", Text,
+                if (MessageBox.Show(this, L.F("{0} está abierto desde esa carpeta. Ciérralo y pulsa «Reintentar».", App.Name), Text,
                         MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning) != DialogResult.Retry)
                     return false;
             dirBox.Text = dir;
@@ -995,13 +1148,13 @@ namespace KoogleKerbinSetup
             failed = error != null;
             if (failed)
             {
-                doneText.Text = "No se pudo completar la instalación:\n\n" + error.Message + "\n\nLos detalles quedan en " + Util.LogPath + ".";
+                doneText.Text = L.F("No se pudo completar la instalación:\n\n{0}\n\nLos detalles quedan en {1}.", error.Message, Util.LogPath);
                 doneText.ForeColor = Ui.Bad;
                 chkLaunch.Visible = false;
             }
-            else doneText.Text = App.Name + " " + Build.Version + " está instalado en:\n" + dir;
+            else doneText.Text = L.F("{0} {1} está instalado en:\n{2}", App.Name, Build.Version, dir);
             ShowPage(4);
-            if (failed) title.Text = "No se pudo instalar";
+            if (failed) title.Text = L.T("No se pudo instalar");
             // la etiqueta solo se mide bien con la página ya visible; y otra vez cuando termina de ajustarse
             pDone.PerformLayout();
             LayoutDone();
@@ -1018,7 +1171,7 @@ namespace KoogleKerbinSetup
         {
             if (installing) { e.Cancel = true; return; }
             if (!finished && page < 4 && e.CloseReason == CloseReason.UserClosing &&
-                MessageBox.Show(this, "¿Salir del instalador? " + App.Name + " no se instalará.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                MessageBox.Show(this, L.F("¿Salir del instalador? {0} no se instalará.", App.Name), Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 e.Cancel = true;
             base.OnFormClosing(e);
         }
@@ -1033,7 +1186,7 @@ namespace KoogleKerbinSetup
         {
             float k = Ui.DpiScale(this);
             Func<double, int> S = v => (int)Math.Round(v * k);
-            Text = "Desinstalar " + App.Name;
+            Text = L.F("Desinstalar {0}", App.Name);
             AutoScaleMode = AutoScaleMode.None;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
@@ -1045,11 +1198,11 @@ namespace KoogleKerbinSetup
             Icon = Util.AppIcon(0);
 
             int w = ClientSize.Width - S(48);
-            var t = Ui.Para(this, "Se quitará " + App.Name + " de:", S(24), S(22), w, null, 11f, FontStyle.Bold);
+            var t = Ui.Para(this, L.F("Se quitará {0} de:", App.Name), S(24), S(22), w, null, 11f, FontStyle.Bold);
             var d = Ui.Para(this, dir, S(24), t.Bottom + S(6), w, Ui.Accent);
             var info = Ui.Para(this, "Tus ajustes, marcadores, mapas cargados y la copia de la partida se guardan aparte y se conservan, " +
                                      "salvo que marques la casilla.", S(24), d.Bottom + S(14), w, Ui.Dim, 9f);
-            chk = Ui.Check(this, "Borrar también mis ajustes y datos de " + App.Name, S(24), info.Bottom + S(14), false);
+            chk = Ui.Check(this, L.F("Borrar también mis ajustes y datos de {0}", App.Name), S(24), info.Bottom + S(14), false);
 
             var cancel = Ui.Btn("Cancelar", false, k);
             var ok = Ui.Btn("Desinstalar", true, k);

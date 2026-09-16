@@ -69,6 +69,8 @@ namespace KerbinMaps.UI
             startArgs = args ?? Array.Empty<string>();
             state = Store.Load("settings.json", new AppState());
             state.LonOffset ??= new LonOffsets();
+            // el idioma se resuelve antes de montar la interfaz: los textos se traducen al crearse
+            Lang.Use(Lang.Detect(state.Lang), Store.DataDir);
 
             Theme.Init(DeviceDpi);
             AutoScaleMode = AutoScaleMode.None;
@@ -304,6 +306,20 @@ namespace KerbinMaps.UI
         }
 
         void SaveSettings() => Store.Save("settings.json", state);
+
+        /* El idioma se aplica al montar la interfaz, así que cambiarlo reinicia el visor. */
+        void CambiarIdioma(string code)
+        {
+            if (string.IsNullOrEmpty(code) || code == Lang.Code) return;
+            state.Lang = code;
+            SaveSettings();
+            if (MessageBox.Show(this, Lang.T("El idioma se aplica al reiniciar el visor. ¿Reiniciar ahora?"),
+                    "Koogle Kerbin", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            state.SimT = HasVessels ? sim.T : null;
+            SaveView();
+            Application.Restart();
+            Close();
+        }
 
         protected override void OnResizeEnd(EventArgs e)
         {
@@ -564,7 +580,7 @@ namespace KerbinMaps.UI
 
         public void Flash(string msg)
         {
-            bannerText.SetText(RichLabel.Esc(msg));
+            bannerText.SetText(RichLabel.Esc(Lang.T(msg)));
             Vis.Set(banner, true);
             LayoutOverlays();
             banner.BringToFront();

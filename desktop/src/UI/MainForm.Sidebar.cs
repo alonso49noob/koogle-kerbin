@@ -301,6 +301,18 @@ namespace KerbinMaps.UI
             bodyInfo = cuerpo.Add(Readout());
             RenderBodyInfo();
 
+            /* ------------------------------------------------------------- Idioma */
+            var idioma = AddSection("Idioma · Language", false);
+            var comboIdioma = new DarkCombo();
+            var idiomas = new List<(string, string)>();
+            foreach (var (code, name) in Core.Lang.Available) idiomas.Add((code, name));
+            comboIdioma.SetItems(idiomas);
+            comboIdioma.SelectedId = Core.Lang.Code;
+            comboIdioma.SelectedChanged += (s, e) => CambiarIdioma(comboIdioma.SelectedId);
+            idioma.Add(Field("Idioma de la interfaz", comboIdioma));
+            idioma.Add(Hint("Se aplica al reiniciar el visor. Lo que no esté traducido se queda en español; " +
+                            "las traducciones están en <code>data/i18n/</code> y puedes corregirlas."));
+
             searchList.DrawItem = DrawSearchRow;
             searchList.ItemClick = (item, pt, r) => SearchRowClick(item);
 

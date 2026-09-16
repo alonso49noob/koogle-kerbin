@@ -45,7 +45,7 @@ namespace KerbinMaps.UI
             int wk = TextRenderer.MeasureText("Koogle", Theme.Title, Size.Empty, flags).Width;
             TextRenderer.DrawText(g, "Koogle", Theme.Title, new Point(x, y), Theme.Fg, flags);
             TextRenderer.DrawText(g, "Kerbin", Theme.Title, new Point(x + wk, y), Theme.Accent, flags);
-            TextRenderer.DrawText(g, "Visor de superficie · KSP stock", Theme.Small, new Point(x, y + Theme.Title.Height + Theme.S(3)), Theme.FgDim, flags);
+            TextRenderer.DrawText(g, Core.Lang.T("Visor de superficie · KSP stock"), Theme.Small, new Point(x, y + Theme.Title.Height + Theme.S(3)), Theme.FgDim, flags);
             using var pen = new Pen(Theme.Line);
             g.DrawLine(pen, 0, Height - 1, Width, Height - 1);
         }
@@ -79,6 +79,7 @@ namespace KerbinMaps.UI
 
         public void SetRows(params (string, string)[] rows)
         {
+            for (int i = 0; i < rows.Length; i++) rows[i] = (Core.Lang.T(rows[i].Item1), rows[i].Item2);
             bool same = rows.Length == Rows.Count;
             for (int i = 0; same && i < rows.Length; i++) same = rows[i] == Rows[i];
             if (same) return;

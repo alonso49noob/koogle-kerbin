@@ -161,9 +161,9 @@ namespace KerbinMaps.Core
            toLocaleString('es'), no agrupa por debajo de 10 000. */
         public static string FmtIntEs(long n)
         {
-            string s = Math.Abs(n).ToString(Inv);
+            string s = Math.Abs(n).ToString(Inv), sep = Lang.Code == "es" ? "." : ",";
             if (s.Length > 4)
-                for (int i = s.Length - 3; i > 0; i -= 3) s = s.Insert(i, ".");
+                for (int i = s.Length - 3; i > 0; i -= 3) s = s.Insert(i, sep);
             return (n < 0 ? "-" : "") + s;
         }
 
@@ -174,8 +174,8 @@ namespace KerbinMaps.Core
             double y = Math.Floor(t / ANIO), d = Math.Floor((t - y * ANIO) / DIA);
             double sg = t - y * ANIO - d * DIA;
             string P(double n) => ((long)Math.Floor(n)).ToString("00", Inv);
-            return "Año " + ((long)y + 1) + " · día " + ((long)d + 1) + " · " +
-                   P(sg / 3600) + ":" + P((sg % 3600) / 60) + ":" + P(sg % 60);
+            return Lang.F("Año {0} · día {1} · {2}", (long)y + 1, (long)d + 1,
+                P(sg / 3600) + ":" + P((sg % 3600) / 60) + ":" + P(sg % 60));
         }
 
         /* Acepta «-0.0972, -74.5577», «-0.0972 -74.5577» y «0.09 S 74.55 W». */

@@ -169,7 +169,7 @@ namespace KerbinMaps.UI
         public Section(string title, bool open)
         {
             BackColor = Theme.Bg2;
-            header = new SectionHeader(this) { Text = title.ToUpperInvariant() };
+            header = new SectionHeader(this) { Text = Core.Lang.T(title).ToUpperInvariant() };
             Body = new StackPanel(10) { Padding = new Padding(Theme.S(16), Theme.S(4), Theme.S(16), Theme.S(16)), BackColor = Theme.Bg2 };
             Controls.Add(header);
             Controls.Add(Body);
@@ -247,7 +247,8 @@ namespace KerbinMaps.UI
 
         public void SetText(string text)
         {
-            markup = text ?? "";
+            // las ayudas son texto fijo y se traducen; los datos que se arman al vuelo, no
+            markup = Core.Lang.T(text) ?? "";
             runs = Parse(markup);
             if (HideWhenEmpty && mode == RichMode.Readout && Vis.Shown(this) != markup.Length > 0) Vis.Set(this, markup.Length > 0);
             Parent?.PerformLayout();
@@ -427,7 +428,7 @@ namespace KerbinMaps.UI
 
         public DropZone(string bold, string rest, string small)
         {
-            this.bold = bold; this.rest = rest; this.small = small;
+            this.bold = Core.Lang.T(bold); this.rest = Core.Lang.T(rest); this.small = Core.Lang.T(small);
             AllowDrop = true;
             Cursor = Cursors.Hand;
         }

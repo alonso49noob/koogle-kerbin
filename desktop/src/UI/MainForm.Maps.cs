@@ -211,11 +211,11 @@ namespace KerbinMaps.UI
             var res = img.Palette(1024, BiomeConfig.MinAreaPct);
             if (res == null) { Flash("No se pudo leer el mapa de biomas."); return; }
             int named = res.Colors.Count(c => BiomeName(c.Hex) != null);
-            string txt = res.Colors.Count + " colores · " + named + " con nombre\n" +
-                         "imagen " + res.Native + (res.Sampled != res.Native ? " (leída a " + res.Sampled + ")" : "");
+            string txt = Lang.F("{0} colores · {1} con nombre", res.Colors.Count, named) + "\n" +
+                         Lang.F("imagen {0}", res.Native) + (res.Sampled != res.Native ? Lang.F(" (leída a {0})", res.Sampled) : "");
             if (res.DroppedCount > 0)
-                txt += "\n" + res.DroppedCount + " colores sueltos ignorados (" + Geo.F(res.DroppedPct, 2) +
-                       "% del total): son el dentado de los bordes.";
+                txt += "\n" + Lang.F("{0} colores sueltos ignorados ({1}% del total): son el dentado de los bordes.",
+                    res.DroppedCount, Geo.F(res.DroppedPct, 2));
             biomeSummary.SetText(RichLabel.Esc(txt));
             biomeLegend.SetItems(res.Colors);
         }
@@ -337,9 +337,9 @@ namespace KerbinMaps.UI
             {
                 var spec = p.Get(slot);
                 if (spec == null) continue;
-                lines.Add(slot.PadRight(7) + spec.File + (spec.Auto ? "  (giro automático)" : spec.LonOffset != 0 ? "  (" + spec.LonOffset + "°)" : ""));
+                lines.Add(slot.PadRight(7) + spec.File + (spec.Auto ? Lang.T("  (giro automático)") : spec.LonOffset != 0 ? "  (" + spec.LonOffset + "°)" : ""));
             }
-            if (p.Fuente != null) lines.Add("\nfuente: " + p.Fuente);
+            if (p.Fuente != null) lines.Add("\n" + Lang.T("fuente: ") + p.Fuente);
             presetNote.SetText(RichLabel.Esc(string.Join("\n", lines)));
         }
 

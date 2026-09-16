@@ -130,9 +130,9 @@ namespace KerbinMaps.UI
             // no dejar que la cámara se meta dentro del casco
             globe.FocusMinDist = Math.Max(a.Radius * 1.5, 3) / Body.Radius;
             if (globe.FocusDist < globe.FocusMinDist) globe.FocusDist = globe.FocusMinDist;
-            SetModelStatus("Modelo: " + a.PartsDrawn + " de " + a.PartsTotal + " piezas, " + Geo.F(a.Radius * 2, 1) + " m de punta a punta." +
-                           (a.PartsDrawn < a.PartsTotal ? " Las que faltan no tienen malla (procedurales o asteroides)." : "") +
-                           " Acércate con la rueda para verla.");
+            SetModelStatus(Lang.F("Modelo: {0} de {1} piezas, {2} m de punta a punta.", a.PartsDrawn, a.PartsTotal, Geo.F(a.Radius * 2, 1)) +
+                           (a.PartsDrawn < a.PartsTotal ? Lang.T(" Las que faltan no tienen malla (procedurales o asteroides).") : "") +
+                           Lang.T(" Acércate con la rueda para verla."));
             RequestRender();
         }
 

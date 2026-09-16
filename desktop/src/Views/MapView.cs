@@ -529,7 +529,7 @@ void main() {
 
         void DrawAttribution(Batch2D b, TextCache tc)
         {
-            var t = tc.Get("Visor no oficial · Kerbal Space Program es de Squad / Private Division",
+            var t = tc.Get(Lang.T("Visor no oficial · Kerbal Space Program es de Squad / Private Division"),
                            new TextStyle("Segoe UI", 10.5f * S, false, unchecked((int)0xFF8A9BB0), false));
             if (t == null) return;
             double w = t.TextW + 10 * S, h = t.TextH + 2 * S;
