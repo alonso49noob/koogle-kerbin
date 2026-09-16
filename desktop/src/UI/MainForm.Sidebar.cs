@@ -61,6 +61,19 @@ namespace KerbinMaps.UI
             sideStack.SuspendLayout();
 
             /* ---------------------------------------------------------------- Capas */
+            /* ------------------------------------------------------- Cuerpo celeste */
+            var cuerpo = AddSection("Cuerpo celeste", true);
+            bodyCombo = new DarkCombo();
+            bodyCombo.SelectedChanged += (s, e) => SetBody(bodyCombo.SelectedId);
+            cuerpo.Add(Field("Cuerpo que se ve", bodyCombo));
+            bodySource = cuerpo.Add(Readout());
+            bodyInfo = cuerpo.Add(Readout());
+            cuerpo.Add(Hint("Las naves, el Sol, la atmósfera y las órbitas pasan al cuerpo elegido. Si tu KSP usa Kopernicus " +
+                            "(OPM, RSS, SOL...), la lista es la de tu instalación. Los mapas, biomas y marcadores que trae el visor " +
+                            "son solo de Kerbin: el resto de cuerpos se ven con su color y la retícula."));
+            RenderBodyList();
+            RenderBodyInfo();
+
             var capas = AddSection("Capas", true);
             baseCombo = new DarkCombo();
             baseCombo.SetItems(new[]
@@ -297,9 +310,6 @@ namespace KerbinMaps.UI
                                 "añádelas tú o importa un JSON."));
 
             /* --------------------------------------------------------------- Cuerpo */
-            var cuerpo = AddSection("Cuerpo", false);
-            bodyInfo = cuerpo.Add(Readout());
-            RenderBodyInfo();
 
             /* ------------------------------------------------------------- Idioma */
             var idioma = AddSection("Idioma · Language", false);

@@ -142,10 +142,11 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Hora solar local con el día de Kerbin de 6 h: «3:00» es mediodía. */
+        /* Hora solar local con el día del cuerpo: el mediodía cae a la mitad (en Kerbin, a las 3:00). */
         static string FmtSolar(double h)
         {
-            int min = (int)Math.Floor(h * 60) % 360;
+            int day = Math.Max(1, (int)Math.Round(Body.SolarDay / 60));
+            int min = ((int)Math.Floor(h * 60) % day + day) % day;
             return (min / 60) + ":" + (min % 60).ToString("00") + " h";
         }
 

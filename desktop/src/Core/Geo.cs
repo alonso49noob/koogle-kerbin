@@ -11,7 +11,7 @@ namespace KerbinMaps.Core
     public static class Geo
     {
         public const double D2R = Math.PI / 180, R2D = 180 / Math.PI;
-        const double R = Body.Radius;
+        static double R => Body.Radius;
         public static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         /* Distancia sobre el gran círculo, en metros. */
@@ -149,7 +149,7 @@ namespace KerbinMaps.Core
         /* Segundos -> d/h/m/s con el día solar de Kerbin (6 h). */
         public static string FmtTime(double s)
         {
-            double day = Body.SolarDay;
+            double day = SolarSystem.Home.SolarDay;      // el calendario es siempre el del planeta de origen
             double d = Math.Floor(s / day); s -= d * day;
             double h = Math.Floor(s / 3600); s -= h * 3600;
             double m = Math.Floor(s / 60); s -= m * 60;
@@ -170,7 +170,7 @@ namespace KerbinMaps.Core
         /* Calendario del juego: días de 6 h y años de 426 días, desde el año 1, día 1. */
         public static string FechaKerbal(double t)
         {
-            double DIA = Body.SolarDay, ANIO = 426 * DIA;
+            double DIA = SolarSystem.Home.SolarDay, ANIO = 426 * DIA;
             double y = Math.Floor(t / ANIO), d = Math.Floor((t - y * ANIO) / DIA);
             double sg = t - y * ANIO - d * DIA;
             string P(double n) => ((long)Math.Floor(n)).ToString("00", Inv);

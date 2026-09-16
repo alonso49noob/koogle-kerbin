@@ -26,6 +26,8 @@ namespace KerbinMaps.UI
 
         sealed class SvState
         {
+            public SaveData Data;                 // la partida entera: al cambiar de cuerpo se vuelven a filtrar las naves
+            public string Nombre;
             public double Ut, Rot, MaxR = 1.2;
             public Calibration Calib;
             public List<Vessel> Naves = new();
@@ -73,12 +75,12 @@ namespace KerbinMaps.UI
         void SimDirty() { sim.Dirty = true; RequestRender(); }
         double RotBase() => sv.Rot + svRot.NumberOr(0);
 
-        /* Longitud subsolar en el instante de la barra de tiempo, con la misma rotación que
-           mueve las naves; sin partida, la del comienzo del juego. */
-        double SunLonNow()
+        /* Dónde está el Sol en el instante de la barra de tiempo, con la misma rotación que
+           mueve las naves. Sin naves en este cuerpo con las que medirla, la del juego. */
+        Sun.Position SunNow()
         {
-            if (!HasVessels) return Sun.SubsolarLon(0, Sun.DefaultRotation(0));
-            return Sun.SubsolarLon(sim.T, RotBase() + 360 * ((sim.T - sv.Ut) / Body.SiderealDay));
+            if (sv.Data == null) return Sun.Subsolar(0, Sun.DefaultRotation(0));
+            return Sun.Subsolar(sim.T, RotBase() + 360 * ((sim.T - sv.Ut) / Body.SiderealDay));
         }
         IEnumerable<GlobePin> VesselPins() => sv.Marcas.Select(m => m.Pin);
 
@@ -258,7 +260,8 @@ namespace KerbinMaps.UI
            pocos fotogramas por segundo el ×1 dejaría de ser tiempo real. */
         void SimTick(double now)
         {
-            if (!HasVessels) return;
+            // el tiempo corre aunque en este cuerpo no haya naves: el Sol se sigue moviendo
+            if (sv.Data == null) return;
             double dt = sim.Last > 0 ? Math.Min(2, now - sim.Last) : 0;
             sim.Last = now;
             if (sim.Running)
@@ -365,28 +368,45 @@ namespace KerbinMaps.UI
                 return;
             }
 
-            /* El visor es de Kerbin: las naves de otros cuerpos se cuentan pero no se
-               dibujan, porque sus latitudes y longitudes son de otro sitio. */
-            var deAqui = d.Vessels.Where(v => v.BodyName == Body.Name && v.Orbit != null).ToList();
-            int otras = d.Vessels.Count - deAqui.Count;
-
+            sv.Data = d;
             sv.Ut = d.Ut.Value;
-            sv.Naves = deAqui;
-            sv.Calib = SaveFile.CalibrarRotacion(d.Vessels.Where(v => v.BodyName == Body.Name), sv.Ut);
-            sv.Rot = sv.Calib.Rot;
-            sv.Sel = null;
-            // hasta dónde debe dejar alejarse la cámara: la órbita más lejana de la partida
-            sv.MaxR = deAqui.Aggregate(1.2, (mx, v) => Math.Max(mx, v.Orbit.Sma * (1 + v.Orbit.Ecc) / Body.Radius));
+            sv.Nombre = restoring ? Lang.F("{0} · copia guardada", Path.GetFileName(state.SavePath ?? path)) : Path.GetFileName(path);
             sim.T = sv.Ut; sim.Warp = 1; sim.Running = false; sim.Follow = false; sim.Dirty = true; sim.Last = 0;
             if (restoring && state.SimT is double tCierre && tCierre >= 0) sim.T = tCierre;
             else if (!restoring) GuardarCopia(path, texto);
-            globe.ExitFocus();
             // las naves de otra partida son otros objetos: los modelos montados ya no valen
             // (con la copia, KSP se busca junto al original)
             loadedSavePath = restoring ? state.SavePath : path;
             vesselModels.Clear();
             ClearModel();
             SetModelStatus(null);
+
+            FiltrarNavesDelCuerpo();
+            Vis.Set(tbar, true);
+            RenderReloj();
+            LayoutOverlays();
+            RequestRender();
+        }
+
+        /* Las naves de la partida que orbitan el cuerpo que se está viendo; las demás se
+           cuentan pero no se dibujan, porque su latitud y longitud son de otro sitio. La
+           rotación del cuerpo se mide con ellas; sin ninguna, la del juego. */
+        void FiltrarNavesDelCuerpo()
+        {
+            var d = sv.Data;
+            if (d == null) return;
+            var delCuerpo = d.Vessels.Where(v => SolarSystem.Find(v.BodyName) == Body.Current).ToList();
+            var deAqui = delCuerpo.Where(v => v.Orbit != null).ToList();
+            int otras = d.Vessels.Count - deAqui.Count;
+
+            sv.Naves = deAqui;
+            sv.Calib = SaveFile.CalibrarRotacion(delCuerpo, sv.Ut);
+            sv.Rot = sv.Calib.N > 0 ? sv.Calib.Rot : Sun.DefaultRotation(sv.Ut);
+            sv.Sel = null;
+            sim.Follow = false;
+            globe.ExitFocus();
+            // hasta dónde debe dejar alejarse la cámara: la órbita más lejana de la partida
+            sv.MaxR = deAqui.Aggregate(1.2, (mx, v) => Math.Max(mx, v.Orbit.Sma * (1 + v.Orbit.Ecc) / Body.Radius));
 
             sv.Tipos.Clear();
             sv.Cuenta.Clear();
@@ -397,13 +417,9 @@ namespace KerbinMaps.UI
             }
 
             svRot.SetNumber(0);
-            RenderSaveInfo(restoring ? Lang.F("{0} · copia guardada", Path.GetFileName(state.SavePath ?? path)) : Path.GetFileName(path), d.Vessels.Count, otras);
+            RenderSaveInfo(sv.Nombre, d.Vessels.Count, otras);
             svTipos.SetItems(sv.Tipos.Keys);
             RenderNaves();
-            Vis.Set(tbar, true);
-            RenderReloj();
-            LayoutOverlays();
-            RequestRender();
         }
 
         void RenderSaveInfo(string nombre, int total, int otras)

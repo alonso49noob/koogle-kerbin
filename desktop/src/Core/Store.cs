@@ -49,6 +49,7 @@ namespace KerbinMaps.Core
         public double SkyAz = 90, SkyEl = 25, SkyFov = 70;
         public bool SkyGrid = true, SkyForceNight;
         public string Lang;                       // «es», «en»; si falta, el del sistema
+        public string BodyName;                   // el cuerpo que se ve; si falta, Kerbin
         public bool DayNight = true;              // luz del Sol en el instante de la barra de tiempo
         public bool ShowOrbitInfo = true;         // panel con la órbita de la nave seleccionada
         public string SavePath;                   // el persistent.sfs original de la copia guardada

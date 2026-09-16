@@ -45,9 +45,10 @@ namespace KerbinMaps.UI
         {
             var cands = new List<string>();
             if (!string.IsNullOrEmpty(state.KspPath)) cands.Add(Path.Combine(state.KspPath, "GameData"));
-            if (loadedSavePath != null)
+            foreach (var save in new[] { loadedSavePath, state.SavePath })
             {
-                var d = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(loadedSavePath)));
+                if (string.IsNullOrEmpty(save)) continue;
+                var d = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(save)));
                 if (d != null) cands.Add(Path.Combine(d, "GameData"));
             }
             cands.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam", "steamapps", "common", "Kerbal Space Program", "GameData"));

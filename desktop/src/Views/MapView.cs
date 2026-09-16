@@ -25,7 +25,7 @@ namespace KerbinMaps.Views
         public bool Grid = true;
         // la mitad del planeta de noche, con el punto subsolar
         public bool DayNight = true;
-        public double SunLon;
+        public double SunLat, SunLon;
         public readonly List<MapLayer> Layers = new();
         public MapDot Hover;
         public int TopLabelOffset = 52;           // bajo la barra superior, en píxeles CSS
@@ -190,7 +190,7 @@ void main() { gl_Position = vec4(P[gl_VertexID], 0.0, 1.0); }";
         const string ImgFS = @"#version 330 core
 uniform vec2 uView;
 uniform vec2 uCenter;
-uniform float uPpd, uOff, uOpacity, uCell, uSunLon, uS;
+uniform float uPpd, uOff, uOpacity, uCell, uSunLat, uSunLon, uS;
 uniform int uMode;
 uniform sampler2D uTex;
 out vec4 frag;
@@ -204,13 +204,13 @@ void main() {
     /* Noche: el coseno del ángulo al punto subsolar (en el ecuador). Un margen de unos
        grados a cada lado del terminador hace de crepúsculo. */
     float dl = mod(lon - uSunLon + 540.0, 360.0) - 180.0;
-    float mu = cos(radians(lat)) * cos(radians(dl));
+    float mu = sin(radians(lat)) * sin(radians(uSunLat)) + cos(radians(lat)) * cos(radians(uSunLat)) * cos(radians(dl));
     float night = 1.0 - smoothstep(-0.09, 0.07, mu);
     float dusk = exp(-mu * mu / 0.004) * 0.10;
     vec4 c = vec4(vec3(0.0, 0.012, 0.04) * night * 0.66, night * 0.66);
     c = vec4(c.rgb + vec3(1.0, 0.45, 0.15) * dusk, c.a + dusk * 0.2);
     // el Sol: un disco en el punto subsolar
-    float d = length(vec2(dl, lat)) * uPpd;
+    float d = length(vec2(dl, lat - uSunLat)) * uPpd;
     float rad = 7.0 * uS;
     float disc = 1.0 - smoothstep(rad - 1.0, rad + 0.5, d);
     float ring = (1.0 - smoothstep(rad + 0.5, rad + 2.0 * uS, d)) * (1.0 - disc);
@@ -250,6 +250,7 @@ void main() {
             imgProg.Float("uOpacity", opacity);
             imgProg.Float("uCell", 180 / Math.Pow(2, TileZoom) / 4);
             imgProg.Int("uMode", mode);
+            imgProg.Float("uSunLat", SunLat);
             imgProg.Float("uSunLon", SunLon);
             imgProg.Float("uS", S);
             GL.ActiveTexture(GL.TEXTURE0);

@@ -56,6 +56,36 @@ KoogleKerbin.exe "C:\ruta\a\persistent.sfs"
 Los ficheros también se pueden soltar directamente sobre el mapa: las partidas
 (`.sfs`) cargan las naves y las imágenes van a su ranura según el nombre.
 
+## Idioma
+
+Español o inglés, en la sección «Idioma · Language» del panel lateral (la primera
+vez, el de Windows). Cambiarlo reinicia el visor. Las traducciones están en
+`data/i18n/en.json`, con el texto en español como clave: lo que falte se queda en
+español, y se puede corregir sin recompilar. El instalador también tiene los dos
+idiomas y deja el visor en el que se elija.
+
+## Cuerpos celestes y sistemas personalizados
+
+La sección «Cuerpo celeste», arriba del panel, elige el cuerpo que se ve. Al
+cambiarlo pasan a ese cuerpo las naves de la partida, el Sol (con su latitud: la
+órbita puede estar inclinada), la atmósfera, el día y la noche, la vista del cielo y
+la ficha con sus datos.
+
+- **Sistema de serie**: los 17 cuerpos de KSP, con los datos del juego (radio,
+  gravedad, rotación, atmósfera, esfera de influencia y órbita), aunque no esté
+  instalado. Cada uno con su color y su aire: Eve violeta, Duna rojizo, Jool verde.
+- **Kopernicus** (OPM, RSS, SOL...): si la instalación de KSP lo usa, la lista sale de
+  la caché de ModuleManager, ya con los parches del pack. Cada cuerpo hereda de la
+  plantilla de serie que nombre y se le aplican sus `Properties`, `Orbit` y
+  `Atmosphere`. La jerarquía (qué orbita a qué) y las esferas de influencia que no se
+  indiquen se calculan.
+- **La rotación** de cada cuerpo se mide con las naves de la partida que lo orbitan,
+  como en Kerbin; sin ninguna, se usa la del juego.
+
+Los mapas, biomas, alturas y marcadores que trae el visor son de Kerbin: el resto de
+cuerpos se ven con su color y la retícula. Los packs que guardan sus texturas en
+paquetes de Unity (OPM, por ejemplo) no dejan leerlas.
+
 ## Las tres vistas
 
 Arriba a la izquierda, **2D**, **3D** y **Cielo**.

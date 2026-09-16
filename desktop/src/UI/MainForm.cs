@@ -71,6 +71,8 @@ namespace KerbinMaps.UI
             state.LonOffset ??= new LonOffsets();
             // el idioma se resuelve antes de montar la interfaz: los textos se traducen al crearse
             Lang.Use(Lang.Detect(state.Lang), Store.DataDir);
+            // el cuerpo de la última vez; si es de un pack, se recupera al leer Kopernicus
+            Body.Current = SolarSystem.Find(state.BodyName) ?? SolarSystem.Home;
 
             Theme.Init(DeviceDpi);
             AutoScaleMode = AutoScaleMode.None;
@@ -278,8 +280,10 @@ namespace KerbinMaps.UI
             double dt = lastFrame > 0 ? Math.Min(0.1, now - lastFrame) : 0;
             lastFrame = now;
 
+            // el Sol antes de avanzar (lo lee el HUD que se repinta dentro) y con el instante nuevo
+            ActualizarSol();
             SimTick(now);
-            globe.SunLon = map.SunLon = SunLonNow();
+            ActualizarSol();
             if (map.Animating) { map.Animate(dt); saveViewTimer.Stop(); saveViewTimer.Start(); }
 
             int w = Math.Max(1, surface.ClientSize.Width), h = Math.Max(1, surface.ClientSize.Height);
@@ -564,11 +568,11 @@ namespace KerbinMaps.UI
                 ("lat", p.HasValue ? Geo.FmtLat(p.Value.Lat) : "—"),
                 ("lon", p.HasValue ? Geo.FmtLon(Geo.WrapLon(p.Value.Lon)) : "—")
             };
-            if (Img("height") != null)
-                rows.Add(("alt", p.HasValue ? Geo.FmtAlt(Img("height").Height_(p.Value.Lat, Geo.WrapLon(p.Value.Lon), state.HMin, state.HMax, state.LonOffset.Height)) : "—"));
-            if (Img("biome") != null)
+            if (MapImg("height") != null)
+                rows.Add(("alt", p.HasValue ? Geo.FmtAlt(MapImg("height").Height_(p.Value.Lat, Geo.WrapLon(p.Value.Lon), state.HMin, state.HMax, state.LonOffset.Height)) : "—"));
+            if (MapImg("biome") != null)
             {
-                string hex = p.HasValue ? Img("biome").BiomeHex(p.Value.Lat, Geo.WrapLon(p.Value.Lon), state.LonOffset.Biome) : null;
+                string hex = p.HasValue ? MapImg("biome").BiomeHex(p.Value.Lat, Geo.WrapLon(p.Value.Lon), state.LonOffset.Biome) : null;
                 rows.Add(("bioma", hex == null ? "—" : BiomeName(hex) ?? hex));
             }
             if (state.DayNight)

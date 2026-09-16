@@ -38,7 +38,7 @@ uniform float uTan, uAspect, uPix, uStarShift, uSunRad;
 uniform sampler2D uColor, uBiome;
 uniform int uHasColor, uHasBiome, uGrid;
 uniform float uColorOff, uBiomeOff, uBiomeAmt;
-uniform vec3 uSun;
+uniform vec3 uSun, uTint;
 out vec4 frag;
 
 void main() {
@@ -64,7 +64,7 @@ void main() {
       vec2 uv2 = vec2(fract(u + 0.5), v);
       vec2 gx2 = dFdx(uv2), gy2 = dFdy(uv2);
       if (abs(gx2.x) + abs(gy2.x) < abs(gx.x) + abs(gy.x)) { gx = gx2; gy = gy2; }
-      vec3 base = vec3(0.10, 0.13, 0.18);
+      vec3 base = uTint;
       if (uHasColor != 0) base = textureGrad(uColor, vec2(fract(u + uColorOff), v), gx, gy).rgb;
       // el mar por el color, antes de mezclar los biomas
       float water = uHasColor != 0 ? smoothstep(0.03, 0.08, base.b - max(base.r, base.g)) : 0.0;
@@ -72,12 +72,12 @@ void main() {
         base = mix(base, textureGrad(uBiome, vec2(fract(u + uBiomeOff), v), gx, gy).rgb, uBiomeAmt);
       // cada punto con su Sol: el suelo lejano puede estar al otro lado del terminador
       vec3 L = shadeGround(p, normalize(p), -d, uSun, pow(base, vec3(2.2)), water);
-      vec3 tr;
-      vec3 ins = inscatter(uEye, d, max(ta.x, 0.0), t, uSun, jit, tr);
+      vec3 tr = vec3(1.0), ins = vec3(0.0);
+      if (uAtmos != 0) ins = inscatter(uEye, d, max(ta.x, 0.0), t, uSun, jit, tr);
       col = L * tr + ins;
     } else {
       vec3 tr = vec3(1.0), ins = vec3(0.0);
-      if (ta.y > 0.0) ins = inscatter(uEye, d, max(ta.x, 0.0), ta.y, uSun, jit, tr);
+      if (uAtmos != 0 && ta.y > 0.0) ins = inscatter(uEye, d, max(ta.x, 0.0), ta.y, uSun, jit, tr);
       col = ins;
       // el Sol, 1,1° de radio visto desde Kerbin, con el color que le deja el aire
       float ang = acos(clamp(dot(d, uSun), -1.0, 1.0));
@@ -182,7 +182,7 @@ void main() {
             // sin día y noche, el Sol se queda en lo alto del observador; forzando la noche, apagado
             var sun = Light ? SunDir : up;
             skyProg.Vec3("uSun", sun[0], sun[1], sun[2]);
-            skyProg.Float("uSunRad", Sun.AngularRadius);
+            skyProg.Float("uSunRad", Math.Max(SunAngularRadius, 0.0015));
             AtmosUniforms(skyProg, 24, sunOn: !SkyForceNight);
             skyProg.Float("uColorOff", ColorOff / 360);
             skyProg.Float("uBiomeOff", BiomeOff / 360);

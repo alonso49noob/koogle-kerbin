@@ -70,12 +70,12 @@ namespace KerbinMaps.UI
             switch (def.kind)
             {
                 case "image":
-                    map.BaseKind = "image";
-                    map.BaseTex = textures.GetValueOrDefault(def.slot);
+                    map.BaseKind = OnMapBody ? "image" : "grid";
+                    map.BaseTex = MapTex(def.slot);
                     map.BaseOffset = state.LonOffset.Get(def.slot);
                     break;
                 case "xyz":
-                    map.BaseKind = "xyz";
+                    map.BaseKind = OnMapBody ? "xyz" : "grid";
                     string url = state.BaseId == "custom" ? state.CustomUrl : def.url;
                     if (tileLayer == null || tileLayer.Template != url)
                     {
@@ -89,12 +89,12 @@ namespace KerbinMaps.UI
                     map.BaseKind = "grid";
                     break;
             }
-            bool biomeOn = state.BiomeOn && Img("biome") != null;
+            bool biomeOn = state.BiomeOn && MapImg("biome") != null;
             map.BiomeTex = biomeOn ? textures.GetValueOrDefault("biome") : null;
             map.BiomeOffset = state.LonOffset.Biome;
             map.BiomeOpacity = biomeOn ? state.BiomeOpacity : 0;
             map.Grid = state.Grid;
-            markerLayer.Visible = state.Landmarks;
+            markerLayer.Visible = state.Landmarks && OnMapBody;
             RequestRender();
         }
 
@@ -102,21 +102,22 @@ namespace KerbinMaps.UI
            para que las dos vistas no se separen. */
         void SyncGlobe()
         {
-            globe.ColorTex = textures.GetValueOrDefault("color");
-            globe.BiomeTex = textures.GetValueOrDefault("biome");
-            globe.HeightTex = textures.GetValueOrDefault("height");
-            globe.BiomeAmt = state.BiomeOn && Img("biome") != null ? state.BiomeOpacity : 0;
+            globe.ColorTex = MapTex("color");
+            globe.BiomeTex = MapTex("biome");
+            globe.HeightTex = MapTex("height");
+            globe.BiomeAmt = state.BiomeOn && MapImg("biome") != null ? state.BiomeOpacity : 0;
             globe.ColorOff = (int)state.LonOffset.Color;
             globe.BiomeOff = (int)state.LonOffset.Biome;
             globe.HeightOff = (int)state.LonOffset.Height;
             globe.HMin = state.HMin;
             globe.HMax = state.HMax;
             globe.Pins.Clear();
-            foreach (var m in MarkersAll())
-                globe.Pins.Add(new GlobePin { Lat = m.Lat, Lon = m.Lon, Name = m.Name, Color = ColorF.Hex(MarkerColor(m.Cat)), Tag = m });
-            globe.Pins.Add(new GlobePin { Lat = state.ObsLat, Lon = state.ObsLon, Name = "Observador", Color = ColorF.Hex("#ffb454") });
+            if (OnMapBody)
+                foreach (var m in MarkersAll())
+                    globe.Pins.Add(new GlobePin { Lat = m.Lat, Lon = m.Lon, Name = m.Name, Color = ColorF.Hex(MarkerColor(m.Cat)), Tag = m });
+            globe.Pins.Add(new GlobePin { Lat = state.ObsLat, Lon = state.ObsLon, Name = Lang.T("Observador"), Color = ColorF.Hex("#ffb454") });
             globe.Pins.AddRange(VesselPins());
-            bool hasHeight = Img("height") != null;
+            bool hasHeight = MapImg("height") != null;
             Vis.Set(reliefWrap, hasHeight);
             Vis.Set(reliefHint, !hasHeight);
             RequestRender();
@@ -701,6 +702,10 @@ namespace KerbinMaps.UI
             SyncBiomeLayer();
             if (Img("biome") != null) ScanBiomes();
             SetViewMode(state.ViewMode ?? (state.View3D ? "3d" : "2d"));
+
+            // el sistema solar de la instalación de KSP, antes de la partida: sus naves pueden orbitar cuerpos de un pack
+            try { await CargarSistemaSolar(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] sistema solar: " + ex.Message); }
 
             // la partida de la última vez, salvo que se abra otra desde la línea de órdenes
             bool abreSfs = false;

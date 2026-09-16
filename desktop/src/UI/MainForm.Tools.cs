@@ -403,19 +403,29 @@ namespace KerbinMaps.UI
             double circ = 2 * Math.PI * Body.Radius;
             double vRot = circ / Body.SiderealDay;
             double vEsc = Math.Sqrt(2 * Body.Mu / Body.Radius);
-            double vLow = Math.Sqrt(Body.Mu / (Body.Radius + 75000));
-            bodyInfo.SetText(string.Join("\n",
+            // órbita baja: por encima del aire, o a un 5% del radio en los cuerpos sin atmósfera
+            double lowAlt = Math.Round(Math.Max(Body.Atmosphere + 5000, Body.Radius * 0.05) / 1000) * 1000;
+            double vLow = Math.Sqrt(Body.Mu / (Body.Radius + lowAlt));
+            if (bodyInfo == null) return;
+            var b = Body.Current;
+            var lines = new List<string>
+            {
+                "<b>" + RichLabel.Esc(b.Label) + "</b>" + (b.Parent != null ? Lang.F("  ·  orbita {0}", RichLabel.Esc(b.Parent.Label)) : Lang.T("  ·  estrella")),
                 Lang.F("Radio            <b>{0} km</b>", Geo.F(Body.Radius / 1000, 0)),
                 Lang.F("Circunf. ecuador <b>{0} km</b>", Geo.F(circ / 1000, 1)),
                 Lang.F("g en superficie  <b>{0} m/s²</b>", Geo.F(g0, 3)),
-                Lang.F("Día sidéreo      <b>{0}</b>", Geo.FmtTime(Body.SiderealDay)),
-                Lang.T("Día solar        <b>6 h exactas</b>"),
+                Lang.F("Día sidéreo      <b>{0}</b>", Geo.FmtTime(Body.SiderealDay)) + (b.TidallyLocked ? Lang.T(" (rotación síncrona)") : ""),
+                Lang.F("Día solar        <b>{0}</b>", Geo.FmtTime(Body.SolarDay)),
                 Lang.F("v de rotación    <b>{0} m/s</b> en el ecuador", Geo.F(vRot, 1)),
-                Lang.F("Atmósfera hasta  <b>{0} km</b>", Geo.F(Body.Atmosphere / 1000, 0)),
-                Lang.F("Órbita síncrona  <b>{0} km</b> de altitud", Geo.F(Body.SynchronousAlt / 1000, 0)),
-                Lang.F("v órbita 75 km   <b>{0} m/s</b>", Geo.F(vLow, 0)),
-                Lang.F("v de escape      <b>{0} m/s</b>", Geo.F(vEsc, 0)),
-                Lang.F("SOI              <b>{0} km</b>", Geo.F(Body.Soi / 1000, 0))));
+                b.Atmosphere > 0 ? Lang.F("Atmósfera hasta  <b>{0} km</b>", Geo.F(Body.Atmosphere / 1000, 0)) : Lang.T("Atmósfera        <b>no tiene</b>")
+            };
+            if (Body.SynchronousAlt > 0 && Body.SynchronousAlt + Body.Radius < Body.Soi)
+                lines.Add(Lang.F("Órbita síncrona  <b>{0} km</b> de altitud", Geo.F(Body.SynchronousAlt / 1000, 0)));
+            lines.Add(Lang.F("v órbita {0} km  <b>{1} m/s</b>", Geo.F(lowAlt / 1000, 0), Geo.F(vLow, 0)));
+            lines.Add(Lang.F("v de escape      <b>{0} m/s</b>", Geo.F(vEsc, 0)));
+            if (!double.IsInfinity(Body.Soi)) lines.Add(Lang.F("SOI              <b>{0} km</b>", Geo.F(Body.Soi / 1000, 0)));
+            if (b.OrbitalPeriod > 0) lines.Add(Lang.F("Periodo orbital  <b>{0}</b>", Geo.FmtTime(b.OrbitalPeriod)));
+            bodyInfo.SetText(string.Join("\n", lines));
         }
     }
 }

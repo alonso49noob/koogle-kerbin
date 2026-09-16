@@ -49,8 +49,9 @@ namespace KerbinMaps.Views
         public bool Light = true, Atmosphere = true;
 
         /* Longitud del punto subsolar (lo fija la ventana con el tiempo de la barra). */
-        public double SunLon = -90;
-        public double[] SunDir => Sph(0, SunLon, 1);
+        public double SunLat, SunLon = -90;
+        public double SunAngularRadius = 0.0192;          // rad, visto desde el cuerpo
+        public double[] SunDir => Sph(SunLat, SunLon, 1);
 
         /* Cuánto Sol le llega a un punto (en radios): 0 dentro de la sombra del planeta,
            con una penumbra corta del grosor de la atmósfera. */
@@ -60,7 +61,7 @@ namespace KerbinMaps.Views
             double along = Dot(p, s);
             if (along >= 0) return 1;
             double perp = Math.Sqrt(Math.Max(0, Dot(p, p) - along * along));
-            double k = Math.Clamp((perp - 1) / (Body.Atmosphere / Body.Radius), 0, 1);
+            double k = Math.Clamp((perp - 1) / (Math.Max(Body.Atmosphere, 2000) / Body.Radius), 0, 1);
             return k * k * (3 - 2 * k);
         }
         public double Relief, BiomeAmt, ColorOff, BiomeOff, HeightOff;
@@ -155,7 +156,7 @@ uniform sampler2D uColor, uBiome, uHeight;
 uniform float uColorOff, uBiomeOff, uBiomeAmt, uHeightOff, uHMin, uHMax, uRadius, uBump;
 uniform vec2 uHeightSize;
 uniform int uHasColor, uHasBiome, uHasHeight, uLit;
-uniform vec3 uLightDir, uCamPos;
+uniform vec3 uLightDir, uCamPos, uTint;
 out vec4 frag;
 
 /* Con fract() la u se envuelve, pero eso dispara las derivadas en la costura y el
@@ -171,7 +172,7 @@ float heightAt(vec2 uv) {
 }
 
 void main() {
-  vec3 base = vec3(0.10, 0.13, 0.18);
+  vec3 base = uTint;                       // sin mapa, el color del cuerpo
   if (uHasColor != 0) base = shifted(uColor, uColorOff);
   vec3 ground = base;
   if (uHasBiome != 0 && uBiomeAmt > 0.0) base = mix(base, shifted(uBiome, uBiomeOff), uBiomeAmt);
@@ -856,7 +857,7 @@ void main() {
             DrawTrack(eye, false);
             DrawOrbits(eye, false);
 
-            if (Atmosphere)
+            if (Atmosphere && Body.Current.HasAir)
             {
                 double scale = (Body.Radius + Body.Atmosphere) / Body.Radius;
                 atmProg.Use();

@@ -29,13 +29,10 @@ namespace KerbinMaps.Views
 
         const string AtmosphereGlsl = @"
 const float PI = 3.14159265;
-const vec3 BETA_R = vec3(3.481, 8.135, 19.86);     // Rayleigh, por radio de Kerbin
-// Mie a la mitad de la Tierra: con más, el halo del Sol bajo se come el rojo del atardecer
-const float BETA_M = 1.20;                         // Mie, dispersión
-const float BETA_ME = 1.33;                        // Mie, extinción
-const float HR = 0.0100;                           // 6 km
-const float HM = 0.0020;                           // 1,2 km
-const float ATM_TOP = 1.11667;                     // 70 km
+/* El aire del cuerpo que se está viendo, en radios del cuerpo: coeficientes de Rayleigh y
+   Mie al nivel del suelo, escalas de altura y techo de la atmósfera. */
+uniform vec3 BETA_R;
+uniform float BETA_M, BETA_ME, HR, HM, ATM_TOP;
 uniform float uSunI, uExposure;
 uniform int uAtmos, uSteps;
 
@@ -113,7 +110,8 @@ vec3 shadeGround(vec3 p, vec3 n, vec3 v, vec3 s, vec3 albedo, float water) {
   vec3 up = normalize(p);
   vec3 sun = uSunI * sunTransmittance(p, s);
   // el cielo como luz ambiente: azulada, y más débil cuanto más bajo está el Sol
-  vec3 skyE = uSunI * vec3(0.05, 0.085, 0.16) * smoothstep(-0.12, 0.4, dot(up, s));
+  // (sin aire no hay cielo que ilumine: queda un resto neutro para no ver las sombras negras del todo)
+  vec3 skyE = uSunI * (uAtmos != 0 ? vec3(0.05, 0.085, 0.16) : vec3(0.012)) * smoothstep(-0.12, 0.4, dot(up, s));
   // de noche, un resto de luz fría para adivinar el terreno
   const vec3 nightE = vec3(0.35, 0.42, 0.62);
   vec3 L = albedo / PI * (sun * max(dot(n, s), 0.0) + skyE * (0.75 + 0.25 * dot(n, up)) + nightE);
@@ -182,12 +180,33 @@ void main() {
   frag = vec4(min(starField(d, uPix, uStarShift), vec3(1.0)), 1.0);
 }";
 
+        /* El aire del cuerpo actual. Los coeficientes se dan por metro al nivel del suelo y se
+           pasan a radios del cuerpo; la escala de altura sale del grosor de la atmósfera (en
+           Kerbin, 70 km dan 6 km). Con Kerbin salen los valores con los que se ajustó el cielo. */
         void AtmosUniforms(ShaderProgram p, int steps, bool sunOn = true)
         {
+            var b = Body.Current;
+            double R = Math.Max(b.Radius, 1);
+            double h = Math.Max(b.Atmosphere, 1000);
+            double hr = h / 11.67;
+            var c = b.AirColor ?? new[] { 5.802, 13.558, 33.1 };
+            double k = 1e-6 * R * b.AirDensity;
+            /* En un gigante gaseoso, cientos de km de aire con los coeficientes de la Tierra lo
+               dejan todo blanco: la profundidad óptica vertical se limita (Kerbin ronda 0,2 y no
+               llega al tope). */
+            double tau = Math.Max(c[0], Math.Max(c[1], c[2])) * k * hr / R;
+            if (tau > 0.25) k *= 0.15 / tau;
             p.Float("uSunI", sunOn ? SunIntensity : 0);
             p.Float("uExposure", Exposure);
             p.Int("uSteps", steps);
-            p.Int("uAtmos", Atmosphere ? 1 : 0);
+            p.Int("uAtmos", Atmosphere && b.HasAir ? 1 : 0);
+            p.Vec3("BETA_R", c[0] * k, c[1] * k, c[2] * k);
+            p.Float("BETA_M", 2.0 * k);
+            p.Float("BETA_ME", 2.22 * k);
+            p.Float("HR", hr / R);
+            p.Float("HM", hr / 5 / R);
+            p.Float("ATM_TOP", 1 + h / R);
+            p.Vec3("uTint", b.Tint[0], b.Tint[1], b.Tint[2]);
         }
 
         /* El fondo de estrellas del globo, detrás de todo. */
