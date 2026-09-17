@@ -11,6 +11,9 @@ dibujados a mano para copiar el tema oscuro de la web, y el mapa, el globo y el
 cielo se pintan con **OpenGL 3.3** llamado directamente. No usa ningún paquete
 externo: compila sin conexión.
 
+*This document is in Spanish. English overview of the project:
+[../README.md](../README.md).*
+
 ## Instalarla
 
 Descarga `KoogleKerbin-Setup-<versión>.exe` de las *releases* del repositorio y

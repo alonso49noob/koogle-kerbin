@@ -1,260 +1,300 @@
 # Koogle Kerbin
 
-Visor de Kerbin (KSP stock) en dos versiones:
+A viewer for the worlds of Kerbal Space Program, in two versions:
 
-- **[Aplicación de escritorio para Windows](desktop/README.md)** (`desktop/`, C# y
-  OpenGL): mapa plano, globo 3D, vista del cielo, día y noche, y las naves de una
-  partida con sus modelos de verdad. El instalador se publicará en las *releases*.
-- **Versión web** (el resto de este repositorio), que se describe a continuación.
+- **[Windows desktop app](desktop/README.md)** (`desktop/`, C# and OpenGL): flat
+  map, 3D globe, sky view, day and night with a physically based atmosphere, any
+  celestial body (stock or Kopernicus), and the vessels from one of your saves
+  rendered with their real part models. Installer in the
+  [releases](https://github.com/alonso49noob/koogle-kerbin/releases).
+- **Web version** (the rest of this repository), described below.
 
-Kerbal Space Program es de Squad y Take-Two Interactive. Este es un proyecto de
-aficionados sin relación con ellos.
+*Español: [README.es.md](README.es.md).*
 
----
-
-## Versión web: Kerbin Maps
-
-Visor de superficie de Kerbin (KSP stock) para ejecutar en local, en la línea de
-Kerbal Maps: un mapa deslizante con retícula, biomas superpuestos, marcadores,
-regla y trazas terrestres de órbitas.
-
-Todo corre en tu máquina. No hay servicios externos, ni telemetría, ni CDN: la
-única dependencia es Leaflet, que está copiada en `vendor/leaflet/`.
+Kerbal Space Program belongs to Squad and Take-Two Interactive. This is a fan
+project with no connection to them.
 
 ---
 
-## Arrancar
+## The desktop app
+
+`desktop/` holds a native Windows application, written in C# (.NET 10, WinForms)
+with OpenGL 3.3. No NuGet packages, no engine, no telemetry: it builds offline and
+reads your game files where they already are.
+
+What it does:
+
+- **Three views of the same place.** A sliding flat map, a 3D globe and a sky view
+  from a point on the surface, all sharing observer, time and selection.
+- **Day and night.** Rayleigh and Mie single scattering with a Chapman function
+  for the sun's optical depth, aerial perspective and a filmic tone map, so
+  sunrises, the terminator and the night side look the way they should. Each body
+  gets its own air colour and density; airless bodies get no shell at all.
+- **Your vessels.** Point it at a `persistent.sfs` and your craft appear in orbit
+  and on the ground, with a time bar using KSP's own warp steps. Select one and you
+  get its orbital data, its ground track, and its **actual model**, assembled part
+  by part from the game's `.mu` files — including the pose each part was saved in:
+  deployed solar panels and antennas, extended landing gear, jettisoned engine
+  shrouds, packed or open parachutes, built fairings.
+- **Any celestial body.** The 17 stock bodies are built in, and if you have
+  Kopernicus installed it reads the planet pack straight from
+  `ModuleManager.ConfigCache` — OPM, RSS, JNSQ or whatever else you run — with the
+  right radius, rotation period, atmosphere, sphere of influence and hierarchy.
+- **English and Spanish**, both in the app and in the installer.
+
+The detailed documentation is in **[desktop/README.md](desktop/README.md)**
+(Spanish). The installer asks for .NET 10 and installs per user; no admin rights.
+
+---
+
+## Web version: Kerbin Maps
+
+A Kerbin surface viewer (stock KSP) to run locally, along the lines of Kerbal
+Maps: a sliding map with a graticule, a biome overlay, markers, a ruler and
+orbital ground tracks.
+
+Everything runs on your machine. No external services, no telemetry, no CDN: the
+only dependency is Leaflet, which is vendored in `vendor/leaflet/`.
+
+---
+
+## Running it
 
 ```bash
 node server.mjs
 ```
 
-Y abre <http://127.0.0.1:8080>. Para otro puerto: `node server.mjs 8099`.
+Then open <http://127.0.0.1:8080>. For another port: `node server.mjs 8099`.
 
-Si no tienes Node, cualquier servidor estático vale; por ejemplo el de Python:
+If you don't have Node, any static server will do; Python's, for instance:
 
 ```bash
 python -m http.server 8080 --bind 127.0.0.1
 ```
 
-El servidor solo escucha en `127.0.0.1`, así que no queda expuesto a la red local.
+The server only listens on `127.0.0.1`, so it isn't exposed to your local network.
 
-Vale cualquier servidor estático; lo que **no** funciona es abrir `index.html`
-con doble clic (`file://`), porque el navegador bloquea el `fetch` de
-`data/landmarks.json` y la lectura de píxeles del canvas.
+Any static server works; what does **not** work is opening `index.html` by double
+clicking it (`file://`), because the browser blocks the `fetch` of
+`data/landmarks.json` and reading pixels back from the canvas.
 
 ---
 
-## Los mapas
+## The maps
 
-En `data/` hay dos imágenes de Kerbin para que puedas probar el visor nada más
-arrancarlo, sin tener que exportar nada:
+`data/` ships two images of Kerbin so you can try the viewer as soon as you start
+it, without having to export anything:
 
-| Fichero | Qué es | Desfase | Origen |
+| File | What it is | Offset | Source |
 |---|---|---|---|
-| `Kerbin_Color_HD.jpg` | color 4096×2048 | 0° | aportado, origen original desconocido |
-| `Kerbin_Color.png` | color 2048×1024 | **90°** | wiki de la comunidad de KSP |
-| `Kerbin_Biome.png` | biomas 1800×900 | 0° | wiki de la comunidad de KSP |
-| `Kerbin_Height.png` | alturas 2048×1024 | 0° | export de SCANsat (gris −1500…6500 m) |
+| `Kerbin_Color_HD.jpg` | colour 4096×2048 | 0° | contributed, original source unknown |
+| `Kerbin_Color.png` | colour 2048×1024 | **90°** | KSP community wiki |
+| `Kerbin_Biome.png` | biomes 1800×900 | 0° | KSP community wiki |
+| `Kerbin_Height.png` | heights 2048×1024 | 0° | SCANsat export (greyscale −1500…6500 m) |
 
-**No son mías ni del proyecto.** Derivan de las texturas del juego, propiedad de
-Squad / Private Division, y la wiki no declara licencia. Están ahí solo para que
-pruebes el visor en tu máquina, dando por hecho que tienes el juego. **No las
-redistribuyas.** Si te sobran, borra los dos ficheros y `data/maps.json`: el
-visor arranca igual y te recibe con la retícula de referencia.
+**They are not mine, nor the project's.** They derive from the game's textures,
+property of Squad / Private Division, and the wiki declares no licence. They are
+there only so you can try the viewer on your own machine, assuming you own the
+game. **Don't redistribute them.** If you'd rather not have them, delete both
+files and `data/maps.json`: the viewer still starts and greets you with the
+reference graticule.
 
-La procedencia y los ajustes de cada una están escritos en `data/maps.json`.
+The provenance and settings of each one are written down in `data/maps.json`.
 
-### Mapas predeterminados
+### Map presets
 
-`data/maps.json` es un catálogo: cada entrada dice qué fichero va en cada ranura
-y con qué desfase de longitud. El marcado como `predeterminado` se carga solo la
-primera vez que abres el visor; los demás están en el desplegable **Mapa
-predeterminado** del panel «Datos del mapa», a un clic.
+`data/maps.json` is a catalogue: each entry says which file goes in which slot and
+with what longitude offset. The one marked `predeterminado` loads by itself the
+first time you open the viewer; the rest are one click away in the **Mapa
+predeterminado** dropdown of the "Datos del mapa" panel.
 
-Añadir el tuyo es meter una entrada más:
+Adding your own is one more entry:
 
 ```json
 {
   "id": "mio",
-  "nombre": "Mi export de KittopiaTech",
+  "nombre": "My KittopiaTech export",
   "color": { "file": "Kerbin_Color_HD.png", "lonOffset": "auto" },
   "biome": { "file": "Kerbin_Biome.png",    "lonOffset": 0 }
 }
 ```
 
-`lonOffset` admite un número de grados o `"auto"`. Con `"auto"`, al cargar el
-preset el visor mide el giro solo comparando la silueta de los continentes contra
-el mapa de biomas, y te dice cuánto ha girado y con qué confianza. Si el fichero
-no está en `data/`, te lo dice por su nombre y deja lo que ya tuvieras cargado.
+`lonOffset` takes a number of degrees or `"auto"`. With `"auto"`, the viewer
+measures the rotation itself when loading the preset by comparing the outline of
+the continents against the biome map, and tells you how much it rotated and with
+what confidence. If the file isn't in `data/`, it names it and leaves whatever you
+already had loaded.
 
-Si ya tienes algo guardado en el navegador, el preset predeterminado no se
-carga: manda lo tuyo.
+If you already have something stored in the browser, the default preset does not
+load: yours wins.
 
-### Cómo meter tus mapas
+### Loading your own maps
 
-Dos vías, la que te resulte más cómoda:
+Two ways, whichever suits you:
 
-1. **Arrastrar y soltar** el PNG sobre el panel «Datos del mapa». Se guarda en
-   IndexedDB del navegador y sigue ahí la próxima vez que abras la página.
-2. **Dejar el fichero en `data/`** con uno de estos nombres y recargar:
-   `Kerbin_Color.png`, `Kerbin_Biome.png`, `Kerbin_Height.png`. Se cargan solos.
+1. **Drag and drop** the PNG onto the "Datos del mapa" panel. It is stored in the
+   browser's IndexedDB and is still there next time you open the page.
+2. **Drop the file into `data/`** under one of these names and reload:
+   `Kerbin_Color.png`, `Kerbin_Biome.png`, `Kerbin_Height.png`. They load by
+   themselves.
 
-El requisito es que la imagen sea **equirectangular y de proporción 2:1**, con
-longitud −180° a la izquierda y +180° a la derecha, y latitud +90° arriba. Es el
-formato en el que KSP guarda sus texturas de cuerpos, así que normalmente no hay
-que reproyectar nada. Si cargas algo que no sea 2:1 el visor te avisa.
+The requirement is that the image be **equirectangular with a 2:1 aspect ratio**,
+longitude −180° on the left and +180° on the right, latitude +90° at the top. That
+is the format KSP stores its body textures in, so normally there is nothing to
+reproject. If you load something that isn't 2:1, the viewer warns you.
 
-La resolución da igual: 720×360 y 8192×4096 funcionan las dos.
+Resolution doesn't matter: 720×360 and 8192×4096 both work.
 
-### Cuando el mapa no cae donde debe
+### When the map doesn't land where it should
 
-No todos los mapas que circulan usan el mismo meridiano de origen que KSP. El de
-color que viene incluido, sin ir más lejos, está girado 90°: tal cual se descarga,
-el KSC cae en mitad de un desierto en vez de en su costa.
+Not every map out there uses the same prime meridian as KSP. The included colour
+map, for one, is rotated 90°: straight off the download, the KSC lands in the
+middle of a desert instead of on its coast.
 
-Cada ranura tiene una casilla de grados que gira el mapa en longitud. Y si tienes
-cargados color y bioma a la vez, el botón **«Alinear color con el bioma»** calcula
-el giro solo: compara la silueta de los continentes de los dos mapas y se queda con
-el ángulo que mejor encaja. Funciona aunque las paletas no se parezcan en nada,
-porque compara formas de costa, no colores. Si el mejor encaje no destaca sobre el
-promedio, en vez de girar a ciegas te avisa de que esos dos mapas no casan.
+Each slot has a degrees field that rotates the map in longitude. And if you have
+both colour and biome loaded, the **"Alinear color con el bioma"** button works the
+rotation out on its own: it compares the coastline outlines of both maps and keeps
+the angle that fits best. It works even when the palettes look nothing alike,
+because it compares shapes, not colours. If the best fit doesn't stand out above
+the average, instead of rotating blindly it tells you those two maps don't match.
 
-Ojo con una trampa: **el desfase es de la imagen, no de la ranura.** Si cargas un
-mapa nuevo encima de otro, el visor reinicia el desfase a 0 en vez de arrastrar el
-del anterior, y si hay un mapa de biomas cargado aprovecha para medir el del nuevo
-ahí mismo y decírtelo. Heredar el giro del mapa anterior pinta el nuevo torcido sin
-motivo aparente, que es de lo más desconcertante.
+Watch out for one trap: **the offset belongs to the image, not to the slot.** If
+you load a new map over another one, the viewer resets the offset to 0 rather than
+carrying the previous one over, and if a biome map is loaded it takes the chance to
+measure the new one right there and tell you. Inheriting the previous map's
+rotation draws the new one crooked for no apparent reason, which is thoroughly
+confusing.
 
-Los dos mapas de color incluidos son un buen ejemplo de que esto no es teórico: el
-de 4096 está alineado (máximo en 0°, 95,9%; los ángulos vecinos bajan) y el de la
-wiki necesita 90° (94,7% girando 90°, entre 44% y 58% con cualquier otro ángulo).
+The two included colour maps are a good example that this isn't theoretical: the
+4096 one is aligned (peak at 0°, 95.9%; neighbouring angles drop off) and the wiki
+one needs 90° (94.7% at 90°, between 44% and 58% at any other angle).
 
-### Biomas — la vía práctica
+### Biomes — the practical route
 
-**El mapa de biomas de SCANsat (720×360) vale tal cual.** Es 2:1, y aunque un
-píxel sea medio grado (unos 5 km en el ecuador), los biomas son regiones planas,
-así que no se pierde nada. El visor lo pinta **sin interpolar**: un color
-promediado entre dos biomas no es ningún bioma, y además rompería la sonda.
+**SCANsat's biome map (720×360) works as is.** It's 2:1, and even though a pixel is
+half a degree (about 5 km at the equator), biomes are flat regions, so nothing is
+lost. The viewer draws it **without interpolation**: a colour averaged between two
+biomes is no biome at all, and it would break the probe as well.
 
-Los biomas van como **capa superpuesta**, con su propia opacidad, encima del
-mapa de color. Es como se miran de verdad: qué bioma cae sobre qué terreno.
+Biomes go in as an **overlay**, with their own opacity, on top of the colour map.
+That's how you actually look at them: which biome falls on which terrain.
 
-Al cargarlo, el panel «Biomas» lee la leyenda entera: cada color con el
-porcentaje de superficie de Kerbin que ocupa. El porcentaje está ponderado por
-`cos(lat)`, porque en equirectangular una fila de píxeles junto al polo
-representa muchísima menos superficie que una del ecuador; sin esa corrección
-los casquetes saldrían tres veces más grandes de lo que son.
+On load, the "Biomas" panel reads the whole legend: each colour with the
+percentage of Kerbin's surface it covers. The percentage is weighted by `cos(lat)`,
+because in an equirectangular projection a row of pixels next to the pole
+represents far less surface than one at the equator; without that correction the
+caps would come out three times larger than they are.
 
-Los nombres los pones tú, en la propia leyenda. La paleta cambia entre versiones
-y exportadores, así que el visor no adivina ninguno. Se guardan en el navegador
-y puedes exportarlos a JSON para reutilizarlos.
+You supply the names, in the legend itself. The palette changes between versions
+and exporters, so the viewer guesses none of them. They are stored in the browser
+and you can export them to JSON to reuse them.
 
-### Altura
+### Height
 
-**El terreno de Kerbin stock es procedural.** Lo genera el PQS con ruido en
-tiempo de ejecución; no existe ninguna textura de alturas dentro de los archivos
-del juego que puedas extraer. Por eso la altura está en un panel aparte marcado
-como opcional. Hay dos formas de conseguir un heightmap de verdad.
+**Stock Kerbin's terrain is procedural.** The PQS generates it with noise at run
+time; there is no height texture inside the game files you could extract. That's
+why height lives in a separate panel marked optional. There are two ways to get a
+real heightmap.
 
-#### La buena: SCANsat en escala de grises
+#### The good one: SCANsat in greyscale
 
-Es la única vía que da datos actuales, a resolución decente y con escala
-conocida. SCANsat ya guarda la altimetría; solo hay que hacer que la pinte de
-forma que se pueda leer como número:
+It's the only route that gives current data, at a decent resolution and with a
+known scale. SCANsat already stores the altimetry; you just have to make it draw
+it in a way that can be read as a number:
 
-1. Escanea Kerbin con un instrumento de altimetría (el SAR da más resolución).
-2. Abre el **big map** y ponlo en **Altimetry**.
-3. En el desplegable de proyección elige **Rectangular**. Las otras
-   (KavrayskiyVII, Polar) no son equirectangulares y no encajarán.
-4. Abre la ventana de **color management** (el icono de paleta) y en la pestaña
-   de terreno:
-   - elige la paleta en **escala de grises**;
-   - déjala en **gradiente suave**, no en *discrete*, o saldrán escalones;
-   - **desactiva Clamp**. Si está activo, todo lo que quede por debajo del corte
-     se pinta con los dos primeros colores de la paleta y el gris deja de ser
-     proporcional a la altura, que es justo lo que necesitas que sea.
-5. **Apunta los valores de los deslizadores Min y Max.** Son los cortes que usa
-   SCANsat para convertir altura en color, así que son exactamente los dos
-   números que pide el visor.
-6. Exporta con el icono de cámara.
+1. Scan Kerbin with an altimetry instrument (SAR gives more resolution).
+2. Open the **big map** and set it to **Altimetry**.
+3. In the projection dropdown pick **Rectangular**. The others (KavrayskiyVII,
+   Polar) are not equirectangular and won't fit.
+4. Open the **color management** window (the palette icon) and, in the terrain tab:
+   - pick the **greyscale** palette;
+   - leave it on **smooth gradient**, not *discrete*, or you'll get steps;
+   - **turn Clamp off**. With it on, everything below the cut is painted with the
+     palette's first two colours and the grey stops being proportional to height,
+     which is exactly what you need it to be.
+5. **Write down the Min and Max slider values.** They are the cuts SCANsat uses to
+   turn height into colour, so they are exactly the two numbers the viewer asks
+   for.
+6. Export with the camera icon.
 
-En el visor: carga el PNG en la ranura **Altura** y escribe en el panel
-`gris 0 = Min` y `gris 255 = Max`. Sin calibrar nada, porque la escala ya la
-sabes. Mejor aún: apúntalos en `data/maps.json` dentro del preset y se aplican
-solos al cargar.
+In the viewer: load the PNG into the **Altura** slot and enter `grey 0 = Min` and
+`grey 255 = Max` in the panel. No calibration needed, because you already know the
+scale. Better still: write them into `data/maps.json` inside the preset and they
+are applied on load.
 
 ```json
 "height": { "file": "Kerbin_Height.png", "lonOffset": 0, "hMin": -1000, "hMax": 6800 }
 ```
 
-El heightmap incluido sale de SCANsat con `TrueGreyScale`. Su rango no está
-estimado: `GameData/SCANsat/Resources/SCANcolors.cfg` guarda por cuerpo
-`minHeightRange` y `maxHeightRange`, y para Kerbin son −1500 y 6500. Mirar ahí es
-más fiable que apuntar los deslizadores a ojo.
+The included heightmap comes out of SCANsat with `TrueGreyScale`. Its range is not
+an estimate: `GameData/SCANsat/Resources/SCANcolors.cfg` stores `minHeightRange`
+and `maxHeightRange` per body, and for Kerbin they are −1500 and 6500. Looking
+there is more reliable than eyeballing the sliders.
 
-Comprobado contra datos independientes: el KSC lee 37 m (su altitud real ronda los
-70, y cada píxel cubre 1,8 km), la alineación sale 0° con 96,6% de coincidencia
-contra el mapa de biomas, y el océano da entre −1090 y −935 m, o sea batimetría de
-verdad y no un plano.
+Checked against independent data: the KSC reads 37 m (its real altitude is around
+70, and each pixel covers 1.8 km), alignment comes out at 0° with a 96.6% match
+against the biome map, and the ocean gives between −1090 and −935 m — real
+bathymetry, not a flat plane.
 
-**Aviso sobre los polos.** El 14,7% de la imagen es gris 48, que con ese rango es
-exactamente 0 m, y el 98,4% de esos píxeles está por encima de |lat| 60°. Es zona
-sin escanear rellenada a 0 m, no terreno. Por debajo de esa latitud el mapa está
-prácticamente completo.
+**A warning about the poles.** 14.7% of the image is grey 48, which with that range
+is exactly 0 m, and 98.4% of those pixels are above |lat| 60°. That's unscanned
+area filled in at 0 m, not terrain. Below that latitude the map is practically
+complete.
 
-**No vale el mapa de altimetría en color.** Es el mismo dato, pero la sonda
-traduce luminancia a metros, y en esas paletas la luminancia no crece con la
-altitud: el amarillo de media ladera brilla más que el rojo de la cumbre, así que
-las cimas saldrían hundidas. El visor mide la saturación de lo que cargas en la
-ranura de Altura y te avisa si le has metido una paleta en vez de un gris.
+**The colour altimetry map is no good.** It's the same data, but the probe
+translates luminance into metres, and in those palettes luminance doesn't grow with
+altitude: the yellow of a mid slope is brighter than the red of the summit, so
+peaks would come out as pits. The viewer measures the saturation of whatever you
+load into the Height slot and warns you if you've fed it a palette instead of a
+greyscale.
 
-Si algún día no sabes de dónde salió un gris, la calibración de dos puntos del
-panel sigue ahí: pulsa «Punto A», haz clic en un sitio del que sepas la altitud
-real, escríbela, repite con B en otro de altitud bien distinta y el rango se
-ajusta solo. Funciona también si el mapa está invertido (oscuro = alto).
+If one day you don't know where a greyscale came from, the panel's two-point
+calibration is still there: press "Punto A", click somewhere whose real altitude
+you know, type it in, repeat with B somewhere of a very different altitude, and the
+range adjusts itself. It also works if the map is inverted (dark = high).
 
-#### La otra: volcar el PQS
+#### The other one: dumping the PQS
 
-KittopiaTech o el editor en juego de Kopernicus pueden muestrear el PQS y sacar
-un heightmap. Da más resolución que SCANsat y no depende de haber escaneado
-nada, pero el gris no viene con escala: ahí sí toca calibrar a dos puntos.
+KittopiaTech or Kopernicus's in-game editor can sample the PQS and produce a
+heightmap. It gives more resolution than SCANsat and doesn't depend on having
+scanned anything, but the greyscale comes with no scale attached: there you do have
+to calibrate with two points.
 
-#### La que no vale: la figura de la wiki
+#### The one that doesn't work: the wiki figure
 
-En la wiki hay un `Kerbin heightmap.jpg`. No es un gris, es una figura coloreada
-por bandas con leyenda y ejes dibujados encima, de KSP 0.18.2.
+The wiki has a `Kerbin heightmap.jpg`. It isn't a greyscale, it's a figure coloured
+in bands with a legend and axes drawn on top, from KSP 0.18.2.
 
-Se puede decodificar —`tools/decode-banded-map.html` lo hace, y clasifica el
-96,8% de los píxeles contra las 13 bandas de su leyenda—, pero el resultado
-**no es fiable donde más te importa**:
+It can be decoded — `tools/decode-banded-map.html` does it, and classifies 96.8% of
+the pixels against the 13 bands of its legend — but the result **is not reliable
+where it matters most**:
 
-- Son **12 escalones**, no una superficie. Los cortes están en −1000, −500, 0,
-  100, 200, 500, 1000, 1500, 2000, 2500 y 3000 m.
-- La geografía global sí sigue valiendo: coincide un **94,6%** con el mapa de
-  biomas actual, sin girar. Los continentes de 2012 son los de hoy.
-- Pero **la costa del KSC no coincide**. En esa figura el KSC cae casi un grado
-  mar adentro, unos 90 km. Baikerbanur, Woomerang y el Dessert Site, que están
-  tierra adentro, sí salen bien; los puntos costeros, no.
+- They are **12 steps**, not a surface. The cuts are at −1000, −500, 0, 100, 200,
+  500, 1000, 1500, 2000, 2500 and 3000 m.
+- The global geography does still hold up: it matches the current biome map by
+  **94.6%**, with no rotation. The continents of 2012 are today's.
+- But **the KSC's coastline doesn't match**. In that figure the KSC falls almost a
+  degree out to sea, some 90 km. Baikerbanur, Woomerang and the Dessert Site, which
+  are inland, do come out right; the coastal points don't.
 
-Sirve para «¿esta región es tierra alta o baja?». No sirve para la altitud de un
-sitio concreto, y menos junto al mar. Por eso **no viene precargado**: tener el
-visor diciendo «alt +217 m» en el KSC con esos datos sería peor que no decir nada.
+It's good for "is this region high or low ground?". It's no good for the altitude
+of a specific spot, least of all next to the sea. That's why it **isn't preloaded**:
+having the viewer say "alt +217 m" at the KSC off that data would be worse than
+saying nothing.
 
-La herramienta se queda porque funciona con cualquier figura por bandas que
-tenga leyenda, no solo con esa.
+The tool stays because it works with any banded figure that has a legend, not just
+that one.
 
-### Color
+### Colour
 
-Cualquier mapa equirectangular de Kerbin que tengas o generes sirve tal cual.
-SCANsat también puede exportar uno, y la función de exportar mapas de
-KittopiaTech / el editor en juego de Kopernicus produce color de un tirón. No te
-doy la ruta exacta de menús de cada mod porque cambia entre versiones; mira la
-documentación del que uses.
+Any equirectangular map of Kerbin you have or generate works as is. SCANsat can
+export one too, and the map export in KittopiaTech / Kopernicus's in-game editor
+produces colour in one go. I'm not giving you the exact menu path for each mod
+because it changes between versions; check the documentation of the one you use.
 
-### Comprobar que encaja
+### Checking that it fits
 
-Genera las imágenes de prueba:
+Generate the test images:
 
 ```bash
 node tools/make-test-map.mjs
@@ -264,377 +304,377 @@ node tools/make-test-map.mjs
 node tools/make-test-map.mjs --biome
 ```
 
-La primera escribe `data/test-equirectangular.png` (2048×1024) con el ecuador en
-verde, el meridiano 0 en rojo y una cruz amarilla sobre las coordenadas del KSC:
-si el marcador azul del KSC cae justo sobre la cruz, la proyección está bien.
+The first writes `data/test-equirectangular.png` (2048×1024) with the equator in
+green, the prime meridian in red and a yellow cross over the KSC's coordinates: if
+the KSC's blue marker lands right on the cross, the projection is right.
 
-La segunda escribe `data/test-biome-720x360.png`, con colores planos, para
-probar la leyenda y los porcentajes con la misma resolución que da SCANsat.
+The second writes `data/test-biome-720x360.png`, in flat colours, to test the
+legend and the percentages at the same resolution SCANsat gives.
 
-Y para la cadena de alturas:
+And for the height chain:
 
 ```bash
 node tools/make-test-map.mjs --height
 ```
 
-Escribe `data/test-height-ramp.png`, un gris con una rampa lineal en longitud:
-`gris = round(255·(lon+180)/360)`. Como la altitud que debe salir en cada punto se
-calcula a mano, sirve para comprobar que la sonda y el rango gris→metros están
-bien antes de meter un export de verdad. Un terreno de aspecto realista quedaría
-más bonito pero no permitiría verificar nada.
+It writes `data/test-height-ramp.png`, a greyscale with a linear ramp in longitude:
+`grey = round(255·(lon+180)/360)`. Since the altitude that should come out at each
+point can be worked out by hand, it serves to check that the probe and the
+grey→metres range are right before feeding it a real export. Realistic-looking
+terrain would be prettier but wouldn't let you verify anything.
 
 ---
 
-## Qué trae
+## What it gives you
 
-**Mapa base.** Retícula de referencia, tu imagen de color, tu mapa de alturas,
-teselas locales en `tiles/`, o una plantilla XYZ propia. Con control de opacidad
-y desfase de longitud por capa, con detección automática del giro.
+**Base map.** Reference graticule, your colour image, your heightmap, local tiles
+in `tiles/`, or your own XYZ template. With per-layer opacity and longitude offset,
+and automatic rotation detection.
 
-**Mapas predeterminados.** Catálogo en `data/maps.json` con el desfase de cada
-uno ya resuelto (o medido al vuelo). Cambiar de mapa es un clic.
+**Map presets.** A catalogue in `data/maps.json` with each one's offset already
+worked out (or measured on the fly). Switching maps is one click.
 
-**Vista 3D.** El botón «Ver en 3D» de la barra superior pasa a un globo: mismas
-texturas, mismos biomas superpuestos, mismos marcadores y la traza orbital, con
-su huella en el suelo y su camino a la altitud real. Arrastra para girar, rueda
-para acercarte. Al volver a 2D conserva el punto que estabas mirando.
+**3D view.** The "Ver en 3D" button in the top bar switches to a globe: same
+textures, same biome overlay, same markers and the orbital track, with its ground
+footprint and its path at true altitude. Drag to rotate, wheel to zoom. Going back
+to 2D keeps the point you were looking at.
 
-**Biomas superpuestos.** Capa encima del relieve con su propia opacidad, pintada
-sin interpolar, y leyenda con el reparto de superficie. Ver arriba.
+**Biome overlay.** A layer over the relief with its own opacity, drawn without
+interpolation, and a legend with the surface breakdown. See above.
 
-**Retícula.** Paralelos y meridianos con paso adaptativo al zoom, rotulados una
-sola vez en el borde.
+**Graticule.** Parallels and meridians with a step that adapts to the zoom,
+labelled once at the edge.
 
-**Coordenadas.** Latitud y longitud bajo el cursor, en el mismo convenio que usa
-KSP (N positivo, E positivo). Al hacer clic, un globo con las coordenadas en
-decimal, listas para copiar, y un botón para dejar ahí un marcador.
+**Coordinates.** Latitude and longitude under the cursor, in the same convention
+KSP uses (N positive, E positive). On click, a popup with the coordinates in
+decimal, ready to copy, and a button to leave a marker there.
 
-**Sonda.** Bajo el cursor, el bioma (por su color, con el nombre que le hayas
-puesto) y, si tienes heightmap calibrado, la altitud.
+**Probe.** Under the cursor, the biome (by its colour, under whatever name you gave
+it) and, if you have a calibrated heightmap, the altitude.
 
-**Regla.** Encadena puntos y mide sobre el gran círculo, con el rumbo inicial de
-cada tramo y el total acumulado. Importante: en una proyección equirectangular la
-recta entre dos puntos **no** es el camino más corto, y la regla lo tiene en
-cuenta.
+**Ruler.** Chain points and measure along the great circle, with the initial
+bearing of each leg and the running total. Important: in an equirectangular
+projection the straight line between two points is **not** the shortest path, and
+the ruler takes that into account.
 
-**Huella / horizonte.** Dada una altitud, dibuja hasta dónde llega la línea de
-visión desde ahí. Sirve para colocar relés de comunicación o planear cobertura
-de escaneo.
+**Footprint / horizon.** Given an altitude, it draws how far the line of sight
+reaches from there. Useful for placing comm relays or planning scanning coverage.
 
-**Traza terrestre.** Introduce periapsis, apoapsis, inclinación, LAN y argumento
-del periapsis, y dibuja por dónde pasa la nave sobre el suelo, teniendo en cuenta
-la rotación de Kerbin. Devuelve periodo, semieje, excentricidad, velocidad en
-periapsis y apoapsis, deriva de longitud por vuelta y latitud máxima alcanzada.
-Avisa si el periapsis entra en atmósfera o bajo el nivel del mar, y detecta las
-órbitas síncronas.
+**Ground track.** Enter periapsis, apoapsis, inclination, LAN and argument of
+periapsis, and it draws where the craft passes over the ground, accounting for
+Kerbin's rotation. It returns period, semi-major axis, eccentricity, velocity at
+periapsis and apoapsis, longitude drift per revolution and maximum latitude
+reached. It warns you if the periapsis enters the atmosphere or goes below sea
+level, and it detects synchronous orbits.
 
-**Naves de una partida.** Arrastras un `persistent.sfs` y aparecen tus naves en
-órbita de Kerbin, en 2D y en 3D (en el globo, a su altitud real). Una barra de
-tiempo las mueve hacia delante y hacia atrás con los escalones de aceleración de
-KSP, con pausa. Puedes dibujar las órbitas de todas a la vez y hacer que la cámara
-siga a una. Ver más abajo.
+**Vessels from a save.** Drag in a `persistent.sfs` and your craft appear in orbit
+around Kerbin, in 2D and in 3D (on the globe, at their true altitude). A time bar
+moves them forwards and backwards with KSP's warp steps, with pause. You can draw
+every orbit at once and have the camera follow one. See below.
 
-**Marcadores.** Vienen seis puntos de referencia (KSC, pista, Island Airfield,
-Baikerbanur, Woomerang, Dessert). Puedes añadir los tuyos, exportarlos a JSON e
-importarlos.
+**Markers.** Six reference points come included (KSC, runway, Island Airfield,
+Baikerbanur, Woomerang, Dessert). You can add your own, export them to JSON and
+import them.
 
-**Búsqueda.** Por nombre de marcador o por coordenadas: `-0.0972, -74.5577` y
-`0.0972 S 74.5577 W` valen las dos.
+**Search.** By marker name or by coordinates: `-0.0972, -74.5577` and
+`0.0972 S 74.5577 W` both work.
 
 ---
 
-## Sobre las coordenadas que incluye
+## About the included coordinates
 
-Los seis marcadores llevan un campo `confianza`:
+The six markers carry a `confianza` (confidence) field:
 
-- `alta` — coordenada muy citada y estable entre versiones. Solo el KSC.
-- `media` — aproximada. Te deja el punto a la vista, pero no la uses para
-  aterrizar a ciegas.
+- `alta` — a much-quoted coordinate, stable across versions. The KSC only.
+- `media` — approximate. It puts the point in view, but don't use it to land
+  blind.
 
-**Las anomalías no están.** Monolitos, pirámides, cráter, restos… no vienen
-incluidos, y es deliberado: no me sé sus coordenadas con precisión suficiente y
-poner números inventados es peor que no poner nada. Añádelas tú conforme las
-encuentres, o pega tu propia lista en `data/landmarks.json` siguiendo el mismo
-formato.
-
----
-
-## Cómo funciona por dentro
-
-**La proyección.** El mapa usa plate carrée (equirectangular), que es la
-proyección en la que KSP guarda las texturas de sus cuerpos: longitud y latitud
-se convierten directamente en X e Y. Leaflet ya la trae como `CRS.EPSG4326`; lo
-único que se cambia es el radio, de los 6371 km de la Tierra a los 600 km de
-Kerbin, para que la escala y las distancias salgan bien (`js/geo.js`).
-
-**Las teselas.** Cargar una imagen de 8192×4096 como un solo elemento se
-atraganta al ampliar. En vez de obligarte a trocear la textura en miles de
-ficheros, `KM.ImageLayer` hereda de `L.GridLayer` y pinta cada tesela recortando
-el trozo que toca de un `ImageBitmap` en memoria. Se comporta como un servidor de
-teselas sin serlo (`js/layers.js`).
-
-El mapa de color se interpola al ampliar; los de biomas y altura **no**, porque
-ahí el valor exacto del píxel es el dato.
-
-**La órbita.** KSP usa cónicas parcheadas: dentro de la esfera de influencia de
-Kerbin la órbita es una elipse kepleriana exacta, sin achatamiento ni J2 que la
-perturben. Así que basta resolver la ecuación de Kepler por Newton-Raphson,
-convertir a coordenadas inerciales y restar la rotación del planeta
-(`js/orbit.js`). Las trazas que salen son las del juego, no una aproximación.
-
-**Constantes de Kerbin** (`js/config.js`): radio 600 km, μ = 3,5316×10¹² m³/s²,
-día sidéreo 21 549,425 s, día solar 6 h exactas, atmósfera hasta 70 km,
-SOI 84 159 286 m.
+**The anomalies are not included.** Monoliths, pyramids, the crater, wreckage… none
+of them ship, and that's deliberate: I don't know their coordinates precisely
+enough, and making numbers up is worse than leaving them out. Add them as you find
+them, or paste your own list into `data/landmarks.json` following the same format.
 
 ---
 
-## Estructura
+## How it works inside
+
+**The projection.** The map uses plate carrée (equirectangular), the projection KSP
+stores its body textures in: longitude and latitude convert straight into X and Y.
+Leaflet already ships it as `CRS.EPSG4326`; the only change is the radius, from
+Earth's 6371 km to Kerbin's 600 km, so scale and distances come out right
+(`js/geo.js`).
+
+**The tiles.** Loading an 8192×4096 image as a single element chokes when you zoom
+in. Rather than forcing you to slice the texture into thousands of files,
+`KM.ImageLayer` extends `L.GridLayer` and draws each tile by cropping the
+corresponding piece out of an in-memory `ImageBitmap`. It behaves like a tile
+server without being one (`js/layers.js`).
+
+The colour map is interpolated when zooming in; the biome and height ones are
+**not**, because there the exact pixel value is the data.
+
+**The orbit.** KSP uses patched conics: inside Kerbin's sphere of influence the
+orbit is an exact Keplerian ellipse, with no oblateness or J2 perturbing it. So it
+is enough to solve Kepler's equation by Newton-Raphson, convert to inertial
+coordinates and subtract the planet's rotation (`js/orbit.js`). The tracks that
+come out are the game's, not an approximation.
+
+**Kerbin constants** (`js/config.js`): radius 600 km, μ = 3.5316×10¹² m³/s²,
+sidereal day 21,549.425 s, solar day exactly 6 h, atmosphere up to 70 km,
+SOI 84,159,286 m.
+
+---
+
+## Layout
 
 ```
-index.html            interfaz
-css/app.css           estilos
-js/config.js          constantes de Kerbin y capas disponibles
-js/geo.js             CRS de Kerbin y geodesia (gran círculo, rumbos, antimeridiano)
-js/storage.js         IndexedDB para imágenes, localStorage para ajustes
-js/layers.js          capa desde imagen, retícula, etiquetas de borde, XYZ
-js/globe.js           vista 3D en WebGL2 (esfera, atmósfera, pines, picking)
-js/probe.js           sonda de píxel y extracción de la leyenda de biomas
-js/orbit.js           propagación kepleriana y traza terrestre
-js/savefile.js        lector de .sfs y calibración de la rotación con las naves
-js/markers.js         marcadores de referencia y propios
-js/tools.js           regla y huella
-js/app.js             cableado de la interfaz
-data/landmarks.json   puntos de referencia
-data/maps.json        qué fichero va en cada ranura, su desfase y su procedencia
-data/                 aquí van tus PNG del mapa
-tiles/                teselas ya troceadas (opcional; ver tiles/LEEME.txt)
-tools/png.mjs         codificador PNG sin dependencias
-tools/make-test-map.mjs  genera imágenes de prueba (color y biomas)
-tools/decode-banded-map.html  figura de elevación por bandas -> heightmap en grises
-server.mjs            servidor estático sin dependencias
+index.html            interface
+css/app.css           styles
+js/config.js          Kerbin constants and available layers
+js/geo.js             Kerbin CRS and geodesy (great circle, bearings, antimeridian)
+js/storage.js         IndexedDB for images, localStorage for settings
+js/layers.js          image layer, graticule, edge labels, XYZ
+js/globe.js           3D view in WebGL2 (sphere, atmosphere, pins, picking)
+js/probe.js           pixel probe and biome legend extraction
+js/orbit.js           Keplerian propagation and ground track
+js/savefile.js        .sfs reader and rotation calibration from the vessels
+js/markers.js         reference and user markers
+js/tools.js           ruler and footprint
+js/app.js             interface wiring
+data/landmarks.json   reference points
+data/maps.json        which file goes in which slot, its offset and its provenance
+data/                 your map PNGs go here
+tiles/                pre-sliced tiles (optional; see tiles/LEEME.txt)
+tools/png.mjs         dependency-free PNG encoder
+tools/make-test-map.mjs  generates test images (colour and biomes)
+tools/decode-banded-map.html  banded elevation figure -> greyscale heightmap
+server.mjs            dependency-free static server
 vendor/leaflet/       Leaflet 1.9.4
+desktop/              the Windows app (C# and OpenGL) — see desktop/README.md
 ```
 
 ---
 
-## Naves de una partida
+## Vessels from a save
 
-Panel «Naves de una partida»: arrastra el `persistent.sfs` de
-`saves/<tu partida>/`. Se lee en el navegador, no sale de tu máquina, y un
-fichero de 6 MB tarda unos 200 ms.
+The "Naves de una partida" panel: drag in the `persistent.sfs` from
+`saves/<your save>/`. It is read in the browser, it never leaves your machine, and
+a 6 MB file takes about 200 ms.
 
-Se dibujan las naves que orbitan Kerbin; las de otros cuerpos se cuentan pero no
-se pintan, porque su latitud y longitud son de otro sitio. Los escombros vienen
-ocultos por defecto: suelen ser la mitad de la lista. Pincha una nave para ver su
-traza y sus datos (Pe, Ap, inclinación, excentricidad, periodo).
+Vessels orbiting Kerbin are drawn; those at other bodies are counted but not
+painted, because their latitude and longitude belong somewhere else. Debris is
+hidden by default: it's usually half the list. Click a vessel to see its track and
+its figures (Pe, Ap, inclination, eccentricity, period).
 
-La traza del globo es una sola: si pinchas una nave sustituye a la órbita que
-hubieras dibujado a mano en su panel, y al revés. Manda la última que pediste.
+The globe has a single track: clicking a vessel replaces the orbit you had drawn by
+hand in its panel, and vice versa. The last one you asked for wins.
 
-### El problema de la longitud, y cómo se resolvió
+### The longitude problem, and how it was solved
 
-De cada nave el save guarda sus elementos orbitales (`SMA`, `ECC`, `INC`, `LPE`,
-`LAN`, `MNA`) referidos a una época `EPH`. Con eso la forma de la órbita, su
-periodo y su inclinación salen exactos. Pero para saber **sobre qué punto del
-suelo** está hace falta el ángulo que ha girado Kerbin en ese instante, y eso el
-save no lo guarda.
+For each vessel the save stores its orbital elements (`SMA`, `ECC`, `INC`, `LPE`,
+`LAN`, `MNA`) referred to an epoch `EPH`. That gives you the shape of the orbit, its
+period and its inclination exactly. But to know **which point of the ground** it is
+over you need the angle Kerbin has rotated at that instant, and the save doesn't
+store that.
 
-Usar una constante no vale. Tras cientos de miles de vueltas, **7·10⁻⁵ s de error
-en el periodo ya desplazan un grado**, y el periodo tabulado da unos 2,6° de error
-medio en una partida larga.
+A constant won't do. After hundreds of thousands of revolutions, **7·10⁻⁵ s of
+error in the period already shifts things by a degree**, and the published period
+gives about 2.6° of mean error in a long-running save.
 
-Lo que sí guarda el save, para cada nave, es su latitud y longitud en el momento
-de su época. Con eso se mide la rotación directamente:
+What the save does store, for each vessel, is its latitude and longitude at the
+moment of its epoch. That's enough to measure the rotation directly:
 
-1. **El norte es el eje Z.** Comprobado con las 107 naves en órbita de una
-   partida real: error mediano de latitud 0,2° con Z, 43° con Y. La latitud no
-   depende de la rotación, así que esta prueba es independiente de todo lo demás.
-2. **La lat/lon del save es la de la época EPH, no la del momento de guardar.**
-   Mediana 0,2° contra 1,2°.
-3. Cada nave cuya latitud calculada cuadra con la guardada (a 0,01°) da la
-   rotación en su época: longitud inercial menos longitud del mapa. Se llevan
-   todas al instante del save con el día sidéreo y se promedian **recortando
-   las incoherentes**: media circular, se descarta lo que se aleje más de 5 veces
-   la dispersión mediana (con un suelo de 2°), y se recalcula. El panel enseña
-   con cuántas naves se ha medido, su dispersión mediana y cuántas descartó.
-4. Hay un **ajuste de longitud** manual por si una partida trae pocas naves
-   aprovechables. Normalmente no hace falta tocarlo.
+1. **North is the Z axis.** Checked against the 107 vessels in orbit in a real
+   save: median latitude error 0.2° with Z, 43° with Y. Latitude doesn't depend on
+   the rotation, so this test is independent of everything else.
+2. **The save's lat/lon is the one at epoch EPH, not at the moment of saving.**
+   Median 0.2° against 1.2°.
+3. Each vessel whose computed latitude matches the stored one (to 0.01°) yields the
+   rotation at its epoch: inertial longitude minus map longitude. They are all
+   carried to the instant of the save with the sidereal day and averaged **with the
+   inconsistent ones trimmed**: circular mean, anything further than 5 times the
+   median dispersion is discarded (with a 2° floor), and it is recomputed. The
+   panel shows how many vessels were used, their median dispersion and how many it
+   threw out.
+4. There's a manual **longitude adjustment** in case a save has few usable vessels.
+   You don't normally need to touch it.
 
-Por qué la rotación sidérea y no la solar: con el día sidéreo las medidas de las
-distintas naves se concentran (R = 0,67 sin filtrar), con el solar se dispersan
-(R = 0,27).
+Why the sidereal rotation and not the solar one: with the sidereal day the
+measurements from the different vessels cluster (R = 0.67 unfiltered), with the
+solar one they scatter (R = 0.27).
 
-**El método da la misma constante en partidas distintas.** La rotación en el
-instante del save cambia con cada guardado, pero descontando el UT tiene que salir
-siempre el mismo origen. Con dos guardados de la misma partida separados por 31
-días de Kerbin: 87,364° y 87,365°. Si ese origen es en realidad 90° con un periodo
-2·10⁻⁴ s más corto que el tabulado no se puede distinguir, porque el valor
-publicado no tiene tanta precisión. Al visor le da igual: calibra cada partida por
-separado.
+**The method gives the same constant across different saves.** The rotation at the
+instant of the save changes with every save, but once UT is discounted the same
+origin has to come out every time. With two saves of the same game 31 Kerbin days
+apart: 87.364° and 87.365°. Whether that origin is really 90° with a period
+2·10⁻⁴ s shorter than the published one can't be told apart, because the published
+value isn't that precise. The viewer doesn't care: it calibrates each save on its
+own.
 
-**Verificación con grupo de control.** Se calibró con la mitad de las naves y se
-predijo la longitud de la otra mitad, que no participó en la calibración. Con las
-dos particiones: error mediano **0,02°** en la peor (unos 2 km) y 0,0004° en la
-mejor. Calibrar y comprobar con las mismas naves no habría demostrado nada. El
-código del visor se ejecutó tal cual en Node sobre la partida y en el navegador,
-y los dos dan el mismo ángulo.
+**Verified with a control group.** It was calibrated with half the vessels and used
+to predict the longitude of the other half, which took no part in the calibration.
+Across the two partitions: median error **0.02°** in the worse one (about 2 km) and
+0.0004° in the better one. Calibrating and checking with the same vessels would
+have proved nothing. The viewer's code was run as is in Node over the save and in
+the browser, and both give the same angle.
 
-**Naves incoherentes.** En esa partida hay dos: una sale 43,5° desviada y un
-escombro 2,9°. Lo más probable es que su lat/lon sea de otro instante y hayan
-pasado el filtro de latitud por casualidad. Por eso la calibración recorta: sin
-recortar, la de 43,5° arrastraba el resultado casi un grado (0,996°), y el
-escombro fue el que estropeó la primera validación, que dio 0,18° en vez de 0,02°.
+**Inconsistent vessels.** That save has two: one comes out 43.5° off and a piece of
+debris 2.9°. Most likely their lat/lon is from another instant and they passed the
+latitude filter by chance. That's why the calibration trims: without trimming, the
+43.5° one dragged the result almost a degree off (0.996°), and the debris was what
+spoiled the first validation, which gave 0.18° instead of 0.02°.
 
-Límites: solo órbitas cerradas (se descartan las hiperbólicas y las radiales
-degeneradas que KSP asigna a las naves posadas), solo el cuerpo del visor, y no se
-conecta al juego en vivo: todo se simula a partir del guardado.
+Limits: closed orbits only (hyperbolic ones and the degenerate radial orbits KSP
+assigns to landed craft are discarded), the viewer's body only, and it doesn't
+connect to the running game: everything is simulated from the save.
 
-### Simulación en el tiempo
+### Simulation in time
 
-Al cargar una partida aparece abajo una barra de tiempo. El reloj arranca en el
-instante del guardado y en pausa.
+Loading a save brings up a time bar at the bottom. The clock starts at the instant
+of the save, paused.
 
-| Control | Atajo | Qué hace |
+| Control | Shortcut | What it does |
 |---|---|---|
-| ▶ / ❚❚ | espacio | continuar / pausar |
-| ▶▶ | `.` | un escalón más rápido hacia delante |
-| ◀◀ | `,` | un escalón más hacia atrás |
-| Guardado | | vuelve al instante de la partida |
-| Seguir | F | la cámara no pierde a la nave seleccionada |
+| ▶ / ❚❚ | space | resume / pause |
+| ▶▶ | `.` | one step faster forwards |
+| ◀◀ | `,` | one step further back |
+| Guardado | | back to the instant of the save |
+| Seguir | F | the camera keeps the selected vessel in view |
 
-Los escalones son los de la aceleración de tiempo de KSP (×1, 5, 10, 50, 100, 1000,
-10 000 y 100 000) y continúan en negativo en una sola escala: ◀◀ baja un escalón
-cada vez (×100 000 … ×5, ×1) y luego pasa a ×−1, ×−5 … ×−100 000, y ▶▶ recorre el
-camino inverso, sin saltos. Cambiar la velocidad arranca el reloj, como en el
-juego. Los atajos no actúan mientras escribes en un campo.
+The steps are KSP's own time warp steps (×1, 5, 10, 50, 100, 1000, 10,000 and
+100,000) and continue into negative values on a single scale: ◀◀ goes down one step
+at a time (×100,000 … ×5, ×1) and then moves on to ×−1, ×−5 … ×−100,000, and ▶▶
+walks back the same way, with no jumps. Changing the speed starts the clock, as in
+the game. The shortcuts don't fire while you're typing in a field.
 
-**Es Kepler puro desde el estado guardado.** Hacia atrás ves dónde *habría estado*
-cada nave según su órbita actual: sin maniobras, sin lanzamientos posteriores y sin
-frenado atmosférico. Una nave cuya órbita corta el suelo se oculta mientras está
-por debajo.
+**It's pure Kepler from the saved state.** Going backwards you see where each
+vessel *would have been* according to its current orbit: no manoeuvres, no later
+launches and no atmospheric drag. A vessel whose orbit cuts the ground is hidden
+while it is below it.
 
-**Todas las órbitas.** La casilla del panel dibuja las de todas las naves visibles.
-En 2D son trazas terrestres desde el instante simulado (hasta 3 vueltas, en un
-canvas, porque decenas de líneas redibujándose varias veces por segundo saturan el
-SVG de Leaflet). En 3D son anillos cerrados: una órbita kepleriana es una elipse
-fija en el espacio y lo que se mueve es Kerbin debajo, así que cada anillo se
-construye una vez y en cada fotograma solo se gira en el shader. La nave
-seleccionada lleva además su huella en el suelo.
+**All orbits.** The panel checkbox draws them for every visible vessel. In 2D they
+are ground tracks from the simulated instant (up to 3 revolutions, on a canvas,
+because dozens of lines redrawing several times a second swamp Leaflet's SVG). In
+3D they are closed rings: a Keplerian orbit is an ellipse fixed in space and what
+moves is Kerbin underneath, so each ring is built once and only rotated in the
+shader each frame. The selected vessel also gets its ground footprint.
 
-**Seguir.** En 3D la cámara se coloca sobre la nave mirando al centro de Kerbin: la
-nave queda en el centro de la pantalla con el suelo pasando por debajo, y no deja
-acercarse por dentro de su órbita. En 2D el mapa se recentra sobre ella. Arrastrar
-lo cancela.
+**Follow.** In 3D the camera sits above the vessel looking at Kerbin's centre: the
+vessel stays at the centre of the screen with the ground passing underneath, and it
+won't let you get inside its orbit. In 2D the map recentres on it. Dragging cancels
+it.
 
-**Zoom.** El alejamiento ya no está topado en 12 radios: llega a tres veces la
-órbita más lejana de la partida. Los planos de recorte dependen de la distancia;
-con el cercano fijo, a cientos de radios el búfer de profundidad se queda sin
-precisión y las órbitas parpadean contra el planeta.
+**Zoom.** Zooming out is no longer capped at 12 radii: it reaches three times the
+furthest orbit in the save. The clipping planes depend on the distance; with a
+fixed near plane, at hundreds of radii the depth buffer runs out of precision and
+the orbits flicker against the planet.
 
-**El reloj no pierde tiempo con pocos fotogramas.** Si la pestaña pasa a segundo
-plano, el hueco se descarta al volver, para no saltar horas de golpe. Pero el tope
-no puede ser por fotograma: una primera versión cortaba cada paso a 0,25 s, y con
-una escena pesada a 3 fotogramas por segundo el ×1 simulaba 0,28 s por segundo real.
+**The clock doesn't lose time at low frame rates.** If the tab goes to the
+background, the gap is discarded on return, so it doesn't jump hours at once. But
+the cap can't be per frame: an early version clipped each step to 0.25 s, and with a
+heavy scene at 3 frames per second ×1 simulated 0.28 s per real second.
 
-**Verificado:**
+**Verified:**
 
-- Cada nave va sobre su anillo girado en instantes de −5000 s a +250 000 s.
-- Sobre el propio render (leyendo los píxeles), con la nave de mayor inclinación
-  (89,83°) y los dos sentidos de giro separados 60°: hay color del anillo junto a
-  la nave con el giro correcto (34 píxeles) y ninguno con el giro invertido ni sin
-  giro. Con una órbita casi ecuatorial esta prueba no discrimina: un anillo
-  ecuatorial girado sobre el polo cae sobre sí mismo.
-- Los marcadores coinciden exactamente con Kepler en el instante simulado, la
-  escala de velocidades recorre y satura como se describe arriba, la pausa congela
-  el reloj y «Guardado» vuelve exacto al instante de la partida.
-- Seguir deja la cámara exactamente sobre la nave en 3D, y en 2D con el redondeo a
-  píxel de Leaflet. Arrastrar lo cancela en los dos modos.
-- Con 62 naves, el alejamiento llega a los 263,5 radios que pide la órbita más
-  lejana.
-- Reloj: midiendo cada fotograma contra su propia marca de tiempo, el tiempo
-  simulado avanza exactamente a la velocidad elegida (×1, ×1000, ×−1000 y
-  ×100 000; error por fotograma de 2 partes por millón como mucho), aun con la
-  ventana limitada a 2–4 fotogramas por segundo.
+- Each vessel sits on its rotated ring at instants from −5000 s to +250,000 s.
+- Against the render itself (reading the pixels back), with the most inclined
+  vessel (89.83°) and the two rotation directions 60° apart: there is ring colour
+  next to the vessel with the correct rotation (34 pixels) and none with the
+  inverted rotation or with no rotation. With a near-equatorial orbit this test
+  doesn't discriminate: an equatorial ring rotated about the pole falls on itself.
+- The markers match Kepler exactly at the simulated instant, the speed scale steps
+  and saturates as described above, pause freezes the clock and "Guardado" returns
+  exactly to the instant of the save.
+- Follow leaves the camera exactly above the vessel in 3D, and in 2D within
+  Leaflet's pixel rounding. Dragging cancels it in both modes.
+- With 62 vessels, zooming out reaches the 263.5 radii the furthest orbit asks for.
+- Clock: measuring each frame against its own timestamp, simulated time advances
+  exactly at the chosen rate (×1, ×1000, ×−1000 and ×100,000; per-frame error of 2
+  parts per million at most), even with the window limited to 2–4 frames per
+  second.
 
-## La vista 3D
+## The 3D view
 
-WebGL directo, sin motor 3D de por medio (`js/globe.js`). Para lo que hace falta
-aquí —una esfera con la textura equirectangular pegada— traerse una librería de
-600 KB no compensa: ese es justo el mapeo UV natural de una esfera.
+Plain WebGL, with no 3D engine in between (`js/globe.js`). For what's needed here —
+a sphere with an equirectangular texture on it — pulling in a 600 KB library
+doesn't pay off: that is precisely a sphere's natural UV mapping.
 
-Detalles que no son evidentes y que costó afinar:
+Details that aren't obvious and took some tuning:
 
-- **La costura del meridiano.** Los vértices de la columna donde `u` pasa de 1 a 0
-  están duplicados; si se cosen, la interpolación va 1 → 0 dentro de un triángulo
-  y sale una franja con la textura entera comprimida. Y como el desfase de
-  longitud mueve `u` fuera de [0,1], se envuelve con `fract()` pero las derivadas
-  se pasan sin envolver a `textureGrad`: con `texture()` normal, el mipmap ve una
-  derivada enorme justo en la costura, elige el nivel más borroso y deja una línea.
-- **Requiere WebGL2**, por lo anterior y porque las texturas de biomas no son
-  potencia de dos (1800×900). Si el navegador no lo trae, te lo dice y se queda
-  en 2D.
-- **Los índices de atributo se fijan a mano** antes de enlazar: el planeta y la
-  atmósfera comparten el mismo VAO, y si cada programa los numerase a su manera,
-  uno de los dos leería basura.
-- **La base de cámara del picking tiene que coincidir con la del renderizado.**
-  `lookAt` construye su eje X como `arriba × atrás`, y es fácil calcularlo en el
-  picking como `arriba × adelante`, que es el mismo vector cambiado de signo: el
-  ratón queda espejado en X respecto a lo que se ve. El fallo es traicionero
-  porque el picking sigue siendo coherente consigo mismo, así que cualquier
-  prueba que compare `pick` contra `pick` lo da por bueno. La única que lo caza es
-  comparar el píxel **dibujado** con el color que la textura tiene en la
-  coordenada que devuelve `pick`: espejado da error medio 100, correcto da 3.
-- **El arrastre agarra la superficie.** Los grados que gira cada píxel no son un
-  factor a ojo: se despejan de la geometría, `θ = asin(d·sen α) − α`, para que el
-  punto que agarras siga al cursor. Un ritmo constante solo vale junto al centro;
-  según te alejas la esfera se escorza, el mismo píxel abarca cada vez más arco, y
-  linealizarlo es lo que hace que el globo se dispare. Verificado midiendo: el
-  punto se desvía menos de 31 km sobre 3770 de circunferencia.
-- **Los marcadores son HTML** sobre el lienzo, no geometría: nítidos a cualquier
-  zoom y con el mismo aspecto que en 2D. Se ocultan solos al pasar tras el
-  horizonte, y cuando varios se amontonan solo el primero conserva el nombre —el
-  punto se mantiene siempre, porque la posición es el dato.
-- **El relieve desplaza vértices y recalcula la normal.** Lo primero es obvio; lo
-  segundo no, y es lo que decide si se ve algo: con la normal de la esfera la luz
-  no se entera de que hay montañas y el relieve solo se distingue en la silueta
-  del limbo. Se muestrean dos vecinos a un par de téxeles del heightmap y se hace
-  el producto vectorial de las tangentes. Lleva exageración porque a escala real
-  el pico más alto de Kerbin es un 1% del radio y no se notaría.
+- **The meridian seam.** The vertices of the column where `u` goes from 1 to 0 are
+  duplicated; if they're stitched, the interpolation runs 1 → 0 inside a triangle
+  and you get a band with the whole texture squeezed into it. And since the
+  longitude offset moves `u` outside [0,1], it is wrapped with `fract()` but the
+  derivatives are passed unwrapped to `textureGrad`: with a plain `texture()`, the
+  mipmap sees a huge derivative right at the seam, picks the blurriest level and
+  leaves a line.
+- **It needs WebGL2**, because of the above and because the biome textures aren't
+  powers of two (1800×900). If the browser doesn't have it, it says so and stays in
+  2D.
+- **Attribute indices are set by hand** before linking: the planet and the
+  atmosphere share the same VAO, and if each program numbered them its own way, one
+  of the two would read garbage.
+- **The picking camera basis has to match the rendering one.** `lookAt` builds its X
+  axis as `up × back`, and it's easy to compute it in the picking code as
+  `up × forward`, which is the same vector with the sign flipped: the mouse ends up
+  mirrored in X with respect to what you see. The bug is treacherous because picking
+  stays consistent with itself, so any test comparing `pick` against `pick` passes
+  it. The only one that catches it compares the **drawn** pixel against the colour
+  the texture holds at the coordinate `pick` returns: mirrored gives a mean error of
+  100, correct gives 3.
+- **Dragging grabs the surface.** The degrees each pixel rotates aren't an
+  eyeballed factor: they are solved from the geometry, `θ = asin(d·sin α) − α`, so
+  the point you grab follows the cursor. A constant rate only works near the centre;
+  as you move outwards the sphere foreshortens, the same pixel spans more and more
+  arc, and linearising it is what makes the globe bolt. Verified by measurement: the
+  point drifts less than 31 km over 3770 of circumference.
+- **The markers are HTML** over the canvas, not geometry: sharp at any zoom and
+  looking the same as in 2D. They hide themselves when they pass behind the horizon,
+  and when several pile up only the first keeps its name — the dot always stays,
+  because the position is the data.
+- **Relief displaces vertices and recomputes the normal.** The first part is
+  obvious; the second isn't, and it's what decides whether you see anything: with
+  the sphere's normal the light never learns there are mountains and the relief only
+  shows on the limb silhouette. Two neighbours a couple of texels away are sampled
+  from the heightmap and the tangents are crossed. It comes with exaggeration
+  because at true scale Kerbin's highest peak is 1% of the radius and wouldn't show.
 
-### La traza orbital sobre el globo
+### The orbital track on the globe
 
-Al dibujar una órbita se pintan dos cosas a partir de los mismos puntos: la
-**huella sobre el suelo** y el **camino a su altitud real**, que se aleja del
-planeta hasta el apoapsis y vuelve.
+Drawing an orbit paints two things from the same points: the **ground footprint**
+and the **path at its true altitude**, which moves away from the planet up to the
+apoapsis and back.
 
-Las dos van en el marco fijo al cuerpo, igual que la textura del globo. Por eso
-el camino en altura **no se cierra en una elipse**: es la trayectoria vista desde
-el planeta que gira, y ese desmadejarse hacia el oeste es exactamente la deriva
-que hace que cada vuelta pase por un sitio distinto. El número que da el panel
-como «deriva por vuelta» es esa misma cosa, medida.
+Both are in the body-fixed frame, like the globe's texture. That's why the path in
+altitude **doesn't close into an ellipse**: it is the trajectory as seen from the
+rotating planet, and that unravelling towards the west is exactly the drift that
+makes each revolution pass somewhere different. The number the panel gives as
+"drift per revolution" is that same thing, measured.
 
-Dos detalles:
+Two details:
 
-- **Aquí no hay que partir nada por el antimeridiano.** Sobre una esfera la línea
-  es continua, así que todo el troceo que en 2D es obligatorio simplemente
-  desaparece. Es de las pocas cosas que salen más fáciles en 3D.
-- **La huella se levanta 0,0016 del suelo.** La esfera es un poliedro inscrito:
-  entre vértices su superficie queda por debajo de r=1, y una línea pegada a r=1
-  se hundiría a trozos. Con el relieve activado la línea se desplaza igual que el
-  terreno, para que no quede flotando.
+- **Nothing has to be split at the antimeridian here.** On a sphere the line is
+  continuous, so all the slicing that is mandatory in 2D simply disappears. It's one
+  of the few things that come out easier in 3D.
+- **The footprint is lifted 0.0016 off the ground.** The sphere is an inscribed
+  polyhedron: between vertices its surface falls below r=1, and a line stuck at r=1
+  would sink in places. With relief enabled the line is displaced like the terrain,
+  so it doesn't end up floating.
 
-Lo que **no** hace: no hay terreno 3D real (solo desplazamiento de vértices desde
-el heightmap, si lo tienes) ni retícula lat/lon en 3D.
+What it does **not** do: there is no real 3D terrain (only vertex displacement from
+the heightmap, if you have one) and no lat/lon graticule in 3D.
 
 ---
 
-## Límites conocidos
+## Known limits (web version)
 
-- **Solo Kerbin.** Añadir Mun, Minmus o el resto de cuerpos es cuestión de meter
-  sus parámetros en `js/config.js` y un selector; no está hecho.
-- **La altura depende de que consigas un heightmap.** No hay ninguno dentro del
-  juego: la vía practicable es exportarlo con SCANsat en escala de grises. Ver arriba.
-- **Sin sombreado de relieve.**
-- **Las huellas que rodean un polo** se dibujan de forma tosca: el círculo se
-  parte en el antimeridiano y cerca del polo eso se nota.
-- **Sin vista 3D.** Es un mapa plano deslizante, no un globo.
+- **Kerbin only.** Adding Mun, Minmus or the rest of the bodies is a matter of
+  putting their parameters into `js/config.js` plus a selector; it isn't done. The
+  desktop app does have every body.
+- **Height depends on your getting hold of a heightmap.** There is none inside the
+  game: the workable route is exporting one from SCANsat in greyscale. See above.
+- **No relief shading** in 2D.
+- **Footprints that wrap around a pole** are drawn crudely: the circle is split at
+  the antimeridian and near the pole that shows.
+- **No day/night.** The web version's lighting is flat; the terminator, the
+  atmosphere and the sky view are desktop-app features.
