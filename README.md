@@ -678,3 +678,17 @@ the heightmap, if you have one) and no lat/lon graticule in 3D.
   the antimeridian and near the pole that shows.
 - **No day/night.** The web version's lighting is flat; the terminator, the
   atmosphere and the sky view are desktop-app features.
+
+  ## Image gallery
+
+  <img width="1919" height="1079" alt="imagen" src="https://github.com/user-attachments/assets/931f78a7-499a-49e4-8e94-cc298367dec6" />
+  <img width="1919" height="1079" alt="Captura de pantalla 2026-09-25 164126" src="https://github.com/user-attachments/assets/fb662264-6c0c-4ad4-a74b-f16266b88cfb" />
+  <img width="1919" height="1079" alt="Captura de pantalla 2026-09-25 164206" src="https://github.com/user-attachments/assets/60602981-8b3e-4a1c-8a1a-ea3628a434c5" />
+  <img width="1919" height="1076" alt="imagen" src="https://github.com/user-attachments/assets/d6d8df68-8d71-4e18-954e-f0ead15e4310" />
+  <img width="1919" height="1079" alt="imagen" src="https://github.com/user-attachments/assets/a702dae1-d4b8-4acf-a806-a659e8cfbd0c" />
+  <img width="1919" height="1079" alt="imagen" src="https://github.com/user-attachments/assets/3e81366a-8f4f-4cc8-be78-a2e8a0d01aa9" />
+  <img width="1919" height="1074" alt="imagen" src="https://github.com/user-attachments/assets/8e80fbb8-b734-43d1-9665-2fd305cccd3b" />
+  <img width="1919" height="1079" alt="imagen" src="https://github.com/user-attachments/assets/ccb2f8e6-25db-4eb3-ac7d-2e6c8a0577a0" />
+  <img width="1919" height="1077" alt="imagen" src="https://github.com/user-attachments/assets/e35b70cb-cd00-488f-aa34-c08c5b75fc5c" />
+  <img width="1919" height="1068" alt="imagen" src="https://github.com/user-attachments/assets/d955dafe-b568-45fd-95a9-f5c61f571d1e" />
+  <img width="1919" height="1079" alt="imagen" src="https://github.com/user-attachments/assets/3883a61c-0ff2-43c9-a0a5-3bd7f4278631" />
