@@ -14,7 +14,7 @@ A viewer for the worlds of Kerbal Space Program, in two versions:
 Kerbal Space Program belongs to Squad and Take-Two Interactive. This is a fan
 project with no connection to them.
 
-Happy to take your suggestions! Leave them on a PR or open an Issue!
+Happy to take your suggestions! Leave them on a PR or open an Issue! You can also contact me in discord as @perritoinfame
 
 ---
 
