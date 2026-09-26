@@ -3,8 +3,12 @@
 La versión nativa para Windows del visor de Kerbin. Hace lo mismo que la web
 (mapa plano, globo 3D, biomas, alturas, herramientas, órbitas y naves de una
 partida con su simulación en el tiempo), pero es un `.exe`: no hace falta
-navegador ni servidor. Además tiene cosas que la web no: la vista del cielo desde
-la superficie y el foco de la cámara en una nave.
+navegador ni servidor. Además tiene bastantes cosas que la web no: cualquier cuerpo
+del sistema (de serie o de Kopernicus), día y noche con atmósfera física, la vista
+del cielo desde la superficie, el foco de la cámara en una nave con su modelo
+montado pieza a pieza, lo que la partida lleva escaneado con SCANsat, un filtro de
+altimetría, waypoints que se escriben en la propia partida, un asistente de
+aterrizaje y una calculadora de ventanas de lanzamiento.
 
 Está escrita en **C# con .NET 10**. La interfaz usa WinForms con controles
 dibujados a mano para copiar el tema oscuro de la web, y el mapa, el globo y el
@@ -85,9 +89,9 @@ la ficha con sus datos.
 - **La rotación** de cada cuerpo se mide con las naves de la partida que lo orbitan,
   como en Kerbin; sin ninguna, se usa la del juego.
 
-Los mapas, biomas, alturas y marcadores que trae el visor son de Kerbin: el resto de
-cuerpos se ven con su color y la retícula. Los packs que guardan sus texturas en
-paquetes de Unity (OPM, por ejemplo) no dejan leerlas.
+Los mapas, biomas, alturas y marcadores que **trae** el visor son de Kerbin, pero los
+demás cuerpos pueden tener los suyos: ver «Mapas de los demás cuerpos», más abajo. Sin
+ellos, cada cuerpo se ve con su color y la retícula.
 
 ## Las tres vistas
 
@@ -198,6 +202,107 @@ Lo que no se reproduce:
 - **La luz** es aproximada: el Sol del globo más una luz desde la cámara, sin
   brillos, mapas de normales ni sombras de unas piezas sobre otras.
 
+## Mapas de los demás cuerpos
+
+El visor solo trae mapas de Kerbin. Si tienes volcadas a PNG las texturas de KSP (con
+cualquier extractor de assets), en «Cuerpo celeste» → **Carpeta de mapas…** se apunta a
+esa carpeta y cada cuerpo se ve con su mapa de verdad, sus alturas y sus biomas si los
+hay. Se reconocen por el nombre: `Duna_Color.png`, `Mun_Height.png`,
+`Eeloo_Biomes.png`… (los de normales se ignoran, y entre dos del mismo tipo gana el de
+más resolución).
+
+**Esas texturas vienen en espejo horizontal y giradas 90° en longitud**, y el visor lo
+corrige solo. No es una suposición: se cuadraron las texturas contra los mapas de
+biomas de la wiki comparando siluetas y bordes. Kerbin encaja al 95,6 % con
+espejo + 90° (el control entre los dos mapas que ya traía el visor da 95,9 %), y el
+mismo par sale en Duna, Eve, Laythe, Moho y Dres. Si tu volcado viene de otra
+herramienta, los dos ajustes (`BodyMapOffset` y `BodyMapMirror`) están en los ajustes.
+
+La escala de gris a metros de cada cuerpo se saca de SCANsat: del propio guardado si lo
+trae, y si no de `SCANsat/Resources/SCANcolors.cfg` de tu instalación.
+
+## SCANsat, anomalías y modo progresión
+
+La sección «SCANsat y progreso» lee de la partida lo que el juego ya sabe:
+
+- **Cobertura de SCANsat** por cuerpo: lo que no has escaneado se tapa, en el mapa y en
+  el globo. El mod la guarda como un `Int16[360,180]` comprimido con LZF dentro de una
+  serialización de .NET; el descompresor de aquí se comprobó byte a byte contra el del
+  propio mod (40 de 40 bloques idénticos) y el mapeo de celdas a lat/lon, con un
+  guardado de cobertura parcial que sale como la banda ecuatorial que le corresponde.
+- **Anomalías**: el catálogo (`data/anomalies.json`, 25 con coordenadas, del proyecto
+  Kerbal Maps, Apache-2.0) se cruza con tu cobertura. Cada una sale como **sin
+  detectar**, **detectada** (pasó el sensor de anomalías) o **identificada** (pasó
+  también el de detalle), igual que en el juego. Se pueden mandar a la partida como
+  waypoints.
+- **Hitos** de `ProgressTracking`: qué cuerpos has alcanzado, sobrevolado, orbitado o
+  pisado.
+
+Con **modo progresión** el visor enseña solo lo descubierto: la cobertura tapa lo no
+escaneado, las anomalías salen solo si las has detectado y los cuerpos sin visitar se
+marcan en la lista. En sandbox se ve todo. Al cargar una partida que no sea sandbox, el
+modo se propone solo.
+
+## Filtro de altimetría
+
+Se elige una franja de altura y el terreno que cae dentro se pinta con paleta de
+altimetría (azul abajo, verde en las llanuras, blanco en las cumbres); el de fuera se
+apaga. Va en las dos vistas y dice qué porcentaje de la superficie queda dentro,
+pesando por `cos(lat)` (sin eso, los polos contarían muchísimo más de lo que ocupan).
+
+Necesita mapa de alturas: el de Kerbin que trae el visor o el del cuerpo, de la carpeta
+de mapas. La conversión de gris a metros es la de la ranura de altura, o la que SCANsat
+tiene tabulada para ese cuerpo.
+
+## Waypoints en la partida
+
+Tus marcadores —y las anomalías— se pueden escribir **dentro de la partida**, en el
+nodo `ScenarioCustomWaypoints`, que es de donde KSP saca los waypoints del mapa y del
+navball: no hace falta ningún mod. También se traen de vuelta como marcadores.
+
+Tocar un `.sfs` es cosa seria, así que antes de escribir se hace copia de seguridad al
+lado del fichero (`partida.sfs.bak-<fecha>`), se escribe en un temporal y se sustituye
+al final. Si el waypoint ya existía se reemplaza **conservando su `navigationId`**, para
+no duplicarlo ni perder el destino que tuvieras puesto en el juego. Y hay que cerrar
+KSP antes: con el juego abierto, la partida está en memoria y se sobrescribe al guardar.
+
+## Aterrizaje desde órbita
+
+Con una nave en órbita del cuerpo y un objetivo en el suelo, «Aterrizaje» busca **cuándo
+frenar** y **cuánto**, con una sola quemada retrógrada, e integra el descenso con RK4:
+gravedad siempre y arrastre con atmósfera exponencial si el cuerpo tiene aire. Dibuja la
+traza en el mapa y en el globo, y da el instante de la frenada, el Δv, el periapsis
+resultante, la entrada en atmósfera, el punto de contacto y a qué distancia queda del
+objetivo.
+
+Sin atmósfera el cálculo es exacto salvo por el relieve. El error que queda es el
+**físico**: con una sola quemada retrógrada no se cambia de plano, así que si la órbita
+no pasa por encima del objetivo, lo mejor posible es la distancia de la traza al punto.
+Medido en Mun sobre una partida real: el plan da 7,55 km de error y la traza de esa
+órbita pasa a 7,54 km del objetivo.
+
+Con atmósfera es una estimación —el frenado depende de la nave, y con FAR o Kerbalism el
+modelo del juego no es este—; el coeficiente balístico (masa entre Cd por área) es el
+mando para ajustarla.
+
+## Transferencias y ventanas de lanzamiento
+
+Se elige destino y el visor busca las salidas más baratas a partir del instante de la
+barra de tiempo: **cuándo salir**, Δv de eyección desde la órbita de aparcamiento, Δv de
+captura, tiempo de vuelo, **ángulo de fase** entre los dos cuerpos y **ángulo de
+eyección** respecto al prógrado. Pinchar una ventana lleva la barra de tiempo a ese día.
+
+Es lo mismo que hace el juego: cónicas parcheadas. La transferencia se resuelve con
+Lambert (variables universales, funciones de Stumpff y bisección en `z`) sobre una
+rejilla de instantes de salida y tiempos de vuelo, así que es **balística**: una sola
+quemada, sin correcciones a medio camino. Vale entre planetas (con la estrella de cuerpo
+central) y hacia una luna del propio cuerpo.
+
+Contrastado con las cifras conocidas del sistema de serie, desde 100 km de aparcamiento:
+Kerbin → Duna 1089 m/s y 309 días de vuelo con fase de unos 44° (lo publicado ronda
+1050 m/s), Kerbin → Mun 842 m/s, Kerbin → Minmus 913 m/s, Kerbin → Eve 1026 m/s. Cada
+búsqueda tarda menos de un cuarto de segundo.
+
 ## Controles
 
 | Acción | Cómo |
@@ -254,7 +359,7 @@ proyecto.
 
 | Carpeta | Qué hay |
 |---|---|
-| `src\Core` | Lo que no depende de la pantalla: geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`. |
+| `src\Core` | Lo que no depende de la pantalla: geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`, más lo que la web no tiene: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
 | `src\Gfx` | Enlaces a OpenGL, el control con el contexto (con antialias multimuestra), shaders, texturas, dibujo 2D por lotes y rótulos. |
 | `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`) y el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble). |
 | `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves. |

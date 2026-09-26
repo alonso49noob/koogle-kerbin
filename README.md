@@ -39,7 +39,17 @@ What it does:
 - **Any celestial body.** The 17 stock bodies are built in, and if you have
   Kopernicus installed it reads the planet pack straight from
   `ModuleManager.ConfigCache` — OPM, RSS, JNSQ or whatever else you run — with the
-  right radius, rotation period, atmosphere, sphere of influence and hierarchy.
+  right radius, rotation period, atmosphere, sphere of influence and hierarchy. Point
+  it at a folder of KSP textures dumped to PNG and every body gets its real map,
+  heights and biomes, with the mirror and the 90° those textures need applied for you.
+- **What your save has discovered.** It reads SCANsat coverage out of the save, so
+  progression mode hides what you haven't scanned and shows only the anomalies your
+  anomaly scanner has found; sandbox mode shows everything. Plus an altimetry filter
+  that paints a height band with a SCANsat-style palette and dims the rest.
+- **Things to fly with.** A landing planner that works out when and how much to burn
+  to set down on a target, a launch-window calculator (patched conics, Lambert, a
+  single ballistic burn with no mid-course corrections), and waypoints written
+  straight into the save so KSP shows them on the map and the navball.
 - **English and Spanish**, both in the app and in the installer.
 
 The detailed documentation is in **[desktop/README.md](desktop/README.md)**

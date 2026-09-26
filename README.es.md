@@ -3,8 +3,11 @@
 Visor de Kerbin (KSP stock) en dos versiones:
 
 - **[Aplicación de escritorio para Windows](desktop/README.md)** (`desktop/`, C# y
-  OpenGL): mapa plano, globo 3D, vista del cielo, día y noche, y las naves de una
-  partida con sus modelos de verdad. Instalador en las [releases](https://github.com/alonso49noob/koogle-kerbin/releases).
+  OpenGL): mapa plano, globo 3D, vista del cielo, día y noche, las naves de una
+  partida con sus modelos de verdad, cualquier cuerpo del sistema con sus mapas, lo
+  que llevas escaneado con SCANsat, filtro de altimetría, waypoints en la partida,
+  asistente de aterrizaje y ventanas de lanzamiento. Instalador en las
+  [releases](https://github.com/alonso49noob/koogle-kerbin/releases).
 - **Versión web** (el resto de este repositorio), que se describe a continuación.
 
 *English: [README.md](README.md).*
