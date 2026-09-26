@@ -59,6 +59,9 @@ namespace KerbinMaps.Core
         public string BodyMapsDir;                // carpeta con las texturas de los cuerpos
         public double BodyMapOffset = 90;         // giro que necesitan esas texturas
         public bool BodyMapMirror = true;         // y su espejo horizontal
+        public double? LandLat, LandLon;          // objetivo del asistente de aterrizaje
+        public double LandPe = 0;                 // periapsis al que frenar, m
+        public double LandBc = 200;               // coeficiente balístico, kg/m2
         public bool AltFilter;                    // filtro de altimetría
         public double? AltMin, AltMax;            // franja; si falta, el rango del cuerpo
         public double AltOpacity = 0.85;

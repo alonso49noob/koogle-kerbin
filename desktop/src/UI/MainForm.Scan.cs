@@ -40,6 +40,7 @@ namespace KerbinMaps.UI
             }
             RenderBodyList();
             ActualizarScan();
+            RenderWaypointInfo();
         }
 
         /* Cobertura, anomalías y rótulos del cuerpo que se está viendo. */

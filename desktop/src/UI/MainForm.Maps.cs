@@ -715,6 +715,7 @@ namespace KerbinMaps.UI
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] sistema solar: " + ex.Message); }
 
             // los mapas de los demás cuerpos, si hay carpeta elegida
+            DibujarObjetivo();
             try { IndexarMapasDeCuerpos(); await CargarMapasDelCuerpo(); AplicarAltimetria(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] mapas de cuerpos: " + ex.Message); }
 

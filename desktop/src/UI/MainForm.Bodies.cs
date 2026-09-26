@@ -67,6 +67,7 @@ namespace KerbinMaps.UI
             ApplyMapTextures();
             SyncGlobe();
             RenderBodyInfo();
+            RenderWaypointInfo();
             if (isSky) RefreshSkyHud(); else UpdateHud(null);
             if (sv.Data != null) { RenderReloj(); RenderOrbitInfo(); }
             RequestRender();

@@ -542,6 +542,7 @@ namespace KerbinMaps.UI
             svList.Invalidate();
             if (HasVessels) RenderReloj();
             RenderOrbitInfo();
+            RenderLandingInfo();
             RequestRender();
         }
 

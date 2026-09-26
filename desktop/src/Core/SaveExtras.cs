@@ -176,7 +176,7 @@ namespace KerbinMaps.Core
            exportar dos veces no los duplique. */
         public static string ConWaypoints(string text, IEnumerable<Waypoint> nuevos, bool reemplazar = true)
         {
-            var lista = nuevos.ToList();
+            var lista = nuevos.Select(w => new Waypoint { Name = w.Name, Body = w.Body, Lat = w.Lat, Lon = w.Lon, Id = w.Id, Mine = w.Mine }).ToList();
             if (lista.Count == 0) return text;
 
             string nl = text.Contains("\r\n") ? "\r\n" : "\n";
@@ -212,17 +212,21 @@ namespace KerbinMaps.Core
             }
 
             string tab = "\t\t";
-            var texto = new List<string>();
-            foreach (var w in lista)
+            List<string> Texto()
             {
-                texto.Add(tab + "WAYPOINT");
-                texto.Add(tab + "{");
-                texto.Add(tab + "\tname = " + w.Name);
-                texto.Add(tab + "\tcelestialName = " + (w.Body ?? Body.Name));
-                texto.Add(tab + "\tlatitude = " + w.Lat.ToString("R", CultureInfo.InvariantCulture));
-                texto.Add(tab + "\tlongitude = " + w.Lon.ToString("R", CultureInfo.InvariantCulture));
-                texto.Add(tab + "\tnavigationId = " + (string.IsNullOrEmpty(w.Id) ? Guid.NewGuid().ToString() : w.Id));
-                texto.Add(tab + "}");
+                var t = new List<string>();
+                foreach (var w in lista)
+                {
+                    t.Add(tab + "WAYPOINT");
+                    t.Add(tab + "{");
+                    t.Add(tab + "\tname = " + w.Name);
+                    t.Add(tab + "\tcelestialName = " + (w.Body ?? Body.Name));
+                    t.Add(tab + "\tlatitude = " + w.Lat.ToString("R", CultureInfo.InvariantCulture));
+                    t.Add(tab + "\tlongitude = " + w.Lon.ToString("R", CultureInfo.InvariantCulture));
+                    t.Add(tab + "\tnavigationId = " + (string.IsNullOrEmpty(w.Id) ? Guid.NewGuid().ToString() : w.Id));
+                    t.Add(tab + "}");
+                }
+                return t;
             }
 
             if (ini < 0)
@@ -231,7 +235,7 @@ namespace KerbinMaps.Core
                 int cierre = lines.FindLastIndex(l => l.Trim() == "}");
                 if (cierre < 0) return text;
                 var nodo = new List<string> { "\tSCENARIO", "\t{", "\t\tname = ScenarioCustomWaypoints", "\t\tscene = 7, 8, 21" };
-                nodo.AddRange(texto);
+                nodo.AddRange(Texto());
                 nodo.Add("\t}");
                 lines.InsertRange(cierre, nodo);
                 return string.Join(nl, lines);
@@ -250,22 +254,27 @@ namespace KerbinMaps.Core
                         if (t == "{") d++;
                         else if (t == "}") { d--; if (d == 0) break; }
                     }
-                    string nom = null, cuerpo = null;
+                    string nom = null, cuerpo = null, id = null;
                     for (int j = i; j <= cierra && j < lines.Count; j++)
                     {
                         string t = lines[j].Trim();
                         if (t.StartsWith("name = ", StringComparison.Ordinal)) nom = t.Substring(7).Trim();
                         else if (t.StartsWith("celestialName = ", StringComparison.Ordinal)) cuerpo = t.Substring(16).Trim();
+                        else if (t.StartsWith("navigationId = ", StringComparison.Ordinal)) id = t.Substring(15).Trim();
                     }
                     if (nom != null && quitar.Contains(Clave(nom, cuerpo)))
                     {
+                        /* Se hereda el identificador del que se sustituye: si tenías ese
+                           waypoint puesto como destino en el juego, lo sigue siendo. */
+                        var mismo = lista.FirstOrDefault(w => Clave(w.Name, w.Body) == Clave(nom, cuerpo));
+                        if (mismo != null && string.IsNullOrEmpty(mismo.Id)) mismo.Id = id;
                         lines.RemoveRange(i, cierra - i + 1);
                         fin -= cierra - i + 1;
                     }
                 }
             }
 
-            lines.InsertRange(fin, texto);
+            lines.InsertRange(fin, Texto());
             return string.Join(nl, lines);
         }
 

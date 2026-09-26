@@ -94,6 +94,9 @@ namespace KerbinMaps.UI
             anomList = sscan.Add(new DrawList(240));
             anomList.DrawItem = DrawAnomalyRow;
             anomList.ItemClick = AnomalyRowClick;
+            var anomWp = new DarkButton("Mandar las anomalías a la partida como waypoints");
+            anomWp.Click += (s, e) => ExportarWaypoints(true);
+            sscan.Add(new BtnRow(anomWp));
             sscan.Add(Hint("En <b>modo progresión</b> el visor enseña solo lo que la partida ha descubierto: la cobertura de " +
                           "SCANsat tapa lo que no has escaneado y las anomalías solo salen si tu escáner de anomalías ha " +
                           "pasado por encima. En sandbox se ve todo. El catálogo de anomalías está en <code>data/anomalies.json</code>."));
@@ -260,6 +263,29 @@ namespace KerbinMaps.UI
                            "de grises a metros es la de arriba, o la que SCANsat tiene tabulada para ese cuerpo."));
             RenderAltInfo();
 
+            /* ---------------------------------------------------------- Aterrizaje */
+            var aterr = AddSection("Aterrizaje", false);
+            var landAqui = new DarkButton("Objetivo aquí (centro de la vista)");
+            landAqui.Click += (s, e) => FijarObjetivoAqui();
+            aterr.Add(new BtnRow(landAqui));
+            landPeBox = Num(state.LandPe);
+            landBcBox = Num(state.LandBc);
+            landPeBox.Committed += (s, e) => { state.LandPe = landPeBox.NumberOr(0); SaveSettings(); };
+            landBcBox.Committed += (s, e) => { state.LandBc = Math.Max(1, landBcBox.NumberOr(200)); SaveSettings(); };
+            aterr.Add(new Row2(Field("periapsis al frenar (m)", landPeBox), Field("coef. balístico (kg/m²)", landBcBox)));
+            landCalc = new DarkButton("Calcular descenso");
+            landCalc.Click += async (s, e) => await CalcularAterrizaje();
+            var landClear = new DarkButton("Quitar", ButtonVariant.Ghost);
+            landClear.Click += (s, e) => LimpiarAterrizaje();
+            aterr.Add(new BtnRow(landCalc, landClear));
+            landInfo = aterr.Add(Readout());
+            aterr.Add(Hint("Elige una nave en órbita, pon el objetivo donde quieras posarte y el visor busca <b>cuándo " +
+                           "frenar</b> y <b>cuánto</b>, con una sola quemada retrógrada. Dibuja el descenso en el mapa y en " +
+                           "el globo. Sin atmósfera el cálculo es exacto salvo por el relieve; con atmósfera es una " +
+                           "estimación: el frenado depende de la nave, y el coeficiente balístico (masa entre Cd por área) " +
+                           "es el mando para ajustarlo."));
+            RenderLandingInfo();
+
             /* ------------------------------------------------------------- Vista 3D */
             globeSection = AddSection("Vista 3D", true);
             chkLight = new DarkCheck("Día y noche (luz del Sol)", state.DayNight);
@@ -360,8 +386,17 @@ namespace KerbinMaps.UI
             mkList = marcadores.Add(new DrawList(260));
             mkList.DrawItem = DrawMarkerRow;
             mkList.ItemClick = MarkerRowClick;
-            marcadores.Add(Hint("Tus marcadores se guardan en tu equipo. Las anomalías del juego <b>no vienen incluidas</b>: " +
-                                "añádelas tú o importa un JSON."));
+            var wpExport = new DarkButton("Mandar a la partida como waypoints");
+            wpExport.Click += (s, e) => ExportarWaypoints(false);
+            var wpImport = new DarkButton("Traer waypoints", ButtonVariant.Ghost);
+            wpImport.Click += (s, e) => ImportarWaypoints();
+            marcadores.Add(new BtnRow(wpExport, wpImport));
+            wpInfo = marcadores.Add(Readout());
+            marcadores.Add(Hint("Tus marcadores se guardan en tu equipo. Los waypoints se escriben <b>dentro de la partida</b> " +
+                                "(nodo <code>ScenarioCustomWaypoints</code>), así que KSP los enseña en el mapa y en el navball " +
+                                "sin ningún mod: cierra el juego antes, que si no sobrescribe la partida al guardar. Se hace " +
+                                "copia de seguridad del .sfs antes de tocarlo. Las anomalías se mandan desde su propia sección."));
+            RenderWaypointInfo();
 
             /* --------------------------------------------------------------- Cuerpo */
 
