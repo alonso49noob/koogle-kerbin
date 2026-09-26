@@ -27,6 +27,17 @@ namespace KerbinMaps.Core
     {
         public const double DefaultOffset = 90;
 
+        /* Esas texturas no usan toda la escala de grises: el tope es 145, no 255. Medido
+           en los quince cuerpos del volcado de Parallax, donde el gris maximo va de 141 a
+           145 y con ese tope la altura sale justo en el maxTerrainAltitude que el mod
+           tiene tabulado. En Kerbin, ademas, pone el KSC en 70 m (su altitud real) y el
+           mar abierto en -1052 m (la referencia de SCANsat da entre -1090 y -935). */
+        public const double GrisTope = 145;
+
+        /* De rango de terreno a calibracion de la rampa de grises (gris 0 y gris 255). */
+        public static (double Min, double Max) Calibracion(double minTerreno, double maxTerreno) =>
+            (minTerreno, minTerreno + 255.0 / GrisTope * (maxTerreno - minTerreno));
+
         /* Un fichero es de un cuerpo si su nombre empieza por el nombre del cuerpo; de ahí
            se mira qué ranura es. Los mapas de normales no sirven para nada aquí, y las
            versiones «_PQS» son de menos resolución que la principal. */
@@ -100,6 +111,35 @@ namespace KerbinMaps.Core
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[mapas] SCANcolors: " + ex.Message); }
             return r;
+        }
+
+        /* Alturas reales de cada cuerpo segun Parallax, que es de donde salen estas
+           texturas: son las que convierten su gris en metros. */
+        public static Dictionary<string, (double Min, double Max)> ParallaxRanges(string gameData)
+        {
+            var r = new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                if (string.IsNullOrEmpty(gameData)) return r;
+                string cfg = Path.Combine(gameData, "Parallax_StockPlanetTextures", "_Configs", "ParallaxScaled.cfg");
+                if (!File.Exists(cfg)) return r;
+                Recorrer(ConfigNode.ParseFile(cfg), null, r);
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[mapas] ParallaxScaled: " + ex.Message); }
+            return r;
+        }
+
+        static void Recorrer(ConfigNode n, string cuerpo, Dictionary<string, (double, double)> r)
+        {
+            // los nodos del parche vienen como «@Body[Kerbin]»
+            if (n.Name.StartsWith("@Body[", StringComparison.Ordinal)) cuerpo = n.Name.Substring(6).TrimEnd(']');
+            foreach (var hijo in n.Nodes)
+            {
+                if (cuerpo != null && hijo.Name.Contains("ScaledProperties", StringComparison.Ordinal)
+                    && Num(hijo.Get("minTerrainAltitude")) is double mn && Num(hijo.Get("maxTerrainAltitude")) is double mx && mx > mn)
+                    r[cuerpo] = (mn, mx);
+                Recorrer(hijo, cuerpo, r);
+            }
         }
 
         static double? Num(string s) =>

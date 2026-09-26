@@ -337,5 +337,10 @@
  "aterrizaje": "landing",
  "órbita": "orbit",
  "sobrevuelo": "flyby",
- "alcanzado": "reached"
+ "alcanzado": "reached",
+ "Calibrar como volcado del juego": "Calibrate as a game texture dump",
+ "No tengo el rango de alturas de {0}: hace falta Parallax en tu instalación de KSP.": "I don't have the height range for {0}: that needs Parallax in your KSP install.",
+ "Calibrado como volcado del juego: gris 0 = <b>{0} m</b>, gris 255 = <b>{1} m</b> (el terreno de {2} va de {3} a {4} m y esas texturas llegan al gris 145).": "Calibrated as a game dump: grey 0 = <b>{0} m</b>, grey 255 = <b>{1} m</b> ({2}'s terrain runs from {3} to {4} m and those textures top out at grey 145).",
+ "Si el PNG que has cargado sale de <b>volcar las texturas de KSP</b> (Parallax), pulsa «Calibrar como volcado del juego»: el gris de esas texturas va del <code>minTerrainAltitude</code> del cuerpo hasta su <code>maxTerrainAltitude</code> con el tope en el gris 145, no en el 255.": "If the PNG you loaded comes from <b>dumping KSP's textures</b> (Parallax), press «Calibrate as a game texture dump»: the grey in those textures runs from the body's <code>minTerrainAltitude</code> to its <code>maxTerrainAltitude</code>, topping out at grey 145, not 255.",
+ "Para calibrar a mano: pulsa «Punto A», haz clic en un sitio del que sepas la altitud real (te la dice el juego al posarte ahí) y escríbela. Repite con B en un punto de altitud bien distinta y el rango se ajusta solo.": "To calibrate by hand: press «Point A», click somewhere whose real altitude you know (the game tells you when you land there) and type it in. Repeat with B somewhere of a very different altitude and the range adjusts itself."
 }

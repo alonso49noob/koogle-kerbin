@@ -218,8 +218,22 @@ espejo + 90° (el control entre los dos mapas que ya traía el visor da 95,9 %),
 mismo par sale en Duna, Eve, Laythe, Moho y Dres. Si tu volcado viene de otra
 herramienta, los dos ajustes (`BodyMapOffset` y `BodyMapMirror`) están en los ajustes.
 
-La escala de gris a metros de cada cuerpo se saca de SCANsat: del propio guardado si lo
-trae, y si no de `SCANsat/Resources/SCANcolors.cfg` de tu instalación.
+**La escala de gris a metros de esas texturas no es la de un export de SCANsat.** El
+gris va del `minTerrainAltitude` del cuerpo a su `maxTerrainAltitude`, pero **con el
+tope en el gris 145, no en el 255**. Los dos valores están tabulados en
+`ParallaxScaled.cfg`, y el visor los lee de tu instalación y calibra cada cuerpo solo.
+
+El 145 está medido: en los quince cuerpos del volcado el gris máximo va de 141 a 145, y
+con ese tope la altura cae justo en el `maxTerrainAltitude` de cada uno. En Kerbin,
+además, pone el KSC en **70 m** (su altitud real ronda los 70) y el mar abierto en
+−1052 m, dentro de lo que da el mapa de SCANsat (−1090 a −935). Con la escala de SCANsat
+(−1500 a 6500) ese mismo mapa pone el KSC en −684 m, que es el error típico al cargar un
+volcado del juego en la ranura de altura.
+
+Si has cargado uno de esos PNG a mano en «Altura», el botón **«Calibrar como volcado del
+juego»** aplica esa misma regla al cuerpo que estés viendo. Sin Parallax instalado se usa
+el rango de SCANsat, que para un export suyo es el correcto y para un volcado, una
+aproximación.
 
 ## SCANsat, anomalías y modo progresión
 

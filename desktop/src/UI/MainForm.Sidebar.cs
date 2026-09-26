@@ -238,8 +238,14 @@ namespace KerbinMaps.UI
             calB.Click += (s, e) => CalibToggle("b");
             calReset.Click += (s, e) => CalibReset();
             altura.Add(new BtnRow(calA, calB, calReset));
+            var calVolcado = new DarkButton("Calibrar como volcado del juego");
+            calVolcado.Click += (s, e) => CalibrarComoVolcado();
+            altura.Add(new BtnRow(calVolcado));
             calOut = altura.Add(Readout());
-            altura.Add(Hint("Para calibrar: pulsa «Punto A», haz clic en un sitio del que sepas la altitud real (te la dice " +
+            altura.Add(Hint("Si el PNG que has cargado sale de <b>volcar las texturas de KSP</b> (Parallax), pulsa " +
+                            "«Calibrar como volcado del juego»: el gris de esas texturas va del <code>minTerrainAltitude</code> " +
+                            "del cuerpo hasta su <code>maxTerrainAltitude</code> con el tope en el gris 145, no en el 255."));
+            altura.Add(Hint("Para calibrar a mano: pulsa «Punto A», haz clic en un sitio del que sepas la altitud real (te la dice " +
                             "el juego al posarte ahí) y escríbela. Repite con B en un punto de altitud bien distinta y el " +
                             "rango se ajusta solo."));
 

@@ -19,6 +19,7 @@ namespace KerbinMaps.UI
     {
         Dictionary<string, BodyMapSet> bodyMapIndex = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, (double Min, double Max)> bodyHeightRanges = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, (double Min, double Max)> parallaxRanges = new(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, ImageData> bodyImages = new();
         readonly Dictionary<string, Texture> bodyTextures = new();
         string bodyMapsLoaded;                       // el cuerpo cuyas imágenes están cargadas
@@ -29,15 +30,33 @@ namespace KerbinMaps.UI
         /* El desfase y el espejo que hay que aplicar a esas texturas (ver BodyMaps). */
         double BodyMapOffset => state.BodyMapOffset;
 
-        /* Rango de alturas del cuerpo que se ve: el de la partida si SCANsat lo trae, el
-           de la configuración de SCANsat si está instalado, y si no el de los ajustes. */
+        /* Calibración del mapa de alturas del cuerpo que se ve: qué altura es el gris 0 y
+           cuál el 255.
+
+           Para los mapas de la carpeta manda Parallax, que es de donde salen: su rango de
+           terreno con el tope de gris 145. Si no está, se usa el rango de SCANsat (el de
+           la partida o el de su configuración), que es el correcto para un export en
+           grises de SCANsat pero solo una aproximación para un volcado. */
         (double Min, double Max) RangoAltura()
         {
             if (OnMapBody) return (state.HMin, state.HMax);
+            if (parallaxRanges.TryGetValue(Body.Name, out var pr)) return BodyMaps.Calibracion(pr.Min, pr.Max);
             var cobertura = extras?.Cobertura(Body.Name);
             if (cobertura != null && !double.IsNaN(cobertura.MinHeight) && cobertura.MaxHeight > cobertura.MinHeight)
                 return (cobertura.MinHeight, cobertura.MaxHeight);
             if (bodyHeightRanges.TryGetValue(Body.Name, out var r)) return r;
+            return (state.HMin, state.HMax);
+        }
+
+        /* Alturas que de verdad tiene el terreno del cuerpo (no la rampa de grises): es lo
+           que el filtro de altimetría usa como franja de partida. */
+        (double Min, double Max) RangoTerreno()
+        {
+            if (parallaxRanges.TryGetValue(Body.Name, out var pr)) return pr;
+            var cobertura = extras?.Cobertura(Body.Name);
+            if (!OnMapBody && cobertura != null && !double.IsNaN(cobertura.MinHeight) && cobertura.MaxHeight > cobertura.MinHeight)
+                return (cobertura.MinHeight, cobertura.MaxHeight);
+            if (!OnMapBody && bodyHeightRanges.TryGetValue(Body.Name, out var r)) return r;
             return (state.HMin, state.HMax);
         }
 
@@ -51,7 +70,9 @@ namespace KerbinMaps.UI
         void IndexarMapasDeCuerpos()
         {
             bodyMapIndex = BodyMaps.Index(state.BodyMapsDir);
-            if (bodyHeightRanges.Count == 0) bodyHeightRanges = BodyMaps.Ranges(FindGameData());
+            string gd = FindGameData();
+            if (bodyHeightRanges.Count == 0) bodyHeightRanges = BodyMaps.Ranges(gd);
+            if (parallaxRanges.Count == 0) parallaxRanges = BodyMaps.ParallaxRanges(gd);
             RenderBodyMapsInfo();
         }
 

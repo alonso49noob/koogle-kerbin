@@ -22,7 +22,7 @@ namespace KerbinMaps.UI
 
         (double Min, double Max) RangoFiltro()
         {
-            var r = RangoAltura();
+            var r = RangoTerreno();
             double min = state.AltMin ?? r.Min, max = state.AltMax ?? r.Max;
             if (max <= min) max = min + 1;
             return (min, max);
@@ -97,7 +97,7 @@ namespace KerbinMaps.UI
            a 6500 m, Gilly a 6000 menos) se devuelve al rango entero. */
         void AjustarFiltroAlCuerpo()
         {
-            var r = RangoAltura();
+            var r = RangoTerreno();
             if (state.AltMin is double mn && state.AltMax is double mx && (mn < r.Min - 1 || mx > r.Max + 1 || mx <= mn))
             {
                 state.AltMin = null; state.AltMax = null;
@@ -107,6 +107,31 @@ namespace KerbinMaps.UI
             altMinBox?.SetNumber(f.Min);
             altMaxBox?.SetNumber(f.Max);
             AplicarAltimetria();
+        }
+
+        /* Calibra la ranura de altura como lo que es un volcado de las texturas del juego:
+           gris 0 en el minTerrainAltitude del cuerpo y la rampa con el tope de gris 145.
+           Es lo que arregla un mapa sacado del juego al que se le ha dejado la escala de
+           un export de SCANsat, que es de otro sitio. */
+        void CalibrarComoVolcado()
+        {
+            if (!parallaxRanges.TryGetValue(Body.Name, out var pr))
+            {
+                Flash(Lang.F("No tengo el rango de alturas de {0}: hace falta Parallax en tu instalación de KSP.", Body.Current.Label));
+                return;
+            }
+            var c = BodyMaps.Calibracion(pr.Min, pr.Max);
+            state.HMin = Math.Round(c.Min);
+            state.HMax = Math.Round(c.Max);
+            hMinBox?.SetNumber(state.HMin);
+            hMaxBox?.SetNumber(state.HMax);
+            SaveSettings();
+            SyncGlobe();
+            AjustarFiltroAlCuerpo();
+            calOut?.SetText(Lang.F("Calibrado como volcado del juego: gris 0 = <b>{0} m</b>, gris 255 = <b>{1} m</b> " +
+                                   "(el terreno de {2} va de {3} a {4} m y esas texturas llegan al gris 145).",
+                Geo.F(state.HMin, 0), Geo.F(state.HMax, 0), Body.Current.Label, Geo.F(pr.Min, 0), Geo.F(pr.Max, 0)));
+            RequestRender();
         }
 
         void SetAltFilter(bool on)
@@ -128,7 +153,7 @@ namespace KerbinMaps.UI
            cuerpo: una franja de Kerbin no significa nada en Tylo. */
         void ResetAltRange()
         {
-            var r = RangoAltura();
+            var r = RangoTerreno();
             state.AltMin = null; state.AltMax = null;
             altMinBox?.SetNumber(r.Min);
             altMaxBox?.SetNumber(r.Max);
