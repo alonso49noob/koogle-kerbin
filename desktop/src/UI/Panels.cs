@@ -242,6 +242,12 @@ namespace KerbinMaps.UI
                 if (!string.IsNullOrEmpty(estado))
                 {
                     anchoEstado = Math.Min(Width / 2, TextRenderer.MeasureText(g, estado, Theme.Tiny, Size.Empty, flags).Width + Theme.S(12));
+                    // el título manda: si con el resumen no cabe entero, el resumen no sale
+                    int anchoTitulo = TextRenderer.MeasureText(g, Text, Theme.Header, Size.Empty, flags).Width;
+                    if (anchoTitulo > Width - Theme.S(36) - anchoEstado) anchoEstado = 0;
+                }
+                if (anchoEstado > 0)
+                {
                     TextRenderer.DrawText(g, estado, Theme.Tiny, new Rectangle(Width - anchoEstado, 0, anchoEstado - Theme.S(12), Height),
                         Theme.FgDim, flags | TextFormatFlags.Right | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
                 }
