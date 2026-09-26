@@ -10,6 +10,7 @@ namespace KerbinMaps.UI
     public sealed partial class MainForm
     {
         Section globeSection;
+        Section secCuerpo, secScan, secAltim, secTransfer, secAterrizaje, secNaves, secMarcadores;
         DarkCombo baseCombo, presetCombo;
         StackPanel customUrlWrap, biomeOpWrap, presetWrap, reliefWrap;
         DarkTextBox customUrl, hMinBox, hMaxBox, fpAlt, orbPe, orbAp, orbInc, orbLan, orbArgp, orbN, svRot;
@@ -70,7 +71,7 @@ namespace KerbinMaps.UI
 
             /* ---------------------------------------------------------------- Capas */
             /* ------------------------------------------------------- Cuerpo celeste */
-            var cuerpo = AddSection("Cuerpo celeste", true);
+            var cuerpo = secCuerpo = AddSection("Cuerpo celeste", true);
             bodyCombo = new DarkCombo { Icons = BodyIcon.Get };
             bodyCombo.SelectedChanged += (s, e) => SetBody(bodyCombo.SelectedId);
             cuerpo.Add(Field("Cuerpo que se ve", bodyCombo));
@@ -89,7 +90,7 @@ namespace KerbinMaps.UI
             RenderBodyInfo();
 
             /* --------------------------------------------------- SCANsat y progreso */
-            var sscan = AddSection("SCANsat y progreso", false);
+            var sscan = secScan = AddSection("SCANsat y progreso", false);
             chkProgresion = new DarkCheck("Modo progresión", state.Progresion);
             chkProgresion.CheckedChanged += (s, e) => SetProgresion(chkProgresion.Checked);
             chkScan = new DarkCheck("Tapar lo no escaneado", state.ShowScan);
@@ -243,7 +244,7 @@ namespace KerbinMaps.UI
                             "rango se ajusta solo."));
 
             /* -------------------------------------------------- Filtro de altimetría */
-            var altim = AddSection("Filtro de altimetría", false);
+            var altim = secAltim = AddSection("Filtro de altimetría", false);
             chkAlt = new DarkCheck("Filtrar por altura", state.AltFilter);
             chkAlt.CheckedChanged += (s, e) => SetAltFilter(chkAlt.Checked);
             altim.Add(Checks(chkAlt));
@@ -272,7 +273,7 @@ namespace KerbinMaps.UI
             RenderAltInfo();
 
             /* ------------------------------------------------------- Transferencias */
-            var trans = AddSection("Transferencias y ventanas", false);
+            var trans = secTransfer = AddSection("Transferencias y ventanas", false);
             trDestino = new DarkCombo { Icons = BodyIcon.Get };
             trDestino.SelectedChanged += (s, e) => { state.TransferTo = trDestino.SelectedId; SaveSettings(); RenderTransferInfo(); };
             trans.Add(Field("Destino", trDestino));
@@ -302,7 +303,7 @@ namespace KerbinMaps.UI
             RenderTransferInfo();
 
             /* ---------------------------------------------------------- Aterrizaje */
-            var aterr = AddSection("Aterrizaje", false);
+            var aterr = secAterrizaje = AddSection("Aterrizaje", false);
             var landAqui = new DarkButton("Objetivo en el centro");
             landAqui.Click += (s, e) => FijarObjetivoAqui();
             aterr.Add(new BtnRow(landAqui));
@@ -376,7 +377,7 @@ namespace KerbinMaps.UI
             orbOut = orbita.Add(Readout());
 
             /* ------------------------------------------------------ Naves de una partida */
-            var naves = AddSection("Naves de una partida", false);
+            var naves = secNaves = AddSection("Naves de una partida", false);
             var svDrop = new DropZone("Arrastra aquí", " un persistent.sfs", "saves / <tu partida> /");
             svDrop.FilesDropped += async files => { foreach (var f in files) { await CargarSave(f); break; } };
             svDrop.Click += async (s, e) => await PickSaveFile();
@@ -413,7 +414,7 @@ namespace KerbinMaps.UI
                            "que roce la atmósfera no frena. El ajuste de longitud corrige todas las naves a la vez; normalmente no hace falta."));
 
             /* ----------------------------------------------------------- Marcadores */
-            var marcadores = AddSection("Marcadores", false);
+            var marcadores = secMarcadores = AddSection("Marcadores", false);
             var mkAdd = new DarkButton("Añadir en el centro");
             var mkExport = new DarkButton("Exportar", ButtonVariant.Ghost);
             var mkImport = new DarkButton("Importar", ButtonVariant.Ghost);
@@ -453,6 +454,7 @@ namespace KerbinMaps.UI
             searchList.DrawItem = DrawSearchRow;
             searchList.ItemClick = (item, pt, r) => SearchRowClick(item);
 
+            ActualizarEstadosSecciones();
             sideStack.ResumeLayout(true);
         }
 

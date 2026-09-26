@@ -125,6 +125,7 @@ namespace KerbinMaps.UI
                 }
                 DibujarObjetivo();
                 RenderLandingInfo();
+                ActualizarEstadosSecciones();
                 RequestRender();
             }
             finally

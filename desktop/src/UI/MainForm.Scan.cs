@@ -56,6 +56,7 @@ namespace KerbinMaps.UI
             ConstruirScanTex();
             RenderAnomalias();
             RenderScanInfo();
+            ActualizarEstadosSecciones();
             RequestRender();
         }
 

@@ -27,6 +27,7 @@ namespace KerbinMaps.Views
         public Texture AltTex;                    // filtro de altimetría sobre el mapa de alturas
         public double AltOffset, AltOpacity, AltHMin, AltHMax, AltMin, AltMax;
         public bool Grid = true;
+        public float[] Tint = { 0.45f, 0.45f, 0.45f };   // color del cuerpo, para el fondo sin imagen
         // la mitad del planeta de noche, con el punto subsolar
         public bool DayNight = true;
         public double SunLat, SunLon;
@@ -197,6 +198,7 @@ uniform vec2 uCenter;
 uniform float uPpd, uOff, uOpacity, uCell, uSunLat, uSunLon, uS;
 uniform int uMode;
 uniform float uHMin, uHMax, uAltMin, uAltMax;
+uniform vec3 uTint;
 uniform sampler2D uTex;
 out vec4 frag;
 
@@ -242,7 +244,9 @@ void main() {
     return;
   }
   if (uMode == 1) {
-    vec3 c = vec3(13.0, 20.0, 29.0) / 255.0;
+    // sin imagen, el fondo lleva un punto del color del cuerpo: Duna se ve rojiza y
+    // Jool verdosa aunque no haya mapa
+    vec3 c = mix(vec3(13.0, 20.0, 29.0) / 255.0, uTint * 0.42, 0.85);
     float ix = floor((lon + 180.0) / uCell), iy = floor((90.0 - lat) / uCell);
     if (mod(ix + iy, 2.0) < 0.5) c = mix(c, vec3(1.0), 0.012);
     frag = vec4(c * uOpacity, uOpacity);
@@ -282,6 +286,7 @@ void main() {
             imgProg.Float("uHMax", AltHMax);
             imgProg.Float("uAltMin", AltMin);
             imgProg.Float("uAltMax", AltMax);
+            imgProg.Vec3("uTint", Tint[0], Tint[1], Tint[2]);
             imgProg.Float("uSunLat", SunLat);
             imgProg.Float("uSunLon", SunLon);
             imgProg.Float("uS", S);

@@ -69,6 +69,7 @@ namespace KerbinMaps.UI
             RenderBodyInfo();
             RenderWaypointInfo();
             RenderDestinos();
+            ActualizarEstadosSecciones();
             transfer = null;
             trList?.SetItems(new List<object>());
             RenderTransferInfo();

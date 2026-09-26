@@ -44,6 +44,7 @@ namespace KerbinMaps.UI
             globe.AltMin = min; globe.AltMax = max;
 
             RenderAltInfo();
+            ActualizarEstadosSecciones();
             RequestRender();
         }
 

@@ -384,6 +384,7 @@ namespace KerbinMaps.UI
             SetModelStatus(null);
 
             AplicarExtras(nuevosExtras, proponerModo: !restoring);
+            ActualizarEstadosSecciones();
             FiltrarNavesDelCuerpo();
             Vis.Set(tbar, true);
             RenderReloj();

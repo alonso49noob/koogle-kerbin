@@ -68,6 +68,7 @@ namespace KerbinMaps.UI
 
                 trList?.SetItems((transfer.Ventanas ?? new List<TransferWindow>()).Cast<object>());
                 RenderTransferInfo();
+                ActualizarEstadosSecciones();
                 RequestRender();
             }
             finally

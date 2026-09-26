@@ -94,6 +94,7 @@ namespace KerbinMaps.UI
             map.BiomeOffset = BiomeOffNow;
             map.BiomeOpacity = biomeOn ? state.BiomeOpacity : 0;
             map.Grid = state.Grid;
+            map.Tint = Body.Current.Tint;
             markerLayer.Visible = state.Landmarks && OnMapBody;
             RequestRender();
         }

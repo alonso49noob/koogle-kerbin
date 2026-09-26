@@ -176,6 +176,15 @@ namespace KerbinMaps.UI
 
         public string Titulo { get; }
 
+        /* Resumen que sale a la derecha del título cuando la sección está plegada: de un
+           vistazo se sabe qué hay dentro sin abrirla. */
+        public string Estado
+        {
+            get => estado;
+            set { if (estado == value) return; estado = value; header.Invalidate(); }
+        }
+        string estado;
+
         public Section(string title, bool open)
         {
             BackColor = Theme.Bg2;
@@ -227,8 +236,17 @@ namespace KerbinMaps.UI
                     if (owner.expanded) g.FillPolygon(b, new[] { new PointF(cx - s, cy - s * 0.6f), new PointF(cx + s, cy - s * 0.6f), new PointF(cx, cy + s * 0.8f) });
                     else g.FillPolygon(b, new[] { new PointF(cx - s * 0.6f, cy - s), new PointF(cx + s * 0.8f, cy), new PointF(cx - s * 0.6f, cy + s) });
                 }
-                TextRenderer.DrawText(g, Text, Theme.Header, new Rectangle(Theme.S(32), 0, Width - Theme.S(36), Height),
-                    hover ? Theme.Fg : Theme.FgDim, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+                var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
+                string estado = owner.expanded ? null : owner.Estado;
+                int anchoEstado = 0;
+                if (!string.IsNullOrEmpty(estado))
+                {
+                    anchoEstado = Math.Min(Width / 2, TextRenderer.MeasureText(g, estado, Theme.Tiny, Size.Empty, flags).Width + Theme.S(12));
+                    TextRenderer.DrawText(g, estado, Theme.Tiny, new Rectangle(Width - anchoEstado, 0, anchoEstado - Theme.S(12), Height),
+                        Theme.FgDim, flags | TextFormatFlags.Right | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                }
+                TextRenderer.DrawText(g, Text, Theme.Header, new Rectangle(Theme.S(32), 0, Width - Theme.S(36) - anchoEstado, Height),
+                    hover ? Theme.Fg : Theme.FgDim, flags | TextFormatFlags.EndEllipsis);
             }
         }
     }
