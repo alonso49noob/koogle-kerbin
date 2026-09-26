@@ -79,7 +79,11 @@ namespace KerbinMaps.UI
             string gd = FindGameData();
             if (gd == null) return;
             int n = await Task.Run(() => SolarSystem.LoadKopernicus(gd));
-            if (n > 0) Body.Current = SolarSystem.Find(state.BodyName) ?? SolarSystem.Home;
+            if (n > 0)
+            {
+                Body.Current = SolarSystem.Find(state.BodyName) ?? SolarSystem.Home;
+                BodyIcon.Clear();                 // otros cuerpos, otros colores
+            }
             RenderBodyList();
             RenderBodyInfo();
             ApplyMapTextures();

@@ -63,7 +63,7 @@ namespace KerbinMaps.UI
             /* ---------------------------------------------------------------- Capas */
             /* ------------------------------------------------------- Cuerpo celeste */
             var cuerpo = AddSection("Cuerpo celeste", true);
-            bodyCombo = new DarkCombo();
+            bodyCombo = new DarkCombo { Icons = BodyIcon.Get };
             bodyCombo.SelectedChanged += (s, e) => SetBody(bodyCombo.SelectedId);
             cuerpo.Add(Field("Cuerpo que se ve", bodyCombo));
             bodySource = cuerpo.Add(Readout());

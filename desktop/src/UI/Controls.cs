@@ -358,6 +358,11 @@ namespace KerbinMaps.UI
         int index = -1;
         public event EventHandler SelectedChanged;
 
+        /* Icono opcional por id: si está puesto, sale a la izquierda del valor y de cada
+           opción de la lista (los cuerpos celestes lo usan). */
+        public Func<string, int, Image> Icons;
+        int IconSize => Theme.S(17);
+
         public DarkCombo()
         {
             Height = Theme.S(32);
@@ -382,11 +387,13 @@ namespace KerbinMaps.UI
         {
             base.OnClick(e);
             if (items.Count == 0) return;
-            var menu = new ContextMenuStrip { Renderer = new DarkRenderer(), ShowImageMargin = false, Font = Theme.UI, BackColor = Theme.Bg2 };
+            var menu = new ContextMenuStrip { Renderer = new DarkRenderer(), ShowImageMargin = Icons != null, Font = Theme.UI, BackColor = Theme.Bg2 };
+            if (Icons != null) menu.ImageScalingSize = new Size(IconSize, IconSize);
             for (int i = 0; i < items.Count; i++)
             {
                 int k = i;
                 var it = new ToolStripMenuItem(items[i].Label) { ForeColor = Theme.Fg, AutoSize = true, Padding = new Padding(0, Theme.S(3), 0, Theme.S(3)) };
+                if (Icons != null) { it.Image = Icons(items[i].Id, IconSize); it.ImageScaling = ToolStripItemImageScaling.None; }
                 if (i == index) it.Font = Theme.Semibold;
                 it.Click += (s, a) =>
                 {
@@ -408,6 +415,13 @@ namespace KerbinMaps.UI
             Theme.FillRound(g, Theme.Bg, hover ? Theme.Accent : Theme.Line, new RectangleF(0, 0, Width, Height), Theme.Sf(7));
             string label = index >= 0 && index < items.Count ? items[index].Label : "";
             int pad = Theme.S(9), arrow = Theme.S(18);
+            var ico = Icons == null ? null : Icons(SelectedId, IconSize);
+            if (ico != null)
+            {
+                g.DrawImage(ico, pad, (Height - IconSize) / 2, IconSize, IconSize);
+                pad += IconSize + Theme.S(7);
+                label = label.TrimStart();          // el sangrado del árbol no pinta nada aquí
+            }
             TextRenderer.DrawText(g, label, Theme.UI, new Rectangle(pad, 0, Width - pad - arrow, Height), Theme.Fg,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
             g.SmoothingMode = SmoothingMode.AntiAlias;
