@@ -56,6 +56,12 @@ namespace KerbinMaps.Core
         public double? SimT;                      // el instante de la barra de tiempo al cerrar
         public bool ShowVesselModels = true;      // montar la nave con las piezas de KSP al acercarse
         public string KspPath;                    // carpeta de KSP elegida a mano, si no se encuentra sola
+        public string BodyMapsDir;                // carpeta con las texturas de los cuerpos
+        public double BodyMapOffset = 90;         // giro que necesitan esas texturas
+        public bool BodyMapMirror = true;         // y su espejo horizontal
+        public bool AltFilter;                    // filtro de altimetría
+        public double? AltMin, AltMax;            // franja; si falta, el rango del cuerpo
+        public double AltOpacity = 0.85;
         public bool Progresion;                   // enseñar solo lo que la partida ha descubierto
         public bool ShowScan = true;              // cobertura de SCANsat sobre el mapa
         public bool ShowAnomalies = true;         // anomalías del catálogo

@@ -69,6 +69,7 @@ namespace KerbinMaps.Views
         public Texture ColorTex, BiomeTex, HeightTex;
         public Texture ScanTex;                   // cobertura de SCANsat (360x180, sin filtrar)
         public double ScanAmt;
+        public double AltMin, AltMax, AltAmt;     // filtro de altimetría
         public double MinDist = 1.02, MaxDist = 12, SceneR = 1.2;
         public int W = 1, H = 1;
         public float S = 1;
@@ -156,6 +157,7 @@ in vec3 vDir;
 in vec3 vWorld;
 uniform sampler2D uColor, uBiome, uHeight, uScan;
 uniform float uColorOff, uBiomeOff, uBiomeAmt, uHeightOff, uHMin, uHMax, uRadius, uBump, uScanAmt;
+uniform float uAltMin, uAltMax, uAltAmt;
 uniform vec2 uHeightSize;
 uniform int uHasColor, uHasBiome, uHasHeight, uHasScan, uLit;
 uniform vec3 uLightDir, uCamPos, uTint;
@@ -165,6 +167,21 @@ out vec4 frag;
    mipmap elige el nivel más borroso. Pasando las derivadas sin envolver se evita. */
 vec3 shifted(sampler2D t, float off) {
   return textureGrad(t, vec2(fract(vUv.x + off), vUv.y), dFdx(vUv), dFdy(vUv)).rgb;
+}
+
+
+/* Paleta de altimetría, al gusto de SCANsat: azul abajo, verde en las llanuras,
+   amarillo y marrón arriba y blanco en las cumbres. */
+vec3 altPalette(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 c0 = vec3(0.13, 0.25, 0.55), c1 = vec3(0.10, 0.55, 0.62), c2 = vec3(0.25, 0.62, 0.29);
+  vec3 c3 = vec3(0.85, 0.79, 0.35), c4 = vec3(0.68, 0.36, 0.20), c5 = vec3(0.96, 0.96, 0.98);
+  float s = t * 5.0;
+  if (s < 1.0) return mix(c0, c1, s);
+  if (s < 2.0) return mix(c1, c2, s - 1.0);
+  if (s < 3.0) return mix(c2, c3, s - 2.0);
+  if (s < 4.0) return mix(c3, c4, s - 3.0);
+  return mix(c4, c5, s - 4.0);
 }
 
 // altitud en metros según la calibración del mapa de alturas
@@ -178,6 +195,13 @@ void main() {
   if (uHasColor != 0) base = shifted(uColor, uColorOff);
   vec3 ground = base;
   if (uHasBiome != 0 && uBiomeAmt > 0.0) base = mix(base, shifted(uBiome, uBiomeOff), uBiomeAmt);
+  // filtro de altimetría: fuera de la franja se apaga el terreno, dentro va con la paleta
+  if (uAltAmt > 0.0 && uHasHeight != 0) {
+    float altf = heightAt(vec2(fract(vUv.x + uHeightOff), vUv.y));
+    if (altf < uAltMin || altf > uAltMax) base = mix(base, vec3(0.03, 0.04, 0.06), 0.78);
+    else base = mix(base, altPalette((altf - uAltMin) / max(1.0, uAltMax - uAltMin)), uAltAmt);
+    ground = base;
+  }
   // lo que la partida no ha escaneado con SCANsat, tapado (la textura ya trae el alfa)
   if (uHasScan != 0 && uScanAmt > 0.0) {
     vec4 sc = texture(uScan, vec2(fract(vUv.x), vUv.y));
@@ -851,6 +875,9 @@ void main() {
             prog.Int("uHasColor", ColorTex != null ? 1 : 0);
             prog.Int("uHasBiome", BiomeTex != null ? 1 : 0);
             prog.Int("uHasScan", ScanTex != null ? 1 : 0);
+            prog.Float("uAltMin", AltMin);
+            prog.Float("uAltMax", AltMax);
+            prog.Float("uAltAmt", HeightTex != null ? AltAmt : 0);
             prog.Float("uScanAmt", ScanTex != null ? ScanAmt : 0);
             prog.Vec3("uLightDir", lightDir[0], lightDir[1], lightDir[2]);
             prog.Int("uLit", Light ? 1 : 0);

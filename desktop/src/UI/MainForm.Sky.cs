@@ -74,7 +74,7 @@ namespace KerbinMaps.UI
         double GroundAlt(double lat, double lon, double fallback)
         {
             var img = Img("height");
-            return img != null ? Math.Max(0, img.Height_(lat, lon, state.HMin, state.HMax, state.LonOffset.Height)) : fallback;
+            return img != null ? Math.Max(0, img.Height_(lat, lon, HMinNow, HMaxNow, HeightOffNow)) : fallback;
         }
 
         void ApplyObserverToGlobe()

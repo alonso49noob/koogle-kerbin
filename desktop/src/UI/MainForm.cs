@@ -569,7 +569,7 @@ namespace KerbinMaps.UI
                 ("lon", p.HasValue ? Geo.FmtLon(Geo.WrapLon(p.Value.Lon)) : "—")
             };
             if (MapImg("height") != null)
-                rows.Add(("alt", p.HasValue ? Geo.FmtAlt(MapImg("height").Height_(p.Value.Lat, Geo.WrapLon(p.Value.Lon), state.HMin, state.HMax, state.LonOffset.Height)) : "—"));
+                rows.Add(("alt", p.HasValue ? Geo.FmtAlt(MapImg("height").Height_(p.Value.Lat, Geo.WrapLon(p.Value.Lon), HMinNow, HMaxNow, HeightOffNow)) : "—"));
             if (MapImg("biome") != null)
             {
                 string hex = p.HasValue ? MapImg("biome").BiomeHex(p.Value.Lat, Geo.WrapLon(p.Value.Lon), state.LonOffset.Biome) : null;

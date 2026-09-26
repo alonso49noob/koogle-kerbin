@@ -17,8 +17,8 @@ namespace KerbinMaps.UI
 
         /* Los mapas, biomas, alturas y marcadores que trae el visor son de Kerbin. */
         bool OnMapBody => Body.Current.Name == "Kerbin";
-        Texture MapTex(string slot) => OnMapBody ? textures.GetValueOrDefault(slot) : null;
-        ImageData MapImg(string slot) => OnMapBody ? Img(slot) : null;
+        Texture MapTex(string slot) => OnMapBody ? textures.GetValueOrDefault(slot) : bodyTextures.GetValueOrDefault(slot);
+        ImageData MapImg(string slot) => OnMapBody ? Img(slot) : bodyImages.GetValueOrDefault(slot);
 
         void RenderBodyList()
         {
@@ -61,6 +61,9 @@ namespace KerbinMaps.UI
 
             FiltrarNavesDelCuerpo();
             ActualizarScan();
+            _ = CargarMapasDelCuerpo();
+            RenderBodyMapsInfo();
+            AjustarFiltroAlCuerpo();
             ApplyMapTextures();
             SyncGlobe();
             RenderBodyInfo();

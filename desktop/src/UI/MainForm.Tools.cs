@@ -305,7 +305,7 @@ namespace KerbinMaps.UI
             string h = "<m>" + Geo.FmtLat(lat) + "  ·  " + Geo.FmtLon(lon) + "</m>\n<m>" + Geo.F(lat, 6) + ", " + Geo.F(lon, 6) + "</m>";
             var actions = new List<(string, Action<DarkButton>)>();
             if (Img("height") != null)
-                h += "\n<m>altura " + Geo.FmtAlt(Img("height").Height_(lat, lon, state.HMin, state.HMax, state.LonOffset.Height)) + "</m>";
+                h += "\n<m>altura " + Geo.FmtAlt(MapImg("height").Height_(lat, lon, HMinNow, HMaxNow, HeightOffNow)) + "</m>";
             if (Img("biome") != null)
             {
                 string hex = Img("biome").BiomeHex(lat, lon, state.LonOffset.Biome);

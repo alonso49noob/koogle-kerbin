@@ -24,6 +24,8 @@ namespace KerbinMaps.Views
         public double BiomeOffset, BiomeOpacity;
         public Texture ScanTex;                   // cobertura de SCANsat: lo no escaneado, tapado
         public double ScanOpacity;
+        public Texture AltTex;                    // filtro de altimetría sobre el mapa de alturas
+        public double AltOffset, AltOpacity, AltHMin, AltHMax, AltMin, AltMax;
         public bool Grid = true;
         // la mitad del planeta de noche, con el punto subsolar
         public bool DayNight = true;
@@ -194,8 +196,24 @@ uniform vec2 uView;
 uniform vec2 uCenter;
 uniform float uPpd, uOff, uOpacity, uCell, uSunLat, uSunLon, uS;
 uniform int uMode;
+uniform float uHMin, uHMax, uAltMin, uAltMax;
 uniform sampler2D uTex;
 out vec4 frag;
+
+/* Paleta de altimetría, al gusto de SCANsat: azul abajo, verde en las llanuras,
+   amarillo y marrón arriba y blanco en las cumbres. */
+vec3 altPalette(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 c0 = vec3(0.13, 0.25, 0.55), c1 = vec3(0.10, 0.55, 0.62), c2 = vec3(0.25, 0.62, 0.29);
+  vec3 c3 = vec3(0.85, 0.79, 0.35), c4 = vec3(0.68, 0.36, 0.20), c5 = vec3(0.96, 0.96, 0.98);
+  float s = t * 5.0;
+  if (s < 1.0) return mix(c0, c1, s);
+  if (s < 2.0) return mix(c1, c2, s - 1.0);
+  if (s < 3.0) return mix(c2, c3, s - 2.0);
+  if (s < 4.0) return mix(c3, c4, s - 3.0);
+  return mix(c4, c5, s - 4.0);
+}
+
 void main() {
   float px = gl_FragCoord.x;
   float py = uView.y - gl_FragCoord.y;
@@ -231,6 +249,14 @@ void main() {
     return;
   }
   vec4 t = texture(uTex, vec2((lon + uOff + 180.0) / 360.0, (90.0 - lat) / 180.0));
+  if (uMode == 3) {
+    // filtro de altimetría: el gris del mapa de alturas pasa a metros con la calibración
+    float lum = dot(t.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float alt = uHMin + lum * (uHMax - uHMin);
+    if (alt < uAltMin || alt > uAltMax) { frag = vec4(vec3(0.015, 0.02, 0.035) * 0.78, 0.78); return; }
+    frag = vec4(altPalette((alt - uAltMin) / max(1.0, uAltMax - uAltMin)) * uOpacity, uOpacity);
+    return;
+  }
   frag = vec4(t.rgb * t.a, t.a) * uOpacity;
 }";
 
@@ -252,6 +278,10 @@ void main() {
             imgProg.Float("uOpacity", opacity);
             imgProg.Float("uCell", 180 / Math.Pow(2, TileZoom) / 4);
             imgProg.Int("uMode", mode);
+            imgProg.Float("uHMin", AltHMin);
+            imgProg.Float("uHMax", AltHMax);
+            imgProg.Float("uAltMin", AltMin);
+            imgProg.Float("uAltMax", AltMax);
             imgProg.Float("uSunLat", SunLat);
             imgProg.Float("uSunLon", SunLon);
             imgProg.Float("uS", S);
@@ -290,6 +320,9 @@ void main() {
 
             // biomas encima del relieve, debajo de trazas y marcadores
             if (BiomeTex != null && BiomeOpacity > 0) DrawImage(0, BiomeTex, BiomeOffset, BiomeOpacity);
+
+            // el filtro de altimetría tapa el terreno, así que va antes de la cobertura
+            if (AltTex != null && AltOpacity > 0) DrawImage(3, AltTex, AltOffset, AltOpacity);
 
             // lo que la partida no ha escaneado, tapado: va sobre el terreno y los biomas
             if (ScanTex != null && ScanOpacity > 0) DrawImage(0, ScanTex, 0, ScanOpacity);

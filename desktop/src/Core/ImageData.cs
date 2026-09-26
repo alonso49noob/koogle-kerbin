@@ -70,6 +70,24 @@ namespace KerbinMaps.Core
             return new ImageData { Width = w, Height = h, Rgba = data };
         }
 
+        /* Espejo en horizontal, in situ. Las texturas de los cuerpos que guarda KSP están
+           así respecto a un mapa equirectangular al uso: la longitud crece al revés. */
+        public ImageData MirrorX()
+        {
+            int w = Width, h = Height;
+            Parallel.For(0, h, y =>
+            {
+                long row = (long)y * w * 4;
+                for (int x = 0; x < w / 2; x++)
+                {
+                    long a = row + (long)x * 4, b = row + (long)(w - 1 - x) * 4;
+                    for (int k = 0; k < 4; k++) (Rgba[a + k], Rgba[b + k]) = (Rgba[b + k], Rgba[a + k]);
+                }
+            });
+            mask = null;
+            return this;
+        }
+
         /* Píxel bajo una coordenada, con el desfase de longitud de su ranura. */
         public bool Sample(double lat, double lon, double lonOffset, out byte r, out byte g, out byte b, out byte a)
         {

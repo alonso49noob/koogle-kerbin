@@ -70,9 +70,9 @@ namespace KerbinMaps.UI
             switch (def.kind)
             {
                 case "image":
-                    map.BaseKind = OnMapBody ? "image" : "grid";
                     map.BaseTex = MapTex(def.slot);
-                    map.BaseOffset = state.LonOffset.Get(def.slot);
+                    map.BaseKind = map.BaseTex != null ? "image" : "grid";
+                    map.BaseOffset = OnMapBody ? state.LonOffset.Get(def.slot) : BodyMapOffset;
                     break;
                 case "xyz":
                     map.BaseKind = OnMapBody ? "xyz" : "grid";
@@ -90,8 +90,8 @@ namespace KerbinMaps.UI
                     break;
             }
             bool biomeOn = state.BiomeOn && MapImg("biome") != null;
-            map.BiomeTex = biomeOn ? textures.GetValueOrDefault("biome") : null;
-            map.BiomeOffset = state.LonOffset.Biome;
+            map.BiomeTex = biomeOn ? MapTex("biome") : null;
+            map.BiomeOffset = BiomeOffNow;
             map.BiomeOpacity = biomeOn ? state.BiomeOpacity : 0;
             map.Grid = state.Grid;
             markerLayer.Visible = state.Landmarks && OnMapBody;
@@ -106,11 +106,11 @@ namespace KerbinMaps.UI
             globe.BiomeTex = MapTex("biome");
             globe.HeightTex = MapTex("height");
             globe.BiomeAmt = state.BiomeOn && MapImg("biome") != null ? state.BiomeOpacity : 0;
-            globe.ColorOff = (int)state.LonOffset.Color;
-            globe.BiomeOff = (int)state.LonOffset.Biome;
-            globe.HeightOff = (int)state.LonOffset.Height;
-            globe.HMin = state.HMin;
-            globe.HMax = state.HMax;
+            globe.ColorOff = (int)ColorOffNow;
+            globe.BiomeOff = (int)BiomeOffNow;
+            globe.HeightOff = (int)HeightOffNow;
+            globe.HMin = HMinNow;
+            globe.HMax = HMaxNow;
             globe.Pins.Clear();
             if (OnMapBody)
                 foreach (var m in MarkersAll())
@@ -713,6 +713,10 @@ namespace KerbinMaps.UI
             // el sistema solar de la instalación de KSP, antes de la partida: sus naves pueden orbitar cuerpos de un pack
             try { await CargarSistemaSolar(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] sistema solar: " + ex.Message); }
+
+            // los mapas de los demás cuerpos, si hay carpeta elegida
+            try { IndexarMapasDeCuerpos(); await CargarMapasDelCuerpo(); AplicarAltimetria(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] mapas de cuerpos: " + ex.Message); }
 
             // la partida de la última vez, salvo que se abra otra desde la línea de órdenes
             bool abreSfs = false;

@@ -68,6 +68,12 @@ namespace KerbinMaps.UI
             cuerpo.Add(Field("Cuerpo que se ve", bodyCombo));
             bodySource = cuerpo.Add(Readout());
             bodyInfo = cuerpo.Add(Readout());
+            var mapasBtn = new DarkButton("Carpeta de mapas de los cuerpos…");
+            mapasBtn.Click += async (s, e) => await ElegirCarpetaMapas();
+            var mapasQuitar = new DarkButton("Quitar");
+            mapasQuitar.Click += (s, e) => QuitarCarpetaMapas();
+            cuerpo.Add(new BtnRow(mapasBtn, mapasQuitar));
+            bodyMapsInfo = cuerpo.Add(Readout());
             cuerpo.Add(Hint("Las naves, el Sol, la atmósfera y las órbitas pasan al cuerpo elegido. Si tu KSP usa Kopernicus " +
                             "(OPM, RSS, SOL...), la lista es la de tu instalación. Los mapas, biomas y marcadores que trae el visor " +
                             "son solo de Kerbin: el resto de cuerpos se ven con su color y la retícula."));
@@ -224,6 +230,35 @@ namespace KerbinMaps.UI
             altura.Add(Hint("Para calibrar: pulsa «Punto A», haz clic en un sitio del que sepas la altitud real (te la dice " +
                             "el juego al posarte ahí) y escríbela. Repite con B en un punto de altitud bien distinta y el " +
                             "rango se ajusta solo."));
+
+            /* -------------------------------------------------- Filtro de altimetría */
+            var altim = AddSection("Filtro de altimetría", false);
+            chkAlt = new DarkCheck("Filtrar por altura", state.AltFilter);
+            chkAlt.CheckedChanged += (s, e) => SetAltFilter(chkAlt.Checked);
+            altim.Add(Checks(chkAlt));
+            var r0 = RangoFiltro();
+            altMinBox = Num(r0.Min);
+            altMaxBox = Num(r0.Max);
+            altMinBox.Committed += (s, e) => SetAltRange(altMinBox.NumberOr(RangoAltura().Min), state.AltMax);
+            altMaxBox.Committed += (s, e) => SetAltRange(state.AltMin, altMaxBox.NumberOr(RangoAltura().Max));
+            altim.Add(new Row2(Field("desde (m)", altMinBox), Field("hasta (m)", altMaxBox)));
+            var altReset = new DarkButton("Todo el rango del cuerpo", ButtonVariant.Ghost, small: true);
+            altReset.Click += (s, e) => ResetAltRange();
+            altim.Add(new BtnRow(altReset));
+            altOpSlider = new DarkSlider(20, 100, (int)Math.Round(state.AltOpacity * 100));
+            altOpSlider.ValueChanged += (s, e) =>
+            {
+                altOpHeader.Value = altOpSlider.Value + "%";
+                state.AltOpacity = altOpSlider.Value / 100.0;
+                SaveSettings();
+                AplicarAltimetria();
+            };
+            altim.Add(Field("Intensidad", altOpSlider, out altOpHeader, altOpSlider.Value + "%"));
+            altInfo = altim.Add(Readout());
+            altim.Add(Hint("El terreno dentro de la franja se pinta con paleta de altimetría (azul abajo, verde en las " +
+                           "llanuras, blanco en las cumbres) y el de fuera se apaga, en el mapa y en el globo. La escala " +
+                           "de grises a metros es la de arriba, o la que SCANsat tiene tabulada para ese cuerpo."));
+            RenderAltInfo();
 
             /* ------------------------------------------------------------- Vista 3D */
             globeSection = AddSection("Vista 3D", true);
