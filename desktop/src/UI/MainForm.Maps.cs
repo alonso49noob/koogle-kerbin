@@ -115,6 +115,13 @@ namespace KerbinMaps.UI
             if (OnMapBody)
                 foreach (var m in MarkersAll())
                     globe.Pins.Add(new GlobePin { Lat = m.Lat, Lon = m.Lon, Name = m.Name, Color = ColorF.Hex(MarkerColor(m.Cat)), Tag = m });
+            if (state.ShowAnomalies)
+                foreach (var a in Visibles())
+                    globe.Pins.Add(new GlobePin
+                    {
+                        Lat = a.Lat, Lon = a.Lon, Name = a.Name, Tag = a,
+                        Color = ColorF.Hex(a.Identificada ? "#7ee787" : a.Detectada ? "#ffb454" : "#b98cff"),
+                    });
             globe.Pins.Add(new GlobePin { Lat = state.ObsLat, Lon = state.ObsLon, Name = Lang.T("Observador"), Color = ColorF.Hex("#ffb454") });
             globe.Pins.AddRange(VesselPins());
             bool hasHeight = MapImg("height") != null;

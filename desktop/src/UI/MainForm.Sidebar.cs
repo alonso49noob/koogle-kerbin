@@ -74,6 +74,25 @@ namespace KerbinMaps.UI
             RenderBodyList();
             RenderBodyInfo();
 
+            /* --------------------------------------------------- SCANsat y progreso */
+            var sscan = AddSection("SCANsat y progreso", false);
+            chkProgresion = new DarkCheck("Modo progresión", state.Progresion);
+            chkProgresion.CheckedChanged += (s, e) => SetProgresion(chkProgresion.Checked);
+            chkScan = new DarkCheck("Tapar lo no escaneado", state.ShowScan);
+            chkScan.CheckedChanged += (s, e) => SetShowScan(chkScan.Checked);
+            chkAnomalias = new DarkCheck("Anomalías", state.ShowAnomalies);
+            chkAnomalias.CheckedChanged += (s, e) => SetShowAnomalias(chkAnomalias.Checked);
+            sscan.Add(Checks(chkProgresion, chkScan, chkAnomalias));
+            scanInfo = sscan.Add(Readout());
+            progInfo = sscan.Add(Readout());
+            anomList = sscan.Add(new DrawList(240));
+            anomList.DrawItem = DrawAnomalyRow;
+            anomList.ItemClick = AnomalyRowClick;
+            sscan.Add(Hint("En <b>modo progresión</b> el visor enseña solo lo que la partida ha descubierto: la cobertura de " +
+                          "SCANsat tapa lo que no has escaneado y las anomalías solo salen si tu escáner de anomalías ha " +
+                          "pasado por encima. En sandbox se ve todo. El catálogo de anomalías está en <code>data/anomalies.json</code>."));
+            RenderScanInfo();
+
             var capas = AddSection("Capas", true);
             baseCombo = new DarkCombo();
             baseCombo.SetItems(new[]

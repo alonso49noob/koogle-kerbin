@@ -1,0 +1,170 @@
+{
+ "_nota": [
+  "Anomalías (easter eggs) de los cuerpos de KSP stock: monolitos, arcos, caras,",
+  "restos y demás. Coordenadas en el convenio de KSP: latitud N+/S-, longitud E+/W-.",
+  "Procedencia: proyecto Kerbal Maps (github.com/FiniteMonkeys/kerbal-maps),",
+  "priv/repo/seeds.exs, licencia Apache-2.0. No están todas las del juego: solo las",
+  "que ese proyecto tiene con coordenadas. Añade las tuyas con este mismo formato;",
+  "el visor las lee igual.",
+  "El rastreador dice cuáles has detectado ya según la cobertura de SCANsat de tu",
+  "partida (bit de anomalía), así que en modo progresión solo verás las encontradas."
+ ],
+ "_fuente": {
+  "proyecto": "Kerbal Maps",
+  "url": "https://github.com/FiniteMonkeys/kerbal-maps",
+  "fichero": "priv/repo/seeds.exs",
+  "licencia": "Apache-2.0"
+ },
+ "items": [
+  {
+   "body": "Bop",
+   "name": "Large Orange Circle",
+   "lat": 4.74,
+   "lon": -72.77
+  },
+  {
+   "body": "Bop",
+   "name": "Space Kraken",
+   "lat": 60.435556,
+   "lon": 117.025278
+  },
+  {
+   "body": "Duna",
+   "name": "Alien Camera",
+   "lat": -30.3525,
+   "lon": -28.6828
+  },
+  {
+   "body": "Duna",
+   "name": "Cyduna Face",
+   "lat": 17.0483,
+   "lon": -85.4717
+  },
+  {
+   "body": "Duna",
+   "name": "SSTV Hill",
+   "lat": -66.1344,
+   "lon": -160.7432
+  },
+  {
+   "body": "Kerbin",
+   "name": "Baikerbanur Monolith",
+   "lat": 20.670895,
+   "lon": -146.496854
+  },
+  {
+   "body": "Kerbin",
+   "name": "Crashed Saucer",
+   "lat": 81.955167,
+   "lon": -128.517573
+  },
+  {
+   "body": "Kerbin",
+   "name": "Eastern Monolith",
+   "lat": -28.8083,
+   "lon": -13.4401
+  },
+  {
+   "body": "Kerbin",
+   "name": "Hidden Valley Monolith",
+   "lat": 35.570511,
+   "lon": -74.977287
+  },
+  {
+   "body": "Kerbin",
+   "name": "KSC Monolith",
+   "lat": 0.10233,
+   "lon": -74.568421
+  },
+  {
+   "body": "Kerbin",
+   "name": "Smiley Face",
+   "lat": -30.0,
+   "lon": -80.0
+  },
+  {
+   "body": "Kerbin",
+   "name": "Tut-Ur Jeb-Ahn",
+   "lat": -6.505657,
+   "lon": -141.685615
+  },
+  {
+   "body": "Kerbin",
+   "name": "Western Monolith",
+   "lat": -0.640111,
+   "lon": -80.766738
+  },
+  {
+   "body": "Minmus",
+   "name": "Monolith",
+   "lat": 23.7768,
+   "lon": 60.0462
+  },
+  {
+   "body": "Moho",
+   "name": "Northern Sinkhole",
+   "lat": 90.0,
+   "lon": 0.0
+  },
+  {
+   "body": "Mun",
+   "name": "Armstrong Monument",
+   "lat": 0.7027,
+   "lon": 22.747
+  },
+  {
+   "body": "Mun",
+   "name": "Crashed Saucer",
+   "lat": -70.9556,
+   "lon": -68.1378
+  },
+  {
+   "body": "Mun",
+   "name": "East Crater Arch",
+   "lat": 2.4695,
+   "lon": 81.5133
+  },
+  {
+   "body": "Mun",
+   "name": "East Farside Arch",
+   "lat": -12.4431,
+   "lon": -140.822
+  },
+  {
+   "body": "Mun",
+   "name": "Nearside Monolith",
+   "lat": -9.8314,
+   "lon": 25.917
+  },
+  {
+   "body": "Mun",
+   "name": "Northern Monolith",
+   "lat": 57.6604,
+   "lon": 9.1422
+  },
+  {
+   "body": "Mun",
+   "name": "Northwest Crater Arch",
+   "lat": 12.4432,
+   "lon": 39.178
+  },
+  {
+   "body": "Mun",
+   "name": "South Polar Monolith",
+   "lat": -82.2063,
+   "lon": 102.9305
+  },
+  {
+   "body": "Tylo",
+   "name": "Cave",
+   "lat": 40.2671,
+   "lon": 174.0467
+  },
+  {
+   "body": "Vall",
+   "name": "Vallhenge",
+   "lat": -60.3289,
+   "lon": 84.0579
+  }
+ ]
+}

@@ -22,6 +22,8 @@ namespace KerbinMaps.Views
         public TileLayer Tiles;
         public Texture BiomeTex;
         public double BiomeOffset, BiomeOpacity;
+        public Texture ScanTex;                   // cobertura de SCANsat: lo no escaneado, tapado
+        public double ScanOpacity;
         public bool Grid = true;
         // la mitad del planeta de noche, con el punto subsolar
         public bool DayNight = true;
@@ -288,6 +290,9 @@ void main() {
 
             // biomas encima del relieve, debajo de trazas y marcadores
             if (BiomeTex != null && BiomeOpacity > 0) DrawImage(0, BiomeTex, BiomeOffset, BiomeOpacity);
+
+            // lo que la partida no ha escaneado, tapado: va sobre el terreno y los biomas
+            if (ScanTex != null && ScanOpacity > 0) DrawImage(0, ScanTex, 0, ScanOpacity);
 
             // la noche va sobre el terreno y debajo de la retícula, las trazas y los marcadores
             if (DayNight) DrawImage(2, null, 0, 1);

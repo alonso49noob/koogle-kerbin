@@ -67,6 +67,8 @@ namespace KerbinMaps.Views
         public double Relief, BiomeAmt, ColorOff, BiomeOff, HeightOff;
         public double HMin = HeightRange.Min, HMax = HeightRange.Max;
         public Texture ColorTex, BiomeTex, HeightTex;
+        public Texture ScanTex;                   // cobertura de SCANsat (360x180, sin filtrar)
+        public double ScanAmt;
         public double MinDist = 1.02, MaxDist = 12, SceneR = 1.2;
         public int W = 1, H = 1;
         public float S = 1;
@@ -152,10 +154,10 @@ in vec2 vUv;
 in vec3 vNormal;
 in vec3 vDir;
 in vec3 vWorld;
-uniform sampler2D uColor, uBiome, uHeight;
-uniform float uColorOff, uBiomeOff, uBiomeAmt, uHeightOff, uHMin, uHMax, uRadius, uBump;
+uniform sampler2D uColor, uBiome, uHeight, uScan;
+uniform float uColorOff, uBiomeOff, uBiomeAmt, uHeightOff, uHMin, uHMax, uRadius, uBump, uScanAmt;
 uniform vec2 uHeightSize;
-uniform int uHasColor, uHasBiome, uHasHeight, uLit;
+uniform int uHasColor, uHasBiome, uHasHeight, uHasScan, uLit;
 uniform vec3 uLightDir, uCamPos, uTint;
 out vec4 frag;
 
@@ -176,6 +178,12 @@ void main() {
   if (uHasColor != 0) base = shifted(uColor, uColorOff);
   vec3 ground = base;
   if (uHasBiome != 0 && uBiomeAmt > 0.0) base = mix(base, shifted(uBiome, uBiomeOff), uBiomeAmt);
+  // lo que la partida no ha escaneado con SCANsat, tapado (la textura ya trae el alfa)
+  if (uHasScan != 0 && uScanAmt > 0.0) {
+    vec4 sc = texture(uScan, vec2(fract(vUv.x), vUv.y));
+    base = mix(base, sc.rgb, sc.a * uScanAmt);
+    ground = mix(ground, sc.rgb, sc.a * uScanAmt);
+  }
   if (uLit == 0) { frag = vec4(base, 1.0); return; }
 
   vec3 up = normalize(vDir);
@@ -842,6 +850,8 @@ void main() {
             prog.Float("uBiomeAmt", BiomeTex != null ? BiomeAmt : 0);
             prog.Int("uHasColor", ColorTex != null ? 1 : 0);
             prog.Int("uHasBiome", BiomeTex != null ? 1 : 0);
+            prog.Int("uHasScan", ScanTex != null ? 1 : 0);
+            prog.Float("uScanAmt", ScanTex != null ? ScanAmt : 0);
             prog.Vec3("uLightDir", lightDir[0], lightDir[1], lightDir[2]);
             prog.Int("uLit", Light ? 1 : 0);
             prog.Int("uHasHeight", HeightTex != null ? 1 : 0);
@@ -852,6 +862,7 @@ void main() {
             BindTex(0, ColorTex); prog.Int("uColor", 0);
             BindTex(1, BiomeTex); prog.Int("uBiome", 1);
             BindTex(2, HeightTex); prog.Int("uHeight", 2);
+            BindTex(3, ScanTex); prog.Int("uScan", 3);
             GL.DrawElements(GL.TRIANGLES, count, GL.UNSIGNED_INT, 0);
 
             DrawTrack(eye, false);

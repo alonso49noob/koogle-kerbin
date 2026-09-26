@@ -346,12 +346,14 @@ namespace KerbinMaps.UI
         async Task CargarSave(string path, bool restoring = false)
         {
             SaveData d;
+            SaveExtras nuevosExtras = null;
             string texto;
             UseWaitCursor = true;
             try
             {
                 texto = await File.ReadAllTextAsync(path);
                 d = await Task.Run(() => SaveFile.Parse(texto));
+                nuevosExtras = await Task.Run(() => SaveExtras.Parse(texto));
             }
             catch (IOException ex) { Flash("No se pudo leer el fichero: " + ex.Message); return; }
             catch (Exception ex)
@@ -381,6 +383,7 @@ namespace KerbinMaps.UI
             ClearModel();
             SetModelStatus(null);
 
+            AplicarExtras(nuevosExtras, proponerModo: !restoring);
             FiltrarNavesDelCuerpo();
             Vis.Set(tbar, true);
             RenderReloj();

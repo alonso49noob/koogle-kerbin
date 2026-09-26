@@ -146,7 +146,7 @@ namespace KerbinMaps.UI
             surface.KeyDown += SurfaceKeyDown;
             mapArea.Controls.Add(surface);
 
-            map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, toolLayer, observerLayer, vesselLayer, markerLayer });
+            map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, toolLayer, observerLayer, anomalyLayer, vesselLayer, markerLayer });
             map.SetView(state.CenterLat, state.CenterLon, state.Zoom);
 
             // barra superior

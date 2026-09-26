@@ -25,7 +25,13 @@ namespace KerbinMaps.UI
             if (bodyCombo == null) return;
             var items = new List<(string, string)>();
             foreach (var (b, depth) in SolarSystem.Tree())
-                items.Add((b.Name, new string(' ', depth * 4) + b.Label));
+            {
+                // en progresión se marca lo que la partida aún no ha visitado
+                string sufijo = "";
+                if (Progresion && extras != null && !b.IsStar && extras.Hitos(b.Name)?.Visitado != true)
+                    sufijo = "  ·  " + Lang.T("sin visitar");
+                items.Add((b.Name, new string(' ', depth * 4) + b.Label + sufijo));
+            }
             bodyCombo.SetItems(items);
             bodyCombo.SelectedId = Body.Name;
             int moons = SolarSystem.Bodies.Count(b => b.Parent != null && !b.Parent.IsStar);
@@ -54,6 +60,7 @@ namespace KerbinMaps.UI
             else SetObserver(0, 0, 0);
 
             FiltrarNavesDelCuerpo();
+            ActualizarScan();
             ApplyMapTextures();
             SyncGlobe();
             RenderBodyInfo();

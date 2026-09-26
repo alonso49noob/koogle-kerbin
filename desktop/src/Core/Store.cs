@@ -56,6 +56,9 @@ namespace KerbinMaps.Core
         public double? SimT;                      // el instante de la barra de tiempo al cerrar
         public bool ShowVesselModels = true;      // montar la nave con las piezas de KSP al acercarse
         public string KspPath;                    // carpeta de KSP elegida a mano, si no se encuentra sola
+        public bool Progresion;                   // enseñar solo lo que la partida ha descubierto
+        public bool ShowScan = true;              // cobertura de SCANsat sobre el mapa
+        public bool ShowAnomalies = true;         // anomalías del catálogo
         public int WinX = int.MinValue, WinY = int.MinValue, WinW = 1400, WinH = 880;
         public bool WinMax;
     }
