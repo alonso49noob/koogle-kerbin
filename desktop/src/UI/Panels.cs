@@ -160,15 +160,26 @@ namespace KerbinMaps.UI
         public readonly StackPanel Body;
         bool expanded;
 
+        public event EventHandler ExpandedChanged;
+
         public bool Expanded
         {
             get => expanded;
-            set { expanded = value; Body.Visible = value; header.Invalidate(); Parent?.PerformLayout(); PerformLayout(); }
+            set
+            {
+                bool cambia = expanded != value;
+                expanded = value; Body.Visible = value; header.Invalidate();
+                Parent?.PerformLayout(); PerformLayout();
+                if (cambia) ExpandedChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
+
+        public string Titulo { get; }
 
         public Section(string title, bool open)
         {
             BackColor = Theme.Bg2;
+            Titulo = title;
             header = new SectionHeader(this) { Text = Core.Lang.T(title).ToUpperInvariant() };
             Body = new StackPanel(10) { Padding = new Padding(Theme.S(16), Theme.S(4), Theme.S(16), Theme.S(16)), BackColor = Theme.Bg2 };
             Controls.Add(header);

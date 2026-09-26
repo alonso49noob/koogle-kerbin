@@ -49,9 +49,17 @@ namespace KerbinMaps.UI
             return t;
         }
 
+        /* Las secciones abiertas se recuerdan entre sesiones: con una docena de ellas,
+           volver a abrir las mismas cada vez cansa. */
         Section AddSection(string title, bool open)
         {
+            if (state.Sections != null && state.Sections.TryGetValue(title, out bool guardado)) open = guardado;
             var s = new Section(title, open);
+            s.ExpandedChanged += (o, e) =>
+            {
+                (state.Sections ??= new Dictionary<string, bool>())[title] = s.Expanded;
+                SaveSettings();
+            };
             sideStack.Controls.Add(s);
             return s;
         }
@@ -68,7 +76,7 @@ namespace KerbinMaps.UI
             cuerpo.Add(Field("Cuerpo que se ve", bodyCombo));
             bodySource = cuerpo.Add(Readout());
             bodyInfo = cuerpo.Add(Readout());
-            var mapasBtn = new DarkButton("Carpeta de mapas de los cuerpos…");
+            var mapasBtn = new DarkButton("Carpeta de mapas…");
             mapasBtn.Click += async (s, e) => await ElegirCarpetaMapas();
             var mapasQuitar = new DarkButton("Quitar");
             mapasQuitar.Click += (s, e) => QuitarCarpetaMapas();
@@ -94,7 +102,7 @@ namespace KerbinMaps.UI
             anomList = sscan.Add(new DrawList(240));
             anomList.DrawItem = DrawAnomalyRow;
             anomList.ItemClick = AnomalyRowClick;
-            var anomWp = new DarkButton("Mandar las anomalías a la partida como waypoints");
+            var anomWp = new DarkButton("Mandar anomalías como waypoints");
             anomWp.Click += (s, e) => ExportarWaypoints(true);
             sscan.Add(new BtnRow(anomWp));
             sscan.Add(Hint("En <b>modo progresión</b> el visor enseña solo lo que la partida ha descubierto: la cobertura de " +
@@ -245,7 +253,7 @@ namespace KerbinMaps.UI
             altMinBox.Committed += (s, e) => SetAltRange(altMinBox.NumberOr(RangoAltura().Min), state.AltMax);
             altMaxBox.Committed += (s, e) => SetAltRange(state.AltMin, altMaxBox.NumberOr(RangoAltura().Max));
             altim.Add(new Row2(Field("desde (m)", altMinBox), Field("hasta (m)", altMaxBox)));
-            var altReset = new DarkButton("Todo el rango del cuerpo", ButtonVariant.Ghost, small: true);
+            var altReset = new DarkButton("Todo el rango", ButtonVariant.Ghost, small: true);
             altReset.Click += (s, e) => ResetAltRange();
             altim.Add(new BtnRow(altReset));
             altOpSlider = new DarkSlider(20, 100, (int)Math.Round(state.AltOpacity * 100));
@@ -263,9 +271,39 @@ namespace KerbinMaps.UI
                            "de grises a metros es la de arriba, o la que SCANsat tiene tabulada para ese cuerpo."));
             RenderAltInfo();
 
+            /* ------------------------------------------------------- Transferencias */
+            var trans = AddSection("Transferencias y ventanas", false);
+            trDestino = new DarkCombo { Icons = BodyIcon.Get };
+            trDestino.SelectedChanged += (s, e) => { state.TransferTo = trDestino.SelectedId; SaveSettings(); RenderTransferInfo(); };
+            trans.Add(Field("Destino", trDestino));
+            trPark = Num(state.TransferPark / 1000);
+            trCaptura = Num(state.TransferCapture / 1000);
+            trPark.Committed += (s, e) => { state.TransferPark = Math.Max(0, trPark.NumberOr(100)) * 1000; SaveSettings(); };
+            trCaptura.Committed += (s, e) => { state.TransferCapture = Math.Max(0, trCaptura.NumberOr(100)) * 1000; SaveSettings(); };
+            trans.Add(new Row2(Field("aparcamiento (km)", trPark), Field("captura (km)", trCaptura)));
+            trCapturar = new DarkCheck("Contar la frenada de captura", state.TransferCapturar);
+            trCapturar.CheckedChanged += (s, e) => { state.TransferCapturar = trCapturar.Checked; SaveSettings(); };
+            trans.Add(Checks(trCapturar));
+            trPlazo = Num(state.TransferSpan);
+            trPlazo.Committed += (s, e) => { state.TransferSpan = Math.Max(1, trPlazo.NumberOr(500)); SaveSettings(); };
+            trans.Add(Field("Buscar en los próximos (días)", trPlazo));
+            trBuscar = new DarkButton("Buscar ventanas");
+            trBuscar.Click += async (s, e) => await BuscarVentanas();
+            trans.Add(new BtnRow(trBuscar));
+            trList = trans.Add(new DrawList(180) { RowHeight = Theme.S(24) });
+            trList.DrawItem = DrawTransferRow;
+            trList.ItemClick = TransferRowClick;
+            trInfo = trans.Add(Readout());
+            trans.Add(Hint("Cónicas parcheadas, como en el juego: una <b>sola quemada</b> de salida, sin correcciones a " +
+                           "medio camino. La búsqueda arranca en el instante de la barra de tiempo. Pincha una ventana y " +
+                           "la barra salta a ese día. El <b>ángulo de fase</b> es lo que tiene que adelantar el destino al " +
+                           "salir, y el de <b>eyección</b> dónde queda tu quemada respecto al prógrado del cuerpo."));
+            RenderDestinos();
+            RenderTransferInfo();
+
             /* ---------------------------------------------------------- Aterrizaje */
             var aterr = AddSection("Aterrizaje", false);
-            var landAqui = new DarkButton("Objetivo aquí (centro de la vista)");
+            var landAqui = new DarkButton("Objetivo en el centro");
             landAqui.Click += (s, e) => FijarObjetivoAqui();
             aterr.Add(new BtnRow(landAqui));
             landPeBox = Num(state.LandPe);
@@ -386,7 +424,7 @@ namespace KerbinMaps.UI
             mkList = marcadores.Add(new DrawList(260));
             mkList.DrawItem = DrawMarkerRow;
             mkList.ItemClick = MarkerRowClick;
-            var wpExport = new DarkButton("Mandar a la partida como waypoints");
+            var wpExport = new DarkButton("Mandar como waypoints");
             wpExport.Click += (s, e) => ExportarWaypoints(false);
             var wpImport = new DarkButton("Traer waypoints", ButtonVariant.Ghost);
             wpImport.Click += (s, e) => ImportarWaypoints();

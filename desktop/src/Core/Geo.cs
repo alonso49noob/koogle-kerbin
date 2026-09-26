@@ -178,6 +178,14 @@ namespace KerbinMaps.Core
                 P(sg / 3600) + ":" + P((sg % 3600) / 60) + ":" + P(sg % 60));
         }
 
+        /* La misma fecha sin reloj, para listas estrechas. */
+        public static string FechaCorta(double t)
+        {
+            double DIA = SolarSystem.Home.SolarDay, ANIO = 426 * DIA;
+            double y = Math.Floor(t / ANIO), d = Math.Floor((t - y * ANIO) / DIA);
+            return Lang.F("Año {0} · día {1}", (long)y + 1, (long)d + 1);
+        }
+
         /* Acepta «-0.0972, -74.5577», «-0.0972 -74.5577» y «0.09 S 74.55 W». */
         public static LatLon? ParseCoords(string s)
         {

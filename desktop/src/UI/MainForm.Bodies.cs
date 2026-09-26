@@ -68,6 +68,10 @@ namespace KerbinMaps.UI
             SyncGlobe();
             RenderBodyInfo();
             RenderWaypointInfo();
+            RenderDestinos();
+            transfer = null;
+            trList?.SetItems(new List<object>());
+            RenderTransferInfo();
             if (isSky) RefreshSkyHud(); else UpdateHud(null);
             if (sv.Data != null) { RenderReloj(); RenderOrbitInfo(); }
             RequestRender();

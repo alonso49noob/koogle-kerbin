@@ -59,6 +59,12 @@ namespace KerbinMaps.Core
         public string BodyMapsDir;                // carpeta con las texturas de los cuerpos
         public double BodyMapOffset = 90;         // giro que necesitan esas texturas
         public bool BodyMapMirror = true;         // y su espejo horizontal
+        public Dictionary<string, bool> Sections = new();   // secciones del panel abiertas o cerradas
+        public string TransferTo;                 // destino de la calculadora de ventanas
+        public double TransferPark = 100000;      // órbita de aparcamiento, m
+        public double TransferCapture = 100000;   // órbita a la que capturar, m
+        public bool TransferCapturar = true;
+        public double TransferSpan = 500;         // plazo de búsqueda, en días
         public double? LandLat, LandLon;          // objetivo del asistente de aterrizaje
         public double LandPe = 0;                 // periapsis al que frenar, m
         public double LandBc = 200;               // coeficiente balístico, kg/m2
