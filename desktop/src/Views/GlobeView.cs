@@ -27,7 +27,7 @@ namespace KerbinMaps.Views
     /* Cómo se coloca la cámara: girando alrededor del planeta, alrededor de una nave
        (el foco pasa del centro de Kerbin a la nave) o de pie en la superficie
        mirando al cielo. */
-    public enum CamMode { Planet, Focus, Sky }
+    public enum CamMode { Planet, Focus, Sky, Free }
 
     /* Vista 3D: Kerbin como esfera texturizada. Mismos shaders que la versión WebGL2,
        pasados a OpenGL 3.3, con la cámara generalizada a los tres modos. */
@@ -534,6 +534,14 @@ void main() {
                     var o = Add(Scale(heading, -Math.Cos(el)), up, Math.Sin(el));
                     return new Cam { Eye = Add(FocusTarget, o, FocusDist), Target = FocusTarget, Up = up, Fov = 45 };
                 }
+                case CamMode.Free:
+                {
+                    var eye = FreePos();
+                    LocalBasis(eye, out var up, out var east, out var north);
+                    double az = FreeAz * D2R, el = FreeEl * D2R;
+                    var f = Add(Scale(Add(Scale(north, Math.Cos(az)), east, Math.Sin(az)), Math.Cos(el)), up, Math.Sin(el));
+                    return new Cam { Eye = eye, Target = Add(eye, f), Up = up, Fov = SkyFov };
+                }
                 case CamMode.Sky:
                 {
                     var eye = ObserverPos();
@@ -663,6 +671,7 @@ void main() {
             {
                 case CamMode.Focus: dragA = FocusAz; dragB = FocusEl; break;
                 case CamMode.Sky: dragA = SkyAz; dragB = SkyEl; break;
+                case CamMode.Free: dragA = FreeAz; dragB = FreeEl; break;
                 default: dragA = CamLat; dragB = CamLon; break;
             }
         }
@@ -689,6 +698,14 @@ void main() {
                     double degPerPx = SkyFov / Math.Max(1, H);
                     SkyAz = ((dragA - dx * degPerPx) % 360 + 360) % 360;
                     SkyEl = Math.Clamp(dragB + dy * degPerPx, -89, 89);
+                    break;
+                }
+                case CamMode.Free:
+                {
+                    // mirar alrededor volando: igual que en el cielo
+                    double degPerPx = SkyFov / Math.Max(1, H);
+                    FreeAz = ((dragA - dx * degPerPx) % 360 + 360) % 360;
+                    FreeEl = Math.Clamp(dragB + dy * degPerPx, -89, 89);
                     break;
                 }
                 default:
@@ -719,6 +736,10 @@ void main() {
                     break;
                 case CamMode.Sky:
                     SkyFov = Math.Clamp(SkyFov * Math.Exp(-notches * 0.1), 3, 110);
+                    break;
+                case CamMode.Free:
+                    // volando, la rueda es el acelerador
+                    FreeSpeedStep((int)Math.Round(notches));
                     break;
                 default:
                     CamDist = Math.Clamp(CamDist * Math.Exp(-notches * 100 * 0.0012), MinDist, MaxDist);
@@ -830,7 +851,7 @@ void main() {
             /* Cerca de la superficie el búfer de profundidad no da para distinguir el
                suelo a metros de una órbita a cientos de kilómetros: ahí se usa el
                trazado de rayos de la vista del cielo, también a mitad de transición. */
-            if (Mode == CamMode.Sky || (transActive && Len(cam.Eye) < 1.1))
+            if (Mode == CamMode.Sky || Mode == CamMode.Free || (transActive && Len(cam.Eye) < 1.1))
             {
                 RenderSky(batch, tc, cam);
                 return;

@@ -93,9 +93,9 @@ Los mapas, biomas, alturas y marcadores que **trae** el visor son de Kerbin, per
 demás cuerpos pueden tener los suyos: ver «Mapas de los demás cuerpos», más abajo. Sin
 ellos, cada cuerpo se ve con su color y la retícula.
 
-## Las tres vistas
+## Las cuatro vistas
 
-Arriba a la izquierda, **2D**, **3D** y **Cielo**.
+Arriba a la izquierda, **2D**, **3D**, **Cielo** y **Vuelo**.
 
 - **2D**: el mapa plano.
 - **3D**: el globo. Al pinchar una nave, el foco de la cámara pasa del centro de
@@ -105,6 +105,7 @@ Arriba a la izquierda, **2D**, **3D** y **Cielo**.
   cruzan el cielo con la barra de tiempo; sus órbitas se tapan con el horizonte.
   El punto se elige en la sección «Vista del cielo» (KSC, centro de la vista o un
   clic en el mapa) o con «Ver el cielo desde aquí» al pinchar en el mapa.
+- **Vuelo**: una cámara libre a ras de suelo, con el relieve del terreno. Ver abajo.
 
 ## Día y noche
 
@@ -317,11 +318,62 @@ Kerbin → Duna 1089 m/s y 309 días de vuelo con fase de unos 44° (lo publicad
 1050 m/s), Kerbin → Mun 842 m/s, Kerbin → Minmus 913 m/s, Kerbin → Eve 1026 m/s. Cada
 búsqueda tarda menos de un cuarto de segundo.
 
+## Vuelo: la cámara libre
+
+Se vuela por encima del terreno como en un avión, pero sin nave: no hay inercia ni
+se puede chocar, solo no deja bajar del suelo.
+
+| Tecla | Qué hace |
+|---|---|
+| W / S | adelante y atrás, en la dirección en la que se mira |
+| A / D | de lado |
+| R / F, o espacio y control | subir y bajar |
+| arrastrar | mirar alrededor |
+| rueda | acelerador (de 2 m/s a 20 km/s) |
+| mayúsculas | multiplica la velocidad por cinco |
+
+El HUD da latitud, longitud, altura sobre el nivel del mar y **sobre el suelo**, rumbo,
+velocidad y bioma. Al salir de la vista, la cámara se queda donde la dejaste.
+
+**El terreno se traza por rayos, no con una malla.** A ras de suelo una malla necesitaría
+teselado y niveles de detalle; aquí cada píxel avanza por el mapa de alturas hasta cruzar
+la superficie, con pasos que crecen con la distancia y el cruce afinado por bisección. El
+horizonte y las siluetas de las montañas salen exactos, y el mar se trata como una esfera
+lisa al nivel del mar, así que el rayo no baja al fondo.
+
+Dos detalles que costó afinar:
+
+- **El mapa de alturas se sube sin filtrar**, porque los biomas se leen por color exacto.
+  Aquí se interpola a mano con una curva quíntica: sin eso el terreno sale a escalones del
+  tamaño de un texel, que en Kerbin son mesetas de 460 m.
+- **Las derivadas de pantalla no sirven** para elegir el nivel de mipmap. Con relieve, la
+  distancia al choque cambia de golpe entre píxeles vecinos (las siluetas) y encima se
+  calcularían dentro de una rama que no todos los píxeles toman, que es justo lo que el
+  lenguaje deja sin definir: el mipmap se iba al nivel más basto y el suelo salía de un
+  gris plano. El nivel se calcula del tamaño que tiene el píxel sobre el suelo.
+
+### Texturas de suelo y nubes, del juego
+
+De cerca, el mapa del cuerpo no da más de sí: un texel son cientos de metros. Encima se
+pone una textura que se repite cada pocos metros, elegida por la pendiente y por el color
+del sitio (hierba en lo verde, arena en lo claro, roca en lo empinado, nieve en lo
+blanco), y que se desvanece a partir de un kilómetro y medio para que no haga muaré. Son
+las del **Community Terrain Texture Pack** de tu instalación, que es lo que usan Parallax
+y compañía.
+
+Las **nubes** salen del mapa de los mods de nubes que tengas (Stock Volumetric Clouds,
+EVE): una capa esférica a la altura que elijas, con la cobertura del propio mapa e
+iluminada por el Sol. Ese mapa es de 16384×8192 y pesa 179 MB con sus mipmaps, así que se
+lee **solo un nivel de 2048 de ancho**, que para pintarlas sobra y se carga al instante.
+
+Las tres cosas se apagan por separado en la sección «Vuelo», y sin esos mods instalados
+el vuelo funciona igual: el suelo de cerca queda liso y no hay nubes.
+
 ## Controles
 
 | Acción | Cómo |
 |---|---|
-| Mover el mapa, girar el globo o mirar alrededor en el cielo | arrastrar |
+| Mover el mapa, girar el globo, o mirar alrededor en el cielo y en vuelo | arrastrar |
 | Zoom (en el cielo, el campo de visión) | rueda; doble clic acerca en 2D; `+`/`-` y flechas con la vista enfocada |
 | Información de un punto | clic en el mapa |
 | Seguir una nave | clic en ella (en el mapa, el globo o la lista) |

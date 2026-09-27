@@ -95,6 +95,30 @@ namespace KerbinMaps.Gfx
             return new Texture { Id = id, Width = w, Height = h };
         }
 
+        /* Textura que ya viene comprimida en DXT con sus mipmaps, como las del juego. Se
+           sube tal cual (la GPU descomprime al leer) y se repite, que es lo que hace falta
+           para las texturas de detalle del terreno. */
+        public static Texture FromCompressed(uint format, int w, int h, IReadOnlyList<byte[]> levels)
+        {
+            uint id = GL.GenTexture();
+            GL.BindTexture(GL.TEXTURE_2D, id);
+            GL.PixelStore(GL.UNPACK_ALIGNMENT, 1);
+            int lw = w, lh = h;
+            for (int l = 0; l < levels.Count; l++)
+            {
+                GL.CompressedTexImage2D(GL.TEXTURE_2D, l, format, lw, lh, levels[l]);
+                lw = Math.Max(1, lw / 2); lh = Math.Max(1, lh / 2);
+            }
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAX_LEVEL, levels.Count - 1);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, levels.Count > 1 ? GL.LINEAR_MIPMAP_LINEAR : GL.LINEAR);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.REPEAT);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.REPEAT);
+            if (GL.MaxAnisotropy > 0) GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAX_ANISOTROPY, Math.Min(8f, GL.MaxAnisotropy));
+            GL.BindTexture(GL.TEXTURE_2D, 0);
+            return new Texture { Id = id, Width = w, Height = h };
+        }
+
         public void Dispose()
         {
             if (Id != 0) { GL.DeleteTexture(Id); Id = 0; }

@@ -709,7 +709,9 @@ namespace KerbinMaps.UI
             if (Img("biome") != null && !state.BiomeTouched) state.BiomeOn = true;
             SyncBiomeLayer();
             if (Img("biome") != null) ScanBiomes();
+            restaurandoVista = true;
             SetViewMode(state.ViewMode ?? (state.View3D ? "3d" : "2d"));
+            restaurandoVista = false;
 
             // el sistema solar de la instalación de KSP, antes de la partida: sus naves pueden orbitar cuerpos de un pack
             try { await CargarSistemaSolar(); }

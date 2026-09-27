@@ -60,6 +60,13 @@ namespace KerbinMaps.Core
         public double BodyMapOffset = 90;         // giro que necesitan esas texturas
         public bool BodyMapMirror = true;         // y su espejo horizontal
         public Dictionary<string, bool> Sections = new();   // secciones del panel abiertas o cerradas
+        public double? FreeLat, FreeLon;          // cámara libre: dónde se quedó
+        public double FreeAlt = 150, FreeAz = 90, FreeSpeed = 120;
+        public bool FreeRelief = true;            // relieve del terreno al volar
+        public bool FreeDetail = true;            // texturas de suelo del juego
+        public int FreeDebug;                     // diagnóstico del relieve (0 = normal)
+        public bool Clouds = true;                // nubes del juego en cielo y vuelo
+        public double CloudAlt = 5200;            // altura de la capa, m
         public string TransferTo;                 // destino de la calculadora de ventanas
         public double TransferPark = 100000;      // órbita de aparcamiento, m
         public double TransferCapture = 100000;   // órbita a la que capturar, m

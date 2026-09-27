@@ -34,6 +34,59 @@ namespace KerbinMaps.Ksp
             return null;
         }
 
+        /* Carga solo los niveles de mipmap que no pasen de `maxAncho`, leyendo del fichero
+           unicamente esa parte. Los mapas de nubes del juego son de 16384x8192 y pesan
+           179 MB con sus mipmaps: para pintarlas basta un nivel de 2048 de ancho, que son
+           dos megas y se lee al instante. Solo vale para DDS comprimidos. */
+        public static TextureFile LoadDdsLevel(string path, int maxAncho)
+        {
+            using var f = File.OpenRead(path);
+            var cab = new byte[128];
+            if (f.Read(cab, 0, 128) != 128 || cab[0] != 'D' || cab[1] != 'D' || cab[2] != 'S' || cab[3] != ' ')
+                throw new InvalidDataException("no es un DDS");
+            int height = BitConverter.ToInt32(cab, 12), width = BitConverter.ToInt32(cab, 16);
+            int mips = Math.Max(1, BitConverter.ToInt32(cab, 28));
+            uint pfFlags = BitConverter.ToUInt32(cab, 80);
+            string four = System.Text.Encoding.ASCII.GetString(cab, 84, 4);
+            if ((pfFlags & 0x4) == 0) return Load(path);          // sin comprimir: se lee entero
+
+            int block = four switch { "DXT1" => 8, "DXT3" => 16, "DXT5" => 16, _ => 0 };
+            if (block == 0) throw new InvalidDataException("DDS con compresión no soportada: " + four);
+
+            var tex = new TextureFile
+            {
+                CompressedFormat = four == "DXT1" ? DXT1 : four == "DXT3" ? DXT3 : DXT5,
+                HasAlpha = four != "DXT1",
+            };
+
+            long offset = 128;
+            int w = width, h = height;
+            for (int i = 0; i < mips; i++)
+            {
+                int size = Math.Max(1, (w + 3) / 4) * Math.Max(1, (h + 3) / 4) * block;
+                if (w <= maxAncho)
+                {
+                    if (tex.Levels.Count == 0) { tex.Width = w; tex.Height = h; }
+                    if (offset + size > f.Length) break;
+                    f.Seek(offset, SeekOrigin.Begin);
+                    var lvl = new byte[size];
+                    int leido = 0;
+                    while (leido < size)
+                    {
+                        int n = f.Read(lvl, leido, size - leido);
+                        if (n <= 0) break;
+                        leido += n;
+                    }
+                    if (leido < size) break;
+                    tex.Levels.Add(lvl);
+                }
+                offset += size;
+                w = Math.Max(1, w / 2); h = Math.Max(1, h / 2);
+            }
+            if (tex.Levels.Count == 0) throw new InvalidDataException("el DDS no tiene ningún nivel bajo " + maxAncho);
+            return tex;
+        }
+
         public static TextureFile Load(string path)
         {
             string ext = Path.GetExtension(path).ToLowerInvariant();

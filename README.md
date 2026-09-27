@@ -26,8 +26,11 @@ reads your game files where they already are.
 
 What it does:
 
-- **Three views of the same place.** A sliding flat map, a 3D globe and a sky view
-  from a point on the surface, all sharing observer, time and selection.
+- **Four views of the same place.** A sliding flat map, a 3D globe, a sky view from a
+  point on the surface and a free camera you fly at ground level, all sharing observer,
+  time and selection. The flight view ray-marches the body's height map, so the horizon
+  and the mountain silhouettes are exact, and it dresses the ground with the game's own
+  terrain textures and cloud maps when you have them installed.
 - **Day and night.** Rayleigh and Mie single scattering with a Chapman function
   for the sun's optical depth, aerial perspective and a filmic tone map, so
   sunrises, the terminator and the night side look the way they should. Each body

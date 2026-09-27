@@ -342,5 +342,21 @@
  "No tengo el rango de alturas de {0}: hace falta Parallax en tu instalación de KSP.": "I don't have the height range for {0}: that needs Parallax in your KSP install.",
  "Calibrado como volcado del juego: gris 0 = <b>{0} m</b>, gris 255 = <b>{1} m</b> (el terreno de {2} va de {3} a {4} m y esas texturas llegan al gris 145).": "Calibrated as a game dump: grey 0 = <b>{0} m</b>, grey 255 = <b>{1} m</b> ({2}'s terrain runs from {3} to {4} m and those textures top out at grey 145).",
  "Si el PNG que has cargado sale de <b>volcar las texturas de KSP</b> (Parallax), pulsa «Calibrar como volcado del juego»: el gris de esas texturas va del <code>minTerrainAltitude</code> del cuerpo hasta su <code>maxTerrainAltitude</code> con el tope en el gris 145, no en el 255.": "If the PNG you loaded comes from <b>dumping KSP's textures</b> (Parallax), press «Calibrate as a game texture dump»: the grey in those textures runs from the body's <code>minTerrainAltitude</code> to its <code>maxTerrainAltitude</code>, topping out at grey 145, not 255.",
- "Para calibrar a mano: pulsa «Punto A», haz clic en un sitio del que sepas la altitud real (te la dice el juego al posarte ahí) y escríbela. Repite con B en un punto de altitud bien distinta y el rango se ajusta solo.": "To calibrate by hand: press «Point A», click somewhere whose real altitude you know (the game tells you when you land there) and type it in. Repeat with B somewhere of a very different altitude and the range adjusts itself."
+ "Para calibrar a mano: pulsa «Punto A», haz clic en un sitio del que sepas la altitud real (te la dice el juego al posarte ahí) y escríbela. Repite con B en un punto de altitud bien distinta y el rango se ajusta solo.": "To calibrate by hand: press «Point A», click somewhere whose real altitude you know (the game tells you when you land there) and type it in. Repeat with B somewhere of a very different altitude and the range adjusts itself.",
+ "Vuelo": "Flight",
+ "Cámara libre a ras de suelo": "Free camera down at ground level",
+ "Cámara libre a ras de suelo. <b>W/S</b> adelante y atrás, <b>A/D</b> de lado, <b>R/F</b> o espacio y control para subir y bajar, arrastrar para mirar, la rueda es el acelerador y <b>mayúsculas</b> multiplica la velocidad por cinco. No se puede bajar del suelo.": "A free camera down at ground level. <b>W/S</b> forward and back, <b>A/D</b> sideways, <b>R/F</b> or space and control to climb and descend, drag to look around, the wheel is the throttle and <b>shift</b> multiplies the speed by five. You cannot go below the ground.",
+ "Relieve del terreno": "Terrain relief",
+ "Texturas de suelo del juego": "Ground textures from the game",
+ "Nubes": "Clouds",
+ "Velocidad": "Speed",
+ "Altura de las nubes": "Cloud height",
+ "El terreno sale del mapa de alturas del cuerpo, y las texturas de cerca y las nubes, de tu instalación de KSP (CTTP y los mods de nubes). Sin ellos el vuelo funciona igual, solo que el suelo de cerca queda liso y no hay nubes.": "The terrain comes from the body's height map, and the close-up textures and the clouds from your KSP install (CTTP and the cloud mods). Without them the flight works just the same, only the ground looks smooth up close and there are no clouds.",
+ "Texturas de suelo: cargadas de tu instalación de KSP.": "Ground textures: loaded from your KSP install.",
+ "Sin texturas de suelo: no encontré CTTP en tu instalación.": "No ground textures: I didn't find CTTP in your install.",
+ "Nubes de {0}: cargadas del juego.": "{0} clouds: loaded from the game.",
+ "Sin mapa de nubes para {0} en tu instalación.": "No cloud map for {0} in your install.",
+ "Sin mapa de alturas de {0}: el terreno sale liso.": "No height map for {0}: the terrain comes out smooth.",
+ "sobre el suelo": "above ground",
+ "rumbo": "heading"
 }

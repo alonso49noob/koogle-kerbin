@@ -41,7 +41,7 @@ namespace KerbinMaps.UI
         ScrollHost sideScroll;
         SidebarPanel sidebar;
         StackPanel sideStack;
-        DarkButton sbToggle, btn2D, btn3D, btnSky;
+        DarkButton sbToggle, btn2D, btn3D, btnSky, btnFree;
         DarkTextBox search;
         OverlayPanel searchBox;
         DrawList searchList;
@@ -51,6 +51,7 @@ namespace KerbinMaps.UI
         DarkButton bannerClose;
         readonly Timer flashTimer = new() { Interval = 7000 };
         readonly Timer saveViewTimer = new() { Interval = 400 };
+        readonly Timer guardarVueloTimer = new() { Interval = 700 };
         MapPopup popup;
 
         readonly Stopwatch clock = Stopwatch.StartNew();
@@ -61,8 +62,8 @@ namespace KerbinMaps.UI
         Point downPt, lastPt;
         double wheelAcc;
 
-        string CurrentView => isSky ? "sky" : is3D ? "3d" : "2d";
-        bool GlobeVisible => is3D || isSky;
+        string CurrentView => isFree ? "free" : isSky ? "sky" : is3D ? "3d" : "2d";
+        bool GlobeVisible => is3D || isSky || isFree;
 
         public MainForm(string[] args)
         {
@@ -99,6 +100,7 @@ namespace KerbinMaps.UI
 
             flashTimer.Tick += (s, e) => { flashTimer.Stop(); Vis.Set(banner, false); UpdateBanner(); };
             saveViewTimer.Tick += (s, e) => { saveViewTimer.Stop(); SaveView(); };
+            guardarVueloTimer.Tick += (s, e) => { guardarVueloTimer.Stop(); GuardarVuelo(); };
             Application.Idle += OnIdle;
             Shown += async (s, e) => await StartupAsync();
         }
@@ -144,6 +146,8 @@ namespace KerbinMaps.UI
             surface.DragEnter += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
             surface.DragDrop += (s, e) => { if (e.Data.GetData(DataFormats.FileDrop) is string[] f) _ = OpenFiles(f); };
             surface.KeyDown += SurfaceKeyDown;
+            surface.KeyUp += (s, e) => VueloKeyUp(e);
+            surface.LostFocus += (s, e) => teclas.Clear();
             mapArea.Controls.Add(surface);
 
             map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, landLayer, toolLayer, observerLayer, anomalyLayer, vesselLayer, markerLayer });
@@ -155,9 +159,11 @@ namespace KerbinMaps.UI
             btn2D = new DarkButton("2D") { Tip = "Mapa plano" };
             btn3D = new DarkButton("3D") { Tip = "Globo" };
             btnSky = new DarkButton("Cielo") { Tip = "El cielo visto desde un punto de la superficie" };
+            btnFree = new DarkButton("Vuelo") { Tip = "Cámara libre a ras de suelo" };
             btn2D.Click += (s, e) => SetViewMode("2d");
             btn3D.Click += (s, e) => SetViewMode("3d");
             btnSky.Click += (s, e) => SetViewMode("sky");
+            btnFree.Click += (s, e) => SetViewMode("free");
             btn2D.Active = true;
             search = new DarkTextBox { Placeholder = "Buscar: KSC, o -0.097, -74.557" };
             search.Edited += (s, e) => DoSearch(search.Text);
@@ -187,7 +193,7 @@ namespace KerbinMaps.UI
 
             BuildTimeBar();
 
-            foreach (Control c in new Control[] { sbToggle, btn2D, btn3D, btnSky, search, searchBox, hud, orbHud, banner, tbar, popup })
+            foreach (Control c in new Control[] { sbToggle, btn2D, btn3D, btnSky, btnFree, search, searchBox, hud, orbHud, banner, tbar, popup })
             {
                 mapArea.Controls.Add(c);
                 c.BringToFront();
@@ -202,7 +208,7 @@ namespace KerbinMaps.UI
             int m = Theme.S(12), h = Theme.S(34), gap = Theme.S(8), seg = Theme.S(3);
             sbToggle.SetBounds(m, m, h, h);
             int x = sbToggle.Right + gap;
-            foreach (var b in new[] { btn2D, btn3D, btnSky })
+            foreach (var b in new[] { btn2D, btn3D, btnSky, btnFree })
             {
                 int w = Math.Max(Theme.S(44), b.PreferredWidth + Theme.S(4));
                 b.SetBounds(x, m, w, h);
@@ -251,6 +257,15 @@ namespace KerbinMaps.UI
             {
                 glError = ex.Message;
                 Debug.WriteLine("[gl] " + ex);
+                /* Un fallo aquí deja la aplicación sin 3D y el mensaje solo se ve de
+                   pasada: se guarda para poder mirarlo después. */
+                try
+                {
+                    System.IO.Directory.CreateDirectory(Store.LocalDir);
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(Store.LocalDir, "gl-error.txt"),
+                        DateTime.Now + Environment.NewLine + ex);
+                }
+                catch { }
             }
         }
 
@@ -262,7 +277,7 @@ namespace KerbinMaps.UI
 
         static bool AppIdle => !PeekMessage(out _, IntPtr.Zero, 0, 0, 0);
 
-        bool WantsFrames => needsFrame || map.Animating || globe.Animating || SimWantsFrames;
+        bool WantsFrames => needsFrame || map.Animating || globe.Animating || SimWantsFrames || VolandoConTeclas;
 
         void OnIdle(object sender, EventArgs e)
         {
@@ -285,6 +300,7 @@ namespace KerbinMaps.UI
             SimTick(now);
             ActualizarSol();
             if (map.Animating) { map.Animate(dt); saveViewTimer.Stop(); saveViewTimer.Start(); }
+            PasoDeVuelo(now);
 
             int w = Math.Max(1, surface.ClientSize.Width), h = Math.Max(1, surface.ClientSize.Height);
             if (GlobeVisible)
@@ -481,6 +497,7 @@ namespace KerbinMaps.UI
 
         void SurfaceKeyDown(object sender, KeyEventArgs e)
         {
+            if (isFree) { VueloKeyDown(e); if (e.Handled) return; }
             if (isSky)
             {
                 double step = Math.Max(1, globe.SkyFov / 20);
@@ -563,6 +580,8 @@ namespace KerbinMaps.UI
 
         void UpdateHud(LatLon? p)
         {
+            // volando manda el HUD del vuelo, que trae altura, rumbo y velocidad
+            if (isFree) { UpdateFreeHud(); return; }
             var rows = new System.Collections.Generic.List<(string, string)>
             {
                 ("lat", p.HasValue ? Geo.FmtLat(p.Value.Lat) : "—"),
@@ -653,14 +672,21 @@ namespace KerbinMaps.UI
 
             if (prev == "2d") globe.SetCenter(map.CenterLat, Geo.WrapLon(map.CenterLon), ZoomToDist(map.Zoom));
             if (prev == "sky") SaveView();
+            if (prev == "free") { GuardarVuelo(); teclas.Clear(); }
 
             is3D = mode == "3d";
             isSky = mode == "sky";
+            isFree = mode == "free";
 
             switch (mode)
             {
                 case "2d":
-                    if (prev == "sky") map.SetView(state.ObsLat, state.ObsLon, Math.Max(map.Zoom, 5));
+                    if (prev == "free")
+                    {
+                        map.SetView(globe.FreeLat, globe.FreeLon, Math.Max(map.Zoom, 7));
+                        globe.ExitFree();
+                    }
+                    else if (prev == "sky") map.SetView(state.ObsLat, state.ObsLon, Math.Max(map.Zoom, 5));
                     else
                     {
                         var c = globe.Center();
@@ -669,7 +695,14 @@ namespace KerbinMaps.UI
                     if (globe.Mode == CamMode.Sky) globe.ExitSky(ZoomToDist(map.Zoom));
                     SimDirty();                 // las trazas 2D no se rehacen mientras se ve el globo
                     break;
+                case "free":
+                    SyncGlobe();
+                    ConstruirAnillos();
+                    PushTrack();
+                    EntrarVuelo(prev);
+                    break;
                 case "3d":
+                    if (globe.Mode == CamMode.Free) { globe.SetCenter(globe.FreeLat, globe.FreeLon, 1.5); globe.ExitFree(); }
                     if (globe.Mode == CamMode.Sky) globe.ExitSky(Math.Max(1.6, ZoomToDist(map.Zoom)));
                     SyncGlobe();
                     ConstruirAnillos();
@@ -678,6 +711,8 @@ namespace KerbinMaps.UI
                     else globe.ExitFocus();
                     break;
                 default:
+                    // del vuelo al cielo: te quedas de pie donde estabas volando
+                    if (prev == "free") SetObserver(globe.FreeLat, globe.FreeLon, null);
                     ApplyObserverToGlobe();
                     SyncGlobe();
                     ConstruirAnillos();
@@ -689,11 +724,13 @@ namespace KerbinMaps.UI
             btn2D.Active = mode == "2d";
             btn3D.Active = mode == "3d";
             btnSky.Active = mode == "sky";
+            btnFree.Active = mode == "free";
             Vis.Set(globeSection, is3D);
             state.ViewMode = mode;
             state.View3D = is3D;
             SaveSettings();
-            if (isSky) UpdateSkyHud(globe.SkyAz, globe.SkyEl);
+            if (isFree) UpdateFreeHud();
+            else if (isSky) UpdateSkyHud(globe.SkyAz, globe.SkyEl);
             else UpdateHud(null);
             LayoutOverlays();
             RequestRender();

@@ -10,7 +10,11 @@ namespace KerbinMaps.UI
     public sealed partial class MainForm
     {
         Section globeSection;
-        Section secCuerpo, secScan, secAltim, secTransfer, secAterrizaje, secNaves, secMarcadores;
+        Section secCuerpo, secScan, secAltim, secTransfer, secAterrizaje, secNaves, secMarcadores, secVuelo;
+        DarkCheck chkRelieve, chkDetalle, chkNubes;
+        DarkSlider velSlider, nubeAltSlider;
+        FieldHeader velHeader, nubeAltHeader;
+        RichLabel vueloInfo;
         DarkCombo baseCombo, presetCombo;
         StackPanel customUrlWrap, biomeOpWrap, presetWrap, reliefWrap;
         DarkTextBox customUrl, hMinBox, hMaxBox, fpAlt, orbPe, orbAp, orbInc, orbLan, orbArgp, orbN, svRot;
@@ -330,6 +334,44 @@ namespace KerbinMaps.UI
                            "estimación: el frenado depende de la nave, y el coeficiente balístico (masa entre Cd por área) " +
                            "es el mando para ajustarlo."));
             RenderLandingInfo();
+
+            /* --------------------------------------------------------------- Vuelo */
+            var vuelo = secVuelo = AddSection("Vuelo", false);
+            vuelo.Add(Hint("Cámara libre a ras de suelo. <b>W/S</b> adelante y atrás, <b>A/D</b> de lado, <b>R/F</b> o " +
+                           "espacio y control para subir y bajar, arrastrar para mirar, la rueda es el acelerador y " +
+                           "<b>mayúsculas</b> multiplica la velocidad por cinco. No se puede bajar del suelo."));
+            chkRelieve = new DarkCheck("Relieve del terreno", state.FreeRelief);
+            chkRelieve.CheckedChanged += (s, e) => { state.FreeRelief = chkRelieve.Checked; globe.FreeRelief = chkRelieve.Checked; SaveSettings(); RequestRender(); };
+            chkDetalle = new DarkCheck("Texturas de suelo del juego", state.FreeDetail);
+            chkDetalle.CheckedChanged += (s, e) => { state.FreeDetail = chkDetalle.Checked; globe.Detail = chkDetalle.Checked; SaveSettings(); RequestRender(); };
+            chkNubes = new DarkCheck("Nubes", state.Clouds);
+            chkNubes.CheckedChanged += (s, e) => { state.Clouds = chkNubes.Checked; globe.Clouds = chkNubes.Checked; SaveSettings(); RenderVueloInfo(); RequestRender(); };
+            vuelo.Add(Checks(chkRelieve, chkDetalle, chkNubes));
+            velSlider = new DarkSlider(1, 100, VelocidadAPaso(state.FreeSpeed));
+            velSlider.ValueChanged += (s, e) =>
+            {
+                globe.FreeSpeed = PasoAVelocidad(velSlider.Value);
+                velHeader.Value = Geo.F(globe.FreeSpeed, 0) + " m/s";
+                state.FreeSpeed = globe.FreeSpeed;
+                SaveSettings();
+                if (isFree) UpdateFreeHud();
+            };
+            vuelo.Add(Field("Velocidad", velSlider, out velHeader, Geo.F(state.FreeSpeed, 0) + " m/s"));
+            nubeAltSlider = new DarkSlider(0, 20, (int)Math.Round(state.CloudAlt / 1000));
+            nubeAltSlider.ValueChanged += (s, e) =>
+            {
+                state.CloudAlt = nubeAltSlider.Value * 1000;
+                globe.CloudAlt = state.CloudAlt;
+                nubeAltHeader.Value = nubeAltSlider.Value + " km";
+                SaveSettings();
+                RequestRender();
+            };
+            vuelo.Add(Field("Altura de las nubes", nubeAltSlider, out nubeAltHeader, (int)Math.Round(state.CloudAlt / 1000) + " km"));
+            vueloInfo = vuelo.Add(Readout());
+            vuelo.Add(Hint("El terreno sale del mapa de alturas del cuerpo, y las texturas de cerca y las nubes, de tu " +
+                           "instalación de KSP (CTTP y los mods de nubes). Sin ellos el vuelo funciona igual, solo que el " +
+                           "suelo de cerca queda liso y no hay nubes."));
+            RenderVueloInfo();
 
             /* ------------------------------------------------------------- Vista 3D */
             globeSection = AddSection("Vista 3D", true);
