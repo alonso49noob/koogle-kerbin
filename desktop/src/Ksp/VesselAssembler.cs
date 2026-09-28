@@ -32,6 +32,7 @@ namespace KerbinMaps.Ksp
         public readonly List<string> AnimsMissing = new(), PivotsMissing = new();
         /* Texturas ya leídas del disco, para que la subida a la GPU no tenga que tocarlo. */
         public Dictionary<string, TextureFile> Textures;
+        public StockAssets Stock;                 // para las texturas que están en los datos del juego
 
         public void LoadTextures()
         {
@@ -39,7 +40,12 @@ namespace KerbinMaps.Ksp
             foreach (var it in Items)
             {
                 if (it.TexturePath == null || t.ContainsKey(it.TexturePath)) continue;
-                try { t[it.TexturePath] = TextureFile.Load(it.TexturePath); }
+                try
+                {
+                    t[it.TexturePath] = it.TexturePath.StartsWith(StockAssets.Prefijo, StringComparison.Ordinal)
+                        ? Stock?.Load(it.TexturePath)
+                        : TextureFile.Load(it.TexturePath);
+                }
                 catch { t[it.TexturePath] = null; }
             }
             Textures = t;
@@ -57,7 +63,9 @@ namespace KerbinMaps.Ksp
         readonly Dictionary<string, string> texCache = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, string> Errors = new();
 
-        public VesselAssembler(PartCatalog catalog) { this.catalog = catalog; }
+        readonly StockAssets stock;
+
+        public VesselAssembler(PartCatalog catalog, StockAssets stock = null) { this.catalog = catalog; this.stock = stock; }
 
         MuFile Mu(string url)
         {
@@ -144,6 +152,27 @@ namespace KerbinMaps.Ksp
                 if (any) result.PartsDrawn++;
             }
             result.Radius = Math.Sqrt(r2);
+            return result;
+        }
+
+        /* Un modelo suelto, como los edificios de Kerbal Konstructs: la jerarquía del .mu con
+           la raíz en el origen. KK coloca y gira la raíz por su cuenta y solo conserva su
+           escala, así que de ella solo se toma eso. */
+        public static AssembledVessel BuildModel(string muPath, StockAssets stock = null)
+        {
+            var mu = MuFile.Load(muPath);
+            var result = new AssembledVessel { PartsTotal = 1, Stock = stock };
+            if (mu?.Root == null) return result;
+            var asm = new VesselAssembler(null, stock);
+            var mr = new ModelRef { Url = Path.GetFileNameWithoutExtension(muPath) };
+            var s = mu.Root.Scale;
+            var world = WorldMatrices(mu.Root, Mat.Scale(s[0], s[1], s[2]), new Dictionary<MuNode, float[]>());
+            var nada = new HashSet<string>();
+            double r2 = 0;
+            bool any = false;
+            asm.Walk(mu, mu.Root, world, mr, Path.GetDirectoryName(muPath), nada, nada, nada, result, ref r2, ref any, isRoot: true);
+            result.Radius = Math.Sqrt(r2);
+            result.PartsDrawn = any ? 1 : 0;
             return result;
         }
 
@@ -532,6 +561,8 @@ namespace KerbinMaps.Ksp
                 if (mr.TextureSwap.TryGetValue(bare, out var swap))
                     found = TextureFile.Find(Path.Combine(catalog.GameData, swap.Replace('/', Path.DirectorySeparatorChar)));
                 found ??= TextureFile.Find(Path.Combine(muDir, bare));
+                // las del KSC de serie que reutilizan los edificios de Kerbal Konstructs
+                found ??= stock?.Find(name);
                 texCache[key] = found;
                 return found;
             }

@@ -410,6 +410,9 @@ namespace KerbinMaps.UI
                            "igual, solo que el suelo de cerca queda liso, sin vegetación y sin nubes."));
             RenderVueloInfo();
 
+            /* --------------------------------------------- Edificios de Kerbal Konstructs */
+            BuildKonstructsSection();
+
             /* ------------------------------------------------------------- Vista 3D */
             globeSection = AddSection("Vista 3D", true);
             chkLight = new DarkCheck("Día y noche (luz del Sol)", state.DayNight);

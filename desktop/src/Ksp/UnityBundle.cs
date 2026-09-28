@@ -17,7 +17,47 @@ namespace KerbinMaps.Ksp
 
        Formatos que se entienden: UnityFS versiones 6 y 7, ficheros serializados de la 17 a
        la 22 (Unity 2017 a 2020), bloques sin comprimir o con LZ4/LZ4HC. */
-    public sealed class UnityBundle : IDisposable
+    /* De dónde salen los bytes de un fichero serializado: un paquete (descomprimiendo sus
+       bloques) o un fichero suelto de los datos del juego. */
+    public interface IUnityData
+    {
+        byte[] Read(long pos, int n);
+    }
+
+    /* Un fichero suelto de KSP_x64_Data (sharedassets9.assets, su .resS...), leído a trozos. */
+    public sealed class UnityFile : IUnityData, IDisposable
+    {
+        readonly FileStream f;
+        public readonly string Path;
+        public long Length => f.Length;
+
+        public UnityFile(string path)
+        {
+            Path = path;
+            f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16);
+        }
+
+        public byte[] Read(long pos, int n)
+        {
+            var o = new byte[n];
+            lock (f)
+            {
+                f.Seek(pos, SeekOrigin.Begin);
+                int leido = 0;
+                while (leido < n)
+                {
+                    int k = f.Read(o, leido, n - leido);
+                    if (k <= 0) throw new EndOfStreamException("lectura fuera del fichero");
+                    leido += k;
+                }
+            }
+            return o;
+        }
+
+        public void Dispose() => f.Dispose();
+    }
+
+    public sealed class UnityBundle : IUnityData, IDisposable
     {
         readonly FileStream f;
         readonly List<(long Comp, long CompSize, long Uncomp, int UncompSize, int Flags)> bloques = new();
@@ -187,14 +227,14 @@ namespace KerbinMaps.Ksp
        para leer el índice del paquete (qué ruta es cada objeto) y las texturas. */
     public sealed class UnitySerialized
     {
-        readonly UnityBundle b;
+        readonly IUnityData b;
         readonly long baseOff;
         long dataOffset;
         int version;
         public readonly Dictionary<long, (long Start, long Size, int ClassId)> Objetos = new();
         public readonly Dictionary<string, long> Contenedor = new(StringComparer.OrdinalIgnoreCase);
 
-        public UnitySerialized(UnityBundle bundle, long offset, long size)
+        public UnitySerialized(IUnityData bundle, long offset, long size)
         {
             b = bundle; baseOff = offset;
             var h = new Reader(b.Read(baseOff, (int)Math.Min(size, 64)), bigEndian: true);
@@ -258,6 +298,17 @@ namespace KerbinMaps.Ksp
             return b.Read(baseOff + dataOffset + o.Start, (int)o.Size);
         }
 
+        /* El nombre de un objeto con nombre (textura, malla, material...): va al principio. */
+        public string Nombre(long pathId)
+        {
+            var o = Objetos[pathId];
+            if (o.Size < 4) return null;
+            var cab = b.Read(baseOff + dataOffset + o.Start, 4);
+            int n = BitConverter.ToInt32(cab, 0);
+            if (n <= 0 || n > 512 || n > o.Size - 4) return null;
+            return Encoding.UTF8.GetString(b.Read(baseOff + dataOffset + o.Start + 4, n));
+        }
+
         /* El objeto AssetBundle (clase 142) lleva el índice: ruta de cada recurso -> objeto. */
         void LeerContenedor()
         {
@@ -311,7 +362,12 @@ namespace KerbinMaps.Ksp
             public byte[] Datos;
         }
 
-        public Textura LeerTextura(long pathId, Func<string, (long Offset, long Size)?> recurso)
+        public Textura LeerTextura(long pathId, Func<string, (long Offset, long Size)?> recurso) =>
+            LeerTextura(pathId, (path, off, size) => recurso(path) is var res && res != null ? b.Read(res.Value.Offset + off, size) : null);
+
+        /* Lo mismo con una función que lee los bytes del fichero de recursos: en un fichero
+           suelto del juego el .resS es otro fichero. */
+        public Textura LeerTextura(long pathId, Func<string, long, int, byte[]> recurso)
         {
             var datos = Objeto(pathId);
             // tras la cabecera fija hay un grupo de booleanos cuyo número cambia entre
@@ -328,7 +384,7 @@ namespace KerbinMaps.Ksp
             throw new InvalidDataException("no reconozco la estructura de la textura");
         }
 
-        Textura Probar(byte[] d, int bools, Func<string, (long Offset, long Size)?> recurso)
+        Textura Probar(byte[] d, int bools, Func<string, long, int, byte[]> recurso)
         {
             var r = new Reader(d, false);
             var t = new Textura { Nombre = r.Str() };
@@ -357,9 +413,8 @@ namespace KerbinMaps.Ksp
                 long size = (uint)r.I32();
                 string path = r.Str();
                 if (size <= 0 || size > (long)completo * 2 + 1024) return null;
-                var res = recurso(path);
-                if (res == null) return null;
-                t.Datos = b.Read(res.Value.Offset + off, (int)size);
+                t.Datos = recurso(path, off, (int)size);
+                if (t.Datos == null) return null;
             }
             return t;
         }

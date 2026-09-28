@@ -69,6 +69,7 @@ namespace KerbinMaps.Core
         public bool Scatters = true;              // hierba, árboles y rocas de Parallax
         public double ScatterDensity = 1;         // fracción de los que pone Parallax
         public bool Wind = true;                  // la vegetación se mueve con el viento
+        public bool ShowStatics = true;           // edificios de Kerbal Konstructs
         public int FreeDebug;                     // diagnóstico del relieve (0 = normal)
         public bool Clouds = true;                // nubes del juego en cielo y vuelo
         public double CloudAlt = 5200;            // altura de la capa, m

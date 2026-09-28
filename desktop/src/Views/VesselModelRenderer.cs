@@ -14,13 +14,6 @@ namespace KerbinMaps.Views
        propio plano cercano y su propio búfer de profundidad, que se limpia antes. */
     public sealed class VesselModelRenderer : IDisposable
     {
-        sealed class GpuMesh
-        {
-            public uint Vao, Vbo;
-            public uint[] Ebo;
-            public int[] Count;
-        }
-
         const string VS = @"#version 330 core
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNrm;
@@ -67,86 +60,14 @@ void main() {
 }";
 
         readonly ShaderProgram prog;
-        readonly Dictionary<MuMesh, GpuMesh> meshes = new();
-        readonly Dictionary<string, uint> textures = new(StringComparer.OrdinalIgnoreCase);
+        readonly ModelGpu gpu = new();
 
         public VesselModelRenderer()
         {
             prog = new ShaderProgram(VS, FS, ("aPos", 0), ("aNrm", 1), ("aUv", 2));
         }
 
-        GpuMesh Upload(MuMesh m)
-        {
-            if (meshes.TryGetValue(m, out var g)) return g;
-            int n = m.VertCount;
-            var data = new float[n * 8];
-            for (int i = 0; i < n; i++)
-            {
-                int o = i * 8;
-                data[o] = m.Verts[i * 3]; data[o + 1] = m.Verts[i * 3 + 1]; data[o + 2] = m.Verts[i * 3 + 2];
-                if (m.Normals != null) { data[o + 3] = m.Normals[i * 3]; data[o + 4] = m.Normals[i * 3 + 1]; data[o + 5] = m.Normals[i * 3 + 2]; }
-                else data[o + 4] = 1;
-                if (m.Uvs != null) { data[o + 6] = m.Uvs[i * 2]; data[o + 7] = m.Uvs[i * 2 + 1]; }
-            }
-            g = new GpuMesh { Vao = GL.GenVertexArray(), Vbo = GL.GenBuffer(), Ebo = new uint[m.Submeshes.Count], Count = new int[m.Submeshes.Count] };
-            GL.BindVertexArray(g.Vao);
-            GL.BindBuffer(GL.ARRAY_BUFFER, g.Vbo);
-            GL.BufferData(GL.ARRAY_BUFFER, data, data.Length, GL.STATIC_DRAW);
-            GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, GL.FLOAT, false, 32, 0);
-            GL.EnableVertexAttribArray(1); GL.VertexAttribPointer(1, 3, GL.FLOAT, false, 32, 12);
-            GL.EnableVertexAttribArray(2); GL.VertexAttribPointer(2, 2, GL.FLOAT, false, 32, 24);
-            GL.BindVertexArray(0);
-            for (int s = 0; s < m.Submeshes.Count; s++)
-            {
-                var idx = m.Submeshes[s];
-                var u = new uint[idx.Length];
-                for (int i = 0; i < idx.Length; i++) u[i] = (uint)Math.Clamp(idx[i], 0, Math.Max(0, n - 1));
-                g.Ebo[s] = GL.GenBuffer();
-                GL.BindBuffer(GL.ELEMENT_ARRAY_BUFFER, g.Ebo[s]);
-                GL.BufferData(GL.ELEMENT_ARRAY_BUFFER, u, u.Length, GL.STATIC_DRAW);
-                g.Count[s] = u.Length;
-            }
-            GL.BindBuffer(GL.ELEMENT_ARRAY_BUFFER, 0);
-            meshes[m] = g;
-            return g;
-        }
-
-        uint Tex(AssembledVessel a, string path)
-        {
-            if (path == null) return 0;
-            if (textures.TryGetValue(path, out var id)) return id;
-            if (a.Textures == null || !a.Textures.TryGetValue(path, out var tf) || tf == null || tf.Levels.Count == 0)
-                return textures[path] = 0;
-            id = GL.GenTexture();
-            GL.BindTexture(GL.TEXTURE_2D, id);
-            GL.PixelStore(GL.UNPACK_ALIGNMENT, 1);
-            if (tf.CompressedFormat != 0)
-            {
-                int w = tf.Width, h = tf.Height;
-                for (int l = 0; l < tf.Levels.Count; l++)
-                {
-                    GL.CompressedTexImage2D(GL.TEXTURE_2D, l, tf.CompressedFormat, w, h, tf.Levels[l]);
-                    w = Math.Max(1, w / 2); h = Math.Max(1, h / 2);
-                }
-                GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAX_LEVEL, tf.Levels.Count - 1);
-                GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, tf.Levels.Count > 1 ? GL.LINEAR_MIPMAP_LINEAR : GL.LINEAR);
-            }
-            else
-            {
-                GL.TexImage2D(GL.TEXTURE_2D, 0, (int)GL.RGBA8, tf.Width, tf.Height, GL.RGBA, GL.UNSIGNED_BYTE, tf.Levels[0]);
-                GL.GenerateMipmap(GL.TEXTURE_2D);
-                GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR_MIPMAP_LINEAR);
-            }
-            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
-            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.REPEAT);
-            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.REPEAT);
-            if (GL.MaxAnisotropy > 0) GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAX_ANISOTROPY, Math.Min(8f, GL.MaxAnisotropy));
-            GL.BindTexture(GL.TEXTURE_2D, 0);
-            a.Textures.Remove(path);              // ya está en la GPU: la copia en memoria sobra
-            return textures[path] = id;
-        }
-
-        static float[] F(double[] m)
+        internal static float[] F(double[] m)
         {
             var f = new float[16];
             for (int i = 0; i < 16; i++) f[i] = (float)m[i];
@@ -155,7 +76,7 @@ void main() {
 
         /* Cofactores del bloque 3x3: la inversa traspuesta sin dividir por el
            determinante, que da igual porque el shader normaliza y usa el valor absoluto. */
-        static float[] NormalMatrix(double[] m)
+        internal static float[] NormalMatrix(double[] m)
         {
             double a = m[0], b = m[4], c = m[8], d = m[1], e = m[5], f = m[9], g = m[2], h = m[6], i = m[10];
             var r = new float[16];
@@ -205,14 +126,14 @@ void main() {
                 foreach (var it in a.Items)
                 {
                     if (it.Transparent != blend) continue;
-                    var gm = Upload(it.Mesh);
+                    var gm = gpu.Upload(it.Mesh);
                     if (it.Submesh >= gm.Ebo.Length || gm.Count[it.Submesh] == 0) continue;
                     var m = Mat.Mul(baseM, it.M);
                     prog.Mat("uModel", F(m));
                     prog.Mat("uNrm", NormalMatrix(m));
                     prog.Vec4("uUvXform", it.TexScale[0], it.TexScale[1], it.TexOffset[0], it.TexOffset[1]);
                     prog.Vec4("uColor", it.Color[0], it.Color[1], it.Color[2], it.Color[3]);
-                    uint tex = Tex(a, it.TexturePath);
+                    uint tex = gpu.Tex(a, it.TexturePath);
                     GL.BindTexture(GL.TEXTURE_2D, tex);
                     prog.Int("uHasTex", tex != 0 ? 1 : 0);
                     prog.Int("uCutout", it.Cutout ? 1 : 0);
@@ -231,15 +152,7 @@ void main() {
         public void Dispose()
         {
             prog.Dispose();
-            foreach (var g in meshes.Values)
-            {
-                foreach (var e in g.Ebo) GL.DeleteBuffer(e);
-                GL.DeleteBuffer(g.Vbo);
-                GL.DeleteVertexArray(g.Vao);
-            }
-            meshes.Clear();
-            foreach (var t in textures.Values) GL.DeleteTexture(t);
-            textures.Clear();
+            gpu.Dispose();
         }
     }
 }

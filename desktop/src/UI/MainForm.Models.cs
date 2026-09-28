@@ -70,6 +70,7 @@ namespace KerbinMaps.UI
             kspCatalog = null; kspAssembler = null; kspCatalogDir = null;
             vesselModels.Clear();
             if (Following && sv.Sel != null) RequestModel(sv.Sel);
+            _ = CargarKonstructs(forzar: true);
         }
 
         void SetModelStatus(string s)

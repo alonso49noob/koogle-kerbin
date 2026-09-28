@@ -123,6 +123,8 @@ namespace KerbinMaps.UI
                         Lat = a.Lat, Lon = a.Lon, Name = a.Name, Tag = a,
                         Color = ColorF.Hex(a.Identificada ? "#7ee787" : a.Detectada ? "#ffb454" : "#b98cff"),
                     });
+            if (ColocarKK()) MarcadoresKK();
+            globe.Pins.AddRange(PinesKK());
             globe.Pins.Add(new GlobePin { Lat = state.ObsLat, Lon = state.ObsLon, Name = Lang.T("Observador"), Color = ColorF.Hex("#ffb454") });
             globe.Pins.AddRange(VesselPins());
             bool hasHeight = MapImg("height") != null;
@@ -722,6 +724,9 @@ namespace KerbinMaps.UI
             DibujarObjetivo();
             try { IndexarMapasDeCuerpos(); await CargarMapasDelCuerpo(); AplicarAltimetria(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] mapas de cuerpos: " + ex.Message); }
+
+            try { await CargarKonstructs(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] kerbal konstructs: " + ex.Message); }
 
             // la partida de la última vez, salvo que se abra otra desde la línea de órdenes
             bool abreSfs = false;

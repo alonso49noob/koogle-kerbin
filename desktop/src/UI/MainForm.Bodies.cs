@@ -74,6 +74,7 @@ namespace KerbinMaps.UI
             if (terrenoDe != null) _ = CargarTexturasDeTerreno();
             if (nubesDe != null) _ = CargarNubes();
             if (scattersDe != null) _ = CargarScatters();
+            AplicarKonstructs();
             transfer = null;
             trList?.SetItems(new List<object>());
             RenderTransferInfo();

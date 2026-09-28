@@ -150,7 +150,7 @@ namespace KerbinMaps.UI
             surface.LostFocus += (s, e) => teclas.Clear();
             mapArea.Controls.Add(surface);
 
-            map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, landLayer, toolLayer, observerLayer, anomalyLayer, vesselLayer, markerLayer });
+            map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, landLayer, toolLayer, observerLayer, anomalyLayer, kkLayer, vesselLayer, markerLayer });
             map.SetView(state.CenterLat, state.CenterLon, state.Zoom);
 
             // barra superior
@@ -445,6 +445,7 @@ namespace KerbinMaps.UI
                     var pin = globe.HitPin(e.X, e.Y);
                     if (pin?.Tag is Vessel v && !Picking) { popup.Hide(); SeleccionarNave(v); }
                     else if (pin?.Tag is Marker mk && !Picking) ShowMarkerPopup(mk);
+                    else if (pin?.Tag is Ksp.KkGroup kg && !Picking) ShowKKPopup(kg);
                     else
                     {
                         var p = globe.Pick(e.X, e.Y);
@@ -463,6 +464,7 @@ namespace KerbinMaps.UI
             var hit = map.HitTest(e.X, e.Y);
             if (hit?.Tag is Vessel v2 && !Picking) { popup.Hide(); SeleccionarNave(v2); }
             else if (hit?.Tag is Marker mk2 && !Picking) ShowMarkerPopup(mk2);
+            else if (hit?.Tag is Ksp.KkGroup kg2 && !Picking) ShowKKPopup(kg2);
             else OnMapClick(click);
             RequestRender();
         }

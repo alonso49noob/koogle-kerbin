@@ -649,10 +649,11 @@ void main() {
             BindTex(6, DetSnow); skyProg.Int("uDetSnow", 6);
             /* Con scatters, el cielo deja en el búfer de profundidad dónde está el suelo. Solo
                se escribe con la prueba activada, así que se activa sin descartar nada. */
-            bool scatters = ScattersActive;
-            skyProg.Int("uWriteDepth", scatters ? 1 : 0);
+            bool scatters = ScattersActive, edificios = StaticsActive;
+            bool profundidad = scatters || edificios;
+            skyProg.Int("uWriteDepth", profundidad ? 1 : 0);
             skyProg.Float("uDepthFar", ScatterFar);
-            if (scatters)
+            if (profundidad)
             {
                 GL.Enable(GL.DEPTH_TEST);
                 GL.DepthFunc(GL.ALWAYS);
@@ -665,13 +666,22 @@ void main() {
             {
                 try { DrawScatters(eye, right, camUp, tan, lat0, lon0); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[scatters] " + ex.Message); }
+            }
+            else ScatterVisibleReset();
+            if (edificios)
+            {
+                try { DrawStatics(eye, right, camUp, tan); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[edificios] " + ex.Message); }
+            }
+            else StaticsVisible = 0;
+            if (profundidad)
+            {
                 // lo que viene después (órbitas, rótulos) no cuenta con esta profundidad
                 GL.DepthFunc(GL.LESS);
                 GL.Clear(GL.DEPTH_BUFFER_BIT);
                 GL.Disable(GL.DEPTH_TEST);
                 GL.Disable(GL.CULL_FACE);
             }
-            else ScatterVisibleReset();
 
             // órbitas y trazas, tapadas por el planeta con el corte de rayo del shader
             DrawOrbits(eye, occlude: true);
