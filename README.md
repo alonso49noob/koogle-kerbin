@@ -68,6 +68,7 @@ What it does:
   to set down on a target, a launch-window calculator (patched conics, Lambert, a
   single ballistic burn with no mid-course corrections), and waypoints written
   straight into the save so KSP shows them on the map and the navball.
+- **Automatic updates.** On startup the app checks the latest GitHub release and offers to update; it verifies the installer's SHA-256 and reinstalls in place. Can be turned off in the panel.
 - **English and Spanish**, both in the app and in the installer.
 
 The detailed documentation is in **[desktop/README.md](desktop/README.md)**

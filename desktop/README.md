@@ -54,6 +54,8 @@ Opciones para instalar sin ventanas: `/silent`, `/dir=<carpeta>`, `/noshortcuts`
 `/noregistry`, `/texturas=planetas,suelo,scatters` (sale con código 5 si alguna no se pudo bajar);
 y `desinstalar.exe /uninstall /silent` para quitarlo.
 
+**Actualizaciones automáticas.** Al abrir (como mucho cada 12 horas) el visor mira la última release de GitHub; si hay una versión nueva ofrece actualizar, omitirla o dejarlo para luego. Baja el instalador, comprueba su SHA-256 contra el que publica GitHub y lo lanza con `/update`: espera a que el visor se cierre, instala en la misma carpeta, rehace los accesos directos que tuvieras y vuelve a abrirlo. Solo se instala sola una copia que salió del instalador; una suelta avisa y abre la página de la release. Se apaga en el panel, sección «Actualizaciones». Para que funcione, el fichero de la release debe llamarse `KoogleKerbin-Setup-<versión>.exe`.
+
 ## Usarla
 
 Abre Koogle Kerbin desde su acceso directo, o `dist\KoogleKerbin\KoogleKerbin.exe` si
