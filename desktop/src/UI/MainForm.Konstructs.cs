@@ -51,6 +51,7 @@ namespace KerbinMaps.UI
             var carpeta = new DarkButton("Carpeta de KSP…", ButtonVariant.Ghost, small: true);
             carpeta.Click += (o, e) => PickKspFolder();
             s.Add(new BtnRow(recargar, carpeta));
+            BuildKKEditor(s);
             s.Add(Hint("Los grupos de edificios de <b>Kerbal Konstructs</b> que tengas instalados (KSC Extended, Tundra " +
                        "Space Center, Kerbin Side...) salen como marcadores. En el vuelo y en el cielo se ven con sus " +
                        "modelos, colocados con las mismas cuentas que KK, sobre el terreno del mapa de alturas. Las texturas " +
@@ -67,6 +68,7 @@ namespace KerbinMaps.UI
             if (!forzar && kk != null && kkDe == gd) { AplicarKonstructs(); return; }
             kkDe = gd;
             kkInfo?.SetText(Lang.T("Leyendo los edificios de Kerbal Konstructs..."));
+            var leidoEn = DateTime.UtcNow;
             string casa = SolarSystem.Home.Name;
             var db = await Task.Run(() =>
             {
@@ -75,9 +77,13 @@ namespace KerbinMaps.UI
             });
             if (kkDe != gd) return;                 // entretanto se eligió otra carpeta
             QuitarModelosKK();
+            SeleccionarKK(null);
             kk = db;
+            kkLeidoEn = leidoEn;
             kkFirma = null;
             AplicarKonstructs();
+            RenderKKModelos();
+            RenderKKSel();
         }
 
         /* Coloca los edificios del cuerpo que se ve y rehace marcadores, lista y globo. */

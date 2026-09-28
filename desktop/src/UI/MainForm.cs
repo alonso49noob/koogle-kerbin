@@ -355,6 +355,15 @@ namespace KerbinMaps.UI
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            if (Ksp.KonstructsWriter.HayCambios(kk))
+            {
+                var r = MessageBox.Show(this, Lang.T("Hay cambios en los edificios de Kerbal Konstructs sin guardar. ¿Guardarlos en los .cfg antes de salir?"),
+                                        "Koogle Kerbin", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                if (r == DialogResult.Cancel) { e.Cancel = true; return; }
+                if (r == DialogResult.Yes)
+                    try { Ksp.KonstructsWriter.Guardar(kk, System.IO.Path.Combine(Store.LocalDir, "kk-copias"), kkLeidoEn); }
+                    catch (Exception ex) { MessageBox.Show(this, ex.Message, "Koogle Kerbin"); e.Cancel = true; return; }
+            }
             state.WinMax = WindowState == FormWindowState.Maximized;
             if (WindowState == FormWindowState.Normal) { state.WinX = Left; state.WinY = Top; state.WinW = Width; state.WinH = Height; }
             // la partida ya está copiada desde que se cargó; falta en qué instante se dejó
@@ -440,6 +449,7 @@ namespace KerbinMaps.UI
             if (GlobeVisible)
             {
                 bool dragged = globe.EndDrag();
+                if (!dragged && KKClick(e.X, e.Y)) { RequestRender(); return; }
                 if (!dragged)
                 {
                     var pin = globe.HitPin(e.X, e.Y);
@@ -499,6 +509,7 @@ namespace KerbinMaps.UI
 
         void SurfaceKeyDown(object sender, KeyEventArgs e)
         {
+            if (KKKeyDown(e)) { RequestRender(); return; }
             if (isFree) { VueloKeyDown(e); if (e.Handled) return; }
             if (isSky)
             {

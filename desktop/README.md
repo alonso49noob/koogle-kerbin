@@ -477,6 +477,59 @@ las montañas no la atraviesen. Se apaga con «Nubes» en «Vista 3D».
 Todo se apaga por separado en la sección «Vuelo», y sin esos mods instalados el vuelo
 funciona igual: el suelo de cerca queda liso, sin vegetación y sin nubes.
 
+## Edificios de Kerbal Konstructs
+
+Si tu KSP tiene **Kerbal Konstructs** y paquetes de bases (KSC Extended, Tundra Space
+Center, Kerbin Side...), el visor lee sus `.cfg` de GameData: los modelos (`STATIC` con
+su `.mu`), los centros de grupo (`KK_GroupCenter`) y cada edificio (`Instances`). Los
+parches de ModuleManager (`@STATIC`...) no se aplican. Con los paquetes de la instalación
+de prueba son 164 ficheros, 111 modelos y 137 edificios, leídos en menos de un segundo.
+
+**Dónde va cada uno** sale de las mismas cuentas que hace KK en el juego (su
+`GroupCenter.cs` y `StaticInstance.cs`): el centro del grupo, a su latitud y longitud y a
+`RadiusOffset` metros sobre el terreno (o sobre el mar con `SeaLevelAsReference`),
+orientado con `LookRotation(vertical) · Euler(0, 0, Heading) · Euler(−90, −90, −90)`; y cada
+edificio, hijo del grupo con `RelativePosition`, `Orientation` y `ModelScale`. Los grupos
+«del juego» (`KSC_Builtin`, `IslandAirfield_Builtin`, `Desert_Airfield_Builtin`...) no están
+en ningún `.cfg`: van con los valores de los PQSCity de Kerbin. También se entiende el
+formato antiguo (`RadialPosition`, `RotationAngle`) y los grupos que faltan, que KK crea en
+la posición del edificio.
+
+**Cómo se ven.** Los grupos salen como marcadores en el mapa y en el globo, y en la
+sección «Edificios (Kerbal Konstructs)» con cuántos edificios tiene cada uno; un clic lleva
+a él y «Volar aquí» deja la cámara de vuelo mirándolo. En el vuelo y en el cielo se ven
+con sus modelos, que se cargan en segundo plano la primera vez que hacen falta, pintados
+como los scatters: relativos al ojo, con la profundidad logarítmica del suelo trazado (una
+colina tapa un hangar) y con la luz y la bruma del suelo. Muchos paquetes reutilizan las
+texturas del KSC de serie («model_vab_exterior_tile_00», el asfalto...), que no están en
+GameData sino en los datos del juego (`KSP_x64_Data/sharedassets*.assets`): se indexan por
+nombre, como las busca KK, y se leen de ahí con su `.resS`. También se aplican los módulos
+`AdvancedTextures` que cambian la textura de partes del modelo.
+
+**Editarlos.** Con «Editar edificios», un clic sobre un edificio en el vuelo o el cielo lo
+elige (se prueba contra sus triángulos, no contra una caja) y se resalta. Se mueve
+respecto a hacia dónde mira la cámara, con el paso que elijas (0,1 a 100 m), se sube, se
+baja o se deja al ras del suelo, se gira alrededor de la vertical, se escala, se duplica o
+se borra; y de la lista de modelos se pone uno nuevo 60 m delante de la cámara, que entra
+en el grupo más cercano (a menos de 25 km, como en KK) o en uno nuevo. Teclas con uno
+elegido: I/K adelante y atrás, J/L a los lados, U/O bajar y subir, Q/E girar, Supr borrar,
+Esc soltar.
+
+Nada toca el disco hasta **«Guardar en los .cfg»**. Entonces no se reescribe el fichero
+entero, sino que se localiza el nodo en el texto y se cambian solo sus líneas
+(`RelativePosition`, `Orientation`, `ModelScale`), se quita su bloque `Instances` o se
+añade uno; lo demás (comentarios, `LaunchSite`, `Facility`, módulos) queda igual. Los
+edificios nuevos van a `KerbalKonstructs/NewInstances/<modelo>-instances.cfg` y los grupos
+nuevos a `KK_GroupCenter_<cuerpo>_<grupo>.cfg`, donde los pone KK. Antes de tocar un
+fichero se copia a `%LOCALAPPDATA%\KoogleKerbin\kk-copias\<fecha>\` con su ruta dentro de
+GameData, y si ha cambiado en disco desde que se leyó (KSP abierto guardando, por ejemplo)
+no se toca. Mejor editar con KSP cerrado. Al salir con cambios sin guardar, se pregunta.
+
+Lo que aún no: los edificios de serie que KK copia del KSC (`KSC_Runway_level_2`...) no se
+pintan, porque sus modelos están dentro de los datos de Unity del juego; el césped de las
+bases sale con su textura, sin el tinte (`GrassColor`) ni la máscara de asfalto de KK; y los
+edificios del formato antiguo se ven pero no se editan.
+
 ## Controles
 
 | Acción | Cómo |
@@ -498,6 +551,8 @@ funciona igual: el suelo de cerca queda liso, sin vegetación y sin nubes.
   bioma).
 - `%LOCALAPPDATA%\KoogleKerbin\slots\`: una copia de las imágenes que cargas a
   mano, para que sigan ahí la próxima vez. Las de `data\` no se copian.
+- `%LOCALAPPDATA%\KoogleKerbin\kk-copias\`: la copia de cada `.cfg` de Kerbal
+  Konstructs antes de que el editor de edificios lo cambie, por fecha.
 - `%LOCALAPPDATA%\KoogleKerbin\partida\persistent.sfs`: una copia de la última
   partida cargada. Al abrir el visor se carga sola, en el instante de la barra de
   tiempo en que se cerró; «Recargar del juego» vuelve a leer el original por si has
@@ -535,8 +590,8 @@ proyecto.
 |---|---|
 | `src\Core` | Lo que no depende de la pantalla: geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`, más lo que la web no tiene: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
 | `src\Gfx` | Enlaces a OpenGL, el control con el contexto (con antialias multimuestra), shaders, texturas, dibujo 2D por lotes y rótulos. |
-| `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`), el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble) y los scatters de Parallax (`ScatterField.cs` los reparte en segundo plano; `GlobeView.Scatters.cs` los pinta). |
-| `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, y los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques; `DxtDecoder.cs`; `ParallaxPlanets.cs`, `ParallaxTerrain.cs` y `ParallaxScatters.cs`). |
+| `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`), el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble), los scatters de Parallax (`ScatterField.cs` los reparte en segundo plano; `GlobeView.Scatters.cs` los pinta) y los edificios de Kerbal Konstructs (`GlobeView.Statics.cs`, con la elección por clic); `ModelGpu.cs` sube mallas y texturas para los dos. |
+| `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques, y también los `.assets` sueltos del juego; `DxtDecoder.cs`; `ParallaxPlanets.cs`, `ParallaxTerrain.cs` y `ParallaxScatters.cs`), las texturas de serie (`StockAssets.cs`) y Kerbal Konstructs (`Konstructs.cs` lee y coloca; `KonstructsWriter.cs` guarda). |
 | `src\UI` | La ventana, el panel lateral y los controles de tema oscuro. `MainForm` está repartida como `app.js`: mapas, naves, herramientas y cielo. |
 
 Decisiones que no son evidentes:

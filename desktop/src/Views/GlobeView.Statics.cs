@@ -124,6 +124,7 @@ void main() {
                 staticsFrame.Add((i, a, rel));
             }
             StaticsVisible = staticsFrame.Count;
+            picF = new[] { fx, fy, fz }; picR = (double[])right.Clone(); picU = (double[])camUp.Clone(); picTan = tan;
             if (staticsFrame.Count == 0) return;
 
             GL.Enable(GL.DEPTH_TEST);
@@ -180,6 +181,77 @@ void main() {
             }
             GL.BindVertexArray(0);
             GL.BindTexture(GL.TEXTURE_2D, 0);
+        }
+
+        // la cámara del último fotograma con edificios, para elegir uno con el ratón
+        double[] picF, picR, picU;
+        double picTan;
+
+        /* El edificio bajo el ratón en la vista de vuelo o del cielo, o null. Primero las
+           esferas que los envuelven y luego, de los candidatos, los triángulos de verdad:
+           un hangar grande envuelve con su esfera a medio grupo. */
+        public KkInstance PickStatic(int px, int py)
+        {
+            if (picF == null || staticsFrame.Count == 0 || W <= 1 || H <= 1) return null;
+            double sx = (2.0 * px / W - 1) * picTan * W / H, sy = (1 - 2.0 * py / H) * picTan;
+            var d = new double[3];
+            for (int k = 0; k < 3; k++) d[k] = picF[k] + picR[k] * sx + picU[k] * sy;
+            double dl = Math.Sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+            for (int k = 0; k < 3; k++) d[k] /= dl;
+
+            KkInstance mejor = null;
+            double tMejor = double.MaxValue;
+            foreach (var (inst, a, rel) in staticsFrame)
+            {
+                double cx = rel[12], cy = rel[13], cz = rel[14];
+                double rad = a.Radius * inst.Scale * (inst.GroupRef?.Scale ?? 1) + 1;
+                double tc = cx * d[0] + cy * d[1] + cz * d[2];
+                double d2 = cx * cx + cy * cy + cz * cz - tc * tc;
+                if (d2 > rad * rad || tc + rad < 0 || tc - rad > tMejor) continue;
+                foreach (var it in a.Items)
+                {
+                    if (it.Submesh >= it.Mesh.Submeshes.Count) continue;
+                    var inv = Mat.Inverse(Mat.Mul(rel, it.M));
+                    if (inv == null) continue;
+                    // el rayo en el espacio de la malla: el parámetro t es el mismo que fuera
+                    var o = Mat.Apply(inv, 0, 0, 0);
+                    var dd = new[]
+                    {
+                        inv[0] * d[0] + inv[4] * d[1] + inv[8] * d[2],
+                        inv[1] * d[0] + inv[5] * d[1] + inv[9] * d[2],
+                        inv[2] * d[0] + inv[6] * d[1] + inv[10] * d[2],
+                    };
+                    double t = RayMesh(o, dd, it.Mesh.Verts, it.Mesh.Submeshes[it.Submesh], tMejor);
+                    if (t < tMejor) { tMejor = t; mejor = inst; }
+                }
+            }
+            return mejor;
+        }
+
+        /* Moller-Trumbore contra una lista de triángulos: el t más cercano por debajo de `max`. */
+        static double RayMesh(double[] o, double[] d, float[] v, int[] idx, double max)
+        {
+            double best = max;
+            for (int k = 0; k + 2 < idx.Length; k += 3)
+            {
+                int a = idx[k] * 3, b = idx[k + 1] * 3, c = idx[k + 2] * 3;
+                if (a < 0 || b < 0 || c < 0 || a + 2 >= v.Length || b + 2 >= v.Length || c + 2 >= v.Length) continue;
+                double e1x = v[b] - v[a], e1y = v[b + 1] - v[a + 1], e1z = v[b + 2] - v[a + 2];
+                double e2x = v[c] - v[a], e2y = v[c + 1] - v[a + 1], e2z = v[c + 2] - v[a + 2];
+                double px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x;
+                double det = e1x * px + e1y * py + e1z * pz;
+                if (Math.Abs(det) < 1e-12) continue;
+                double f = 1 / det;
+                double sx = o[0] - v[a], sy = o[1] - v[a + 1], sz = o[2] - v[a + 2];
+                double u = f * (sx * px + sy * py + sz * pz);
+                if (u < 0 || u > 1) continue;
+                double qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+                double w = f * (d[0] * qx + d[1] * qy + d[2] * qz);
+                if (w < 0 || u + w > 1) continue;
+                double t = f * (e2x * qx + e2y * qy + e2z * qz);
+                if (t > 0.01 && t < best) best = t;
+            }
+            return best;
         }
 
         /* Al cambiar de instalación o apagar los edificios: fuera lo subido a la GPU. */

@@ -58,6 +58,7 @@ namespace KerbinMaps.Ksp
     {
         public string Name, Body, CfgPath;
         public double Lat, Lon, RadiusOffset, Heading = 361, RotationAngle, Scale = 1;
+        public bool Nuevo, Cambiado;              // creado o tocado en el editor, sin guardar
         public double[] Up = { 0, 1, 0 };
         public bool SeaLevel, Builtin, Implicit;
         public ConfigNode Node;
@@ -73,6 +74,8 @@ namespace KerbinMaps.Ksp
     public sealed class KkInstance
     {
         public string Model, Body, Group = "Ungrouped", Uuid, CfgPath, LaunchSite;
+        public int FileIndex = -1;                // qué nodo Instances es dentro de su fichero
+        public bool Nuevo, Cambiado, Borrado;     // estado en el editor, sin guardar
         public double[] Rel = { 0, 0, 0 }, Euler = { 0, 0, 0 };
         public double Scale = 1, Visibility = 25000;
         // formato antiguo
@@ -165,13 +168,23 @@ namespace KerbinMaps.Ksp
             // primero todos los modelos, porque una instancia puede ir en otro fichero
             foreach (var (n, path) in pendientes)
                 if (n.Get("mesh") != null) db.AddModel(n, path);
+            var porFichero = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             foreach (var (n, path) in pendientes)
             {
                 string modelo = n.Get("pointername") is string pn && pn.Length > 0 && !pn.Equals("none", StringComparison.OrdinalIgnoreCase)
                     ? pn : n.Get("name");
-                if (string.IsNullOrEmpty(modelo)) continue;
+                if (string.IsNullOrEmpty(modelo))
+                {
+                    porFichero[path] = porFichero.GetValueOrDefault(path) + n.Children("Instances").Count();
+                    continue;
+                }
                 foreach (var inst in n.Children("Instances"))
-                    db.Instances.Add(ParseInstance(inst, modelo, path));
+                {
+                    var i = ParseInstance(inst, modelo, path);
+                    i.FileIndex = porFichero.GetValueOrDefault(path);
+                    porFichero[path] = i.FileIndex + 1;
+                    db.Instances.Add(i);
+                }
             }
             foreach (var i in db.Instances)
                 i.ModelRef = db.Models.GetValueOrDefault(i.Model);
@@ -271,7 +284,7 @@ namespace KerbinMaps.Ksp
             foreach (var i in Instances)
             {
                 i.Placed = false;
-                if (i.Body != body) continue;
+                if (i.Body != body || i.Borrado) continue;
                 double[] m;
                 if (i.Legacy)
                 {
@@ -324,6 +337,135 @@ namespace KerbinMaps.Ksp
             else
                 rot = Mat.Rotate(Mat.QMul(FromTo(g.Up, n), AngleAxis(g.RotationAngle, g.Up)));
             g.M = Mat.Mul(Mat.Translate(Scale(n, radius + g.Alt)), Mat.Mul(rot, Mat.Scale(g.Scale, g.Scale, g.Scale)));
+        }
+
+        /* ------------------------------------------------ edición */
+
+        /* Este, norte y vertical de un punto, en el marco de KSP. */
+        public static (double[] E, double[] N, double[] U) Enu(double lat, double lon)
+        {
+            double la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
+            return (new[] { -Math.Sin(lo), 0, Math.Cos(lo) },
+                    new[] { -Math.Sin(la) * Math.Cos(lo), Math.Cos(la), -Math.Sin(la) * Math.Sin(lo) },
+                    NVec(lat, lon));
+        }
+
+        /* Mueve una instancia unos metros hacia el este, el norte y arriba (en su sitio).
+           Lo que cambia es su posición dentro del grupo. */
+        public static bool Move(KkInstance i, double dE, double dN, double dU)
+        {
+            var g = i.GroupRef;
+            if (g?.M == null || i.Legacy || !i.Placed) return false;
+            var (e, n, u) = Enu(i.Lat, i.Lon);
+            var d = new double[3];
+            for (int k = 0; k < 3; k++) d[k] = e[k] * dE + n[k] * dN + u[k] * dU;
+            var local = ToLocal(g, d);
+            for (int k = 0; k < 3; k++) i.Rel[k] += local[k];
+            i.Cambiado = true;
+            return true;
+        }
+
+        /* Gira alrededor de la vertical del grupo (su eje Y), que es lo que hace el ángulo Y
+           de Orientation. Positivo: en el sentido de las agujas del reloj visto desde arriba. */
+        public static void Rotate(KkInstance i, double deg)
+        {
+            i.Euler[1] = ((i.Euler[1] + deg) % 360 + 360) % 360;
+            i.Cambiado = true;
+        }
+
+        /* Rumbo al que mira el modelo (su eje Z), en grados desde el norte. */
+        public static double Heading(KkInstance i)
+        {
+            if (i.M == null) return 0;
+            var f = new[] { i.M[8], i.M[9], i.M[10] };
+            var (e, n, _) = Enu(i.Lat, i.Lon);
+            double h = Math.Atan2(f[0] * e[0] + f[1] * e[1] + f[2] * e[2], f[0] * n[0] + f[1] * n[1] + f[2] * n[2]) * 180 / Math.PI;
+            return (h + 360) % 360;
+        }
+
+        /* Un vector del marco de KSP al de dentro del grupo (sin traslación). */
+        static double[] ToLocal(KkGroup g, double[] d)
+        {
+            // las columnas de la matriz del grupo son sus ejes, con su escala
+            var r = new double[3];
+            for (int c = 0; c < 3; c++)
+            {
+                double ax = g.M[c * 4], ay = g.M[c * 4 + 1], az = g.M[c * 4 + 2];
+                double l2 = ax * ax + ay * ay + az * az;
+                r[c] = (d[0] * ax + d[1] * ay + d[2] * az) / l2;
+            }
+            return r;
+        }
+
+        /* Un edificio nuevo en un punto: va al grupo más cercano (a menos de 25 km, como
+           los de KK) o a uno nuevo, mirando al rumbo dado. */
+        public KkInstance Add(KkModel model, string body, double radius, double lat, double lon, double alt, double heading,
+                              Func<double, double, double> ground, string grupoNuevo)
+        {
+            var pos = Scale(NVec(lat, lon), radius + alt);
+            KkGroup g = null;
+            double mejor = 25000;
+            foreach (var c in Groups.Values)
+            {
+                if (c.Body != body || c.M == null || c.Implicit) continue;
+                double dx = c.M[12] - pos[0], dy = c.M[13] - pos[1], dz = c.M[14] - pos[2];
+                double dd = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+                if (dd < mejor) { mejor = dd; g = c; }
+            }
+            if (g == null)
+            {
+                string nombre = grupoNuevo;
+                for (int k = 1; Groups.ContainsKey(body + "_" + nombre); k++) nombre = grupoNuevo + "_" + k;
+                g = new KkGroup { Name = nombre, Body = body, Lat = lat, Lon = lon, Heading = 0, Nuevo = true, Cambiado = true };
+                Groups[g.Key] = g;
+                PlaceGroup(g, radius, ground);
+            }
+            var d = new[] { pos[0] - g.M[12], pos[1] - g.M[13], pos[2] - g.M[14] };
+            var i = new KkInstance
+            {
+                Model = model.Name, ModelRef = model, Body = body, Group = g.Name, GroupRef = g,
+                Uuid = Guid.NewGuid().ToString(), Rel = ToLocal(g, d), Nuevo = true, Cambiado = true,
+            };
+            Instances.Add(i);
+            PlaceOne(i, radius);
+            // que mire al rumbo pedido
+            Rotate(i, heading - Heading(i));
+            PlaceOne(i, radius);
+            g.Count++;
+            return i;
+        }
+
+        /* Copia de una instancia unos metros al este, para moverla después. */
+        public KkInstance Duplicate(KkInstance src, double radius)
+        {
+            var i = new KkInstance
+            {
+                Model = src.Model, ModelRef = src.ModelRef, Body = src.Body, Group = src.Group, GroupRef = src.GroupRef,
+                Uuid = Guid.NewGuid().ToString(), Rel = (double[])src.Rel.Clone(), Euler = (double[])src.Euler.Clone(),
+                Scale = src.Scale, Visibility = src.Visibility, Nuevo = true, Cambiado = true,
+            };
+            Instances.Add(i);
+            PlaceOne(i, radius);
+            Move(i, 20, 0, 0);
+            PlaceOne(i, radius);
+            if (i.GroupRef != null) i.GroupRef.Count++;
+            return i;
+        }
+
+        /* Recoloca una sola instancia con su grupo ya colocado (tras editarla). */
+        public void PlaceOne(KkInstance i, double radius)
+        {
+            var g = i.GroupRef;
+            if (g?.M == null || i.Legacy) return;
+            var m = Mat.Mul(g.M, Mat.Mul(Mat.Translate(i.Rel),
+                Mat.Mul(Mat.Rotate(Mat.Euler(i.Euler)), Mat.Scale(i.Scale, i.Scale, i.Scale))));
+            i.M = m;
+            double x = m[12], y = m[13], z = m[14];
+            double r = Math.Sqrt(x * x + y * y + z * z);
+            i.Lat = Math.Asin(y / r) * 180 / Math.PI;
+            i.Lon = Math.Atan2(z, x) * 180 / Math.PI;
+            i.Alt = r - radius;
+            i.Placed = true;
         }
 
         /* ------------------------------------------------ cuentas de Unity */

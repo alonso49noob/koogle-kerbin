@@ -41,6 +41,13 @@ What it does:
   its own distribution rules (noise, slope, altitude, biome blacklists) and depth-tested
   against the ray-marched ground, so a hill hides the trees behind it. Grass and foliage
   sway in the wind the way the mod animates them.
+- **Kerbal Konstructs bases, viewed and edited.** The KK statics you have installed
+  (KSC Extended, Tundra Space Center, Kerbin Side...) are read from GameData and placed
+  with KK's own maths, shown as markers on the map and globe and as textured models in
+  the flight and sky views (the stock KSC textures they reuse come straight from the
+  game's `sharedassets` files). An editor moves, rotates, scales, duplicates, deletes and
+  adds buildings, and saves back to the `.cfg` files by changing only the lines involved,
+  after backing each file up.
 - **Optional extra textures in the installer.** If you don't have Parallax, the
   installer can fetch its planet maps (234 MB), surface textures (1.9 GB) and scatters
   (1.1 GB) from the
