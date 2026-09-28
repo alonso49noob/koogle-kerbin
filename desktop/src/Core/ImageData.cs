@@ -34,6 +34,25 @@ namespace KerbinMaps.Core
 
         byte[] mask;            // silueta tierra/agua a 1° por celda, calculada una vez
 
+        /* A partir de píxeles RGBA ya en memoria (texturas de paquetes de Unity, por ejemplo). */
+        public static ImageData FromRgba(byte[] rgba, int w, int h) => new ImageData { Width = w, Height = h, Rgba = rgba };
+
+        /* Volteo vertical in situ: Unity y OpenGL guardan la primera fila abajo. */
+        public ImageData FlipY()
+        {
+            int fila = Width * 4;
+            var tmp = new byte[fila];
+            for (int y = 0; y < Height / 2; y++)
+            {
+                int a = y * fila, b = (Height - 1 - y) * fila;
+                Buffer.BlockCopy(Rgba, a, tmp, 0, fila);
+                Buffer.BlockCopy(Rgba, b, Rgba, a, fila);
+                Buffer.BlockCopy(tmp, 0, Rgba, b, fila);
+            }
+            mask = null;
+            return this;
+        }
+
         public static ImageData Decode(byte[] bytes)
         {
             using var ms = new MemoryStream(bytes);

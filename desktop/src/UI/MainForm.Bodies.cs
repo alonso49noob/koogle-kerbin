@@ -70,6 +70,9 @@ namespace KerbinMaps.UI
             RenderWaypointInfo();
             RenderDestinos();
             ActualizarEstadosSecciones();
+            // las texturas de suelo de Parallax y las nubes son de cada cuerpo
+            if (terrenoDe != null) _ = CargarTexturasDeTerreno();
+            if (nubesDe != null) _ = CargarNubes();
             transfer = null;
             trList?.SetItems(new List<object>());
             RenderTransferInfo();

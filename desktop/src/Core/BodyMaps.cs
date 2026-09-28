@@ -120,9 +120,10 @@ namespace KerbinMaps.Core
             var r = new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase);
             try
             {
-                if (string.IsNullOrEmpty(gameData)) return r;
-                string cfg = Path.Combine(gameData, "Parallax_StockPlanetTextures", "_Configs", "ParallaxScaled.cfg");
-                if (!File.Exists(cfg)) return r;
+                string cfg = ParallaxPlanets.GameDatas(gameData)
+                    .Select(gd => Path.Combine(gd, "Parallax_StockPlanetTextures", "_Configs", "ParallaxScaled.cfg"))
+                    .FirstOrDefault(File.Exists);
+                if (cfg == null) return r;
                 Recorrer(ConfigNode.ParseFile(cfg), null, r);
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[mapas] ParallaxScaled: " + ex.Message); }

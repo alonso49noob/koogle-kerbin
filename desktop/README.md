@@ -37,8 +37,21 @@ Si ya estaba instalado, el asistente actualiza en la misma carpeta. Como el
 instalador no está firmado, Windows SmartScreen puede avisar la primera vez: «Más
 información › Ejecutar de todas formas».
 
+Antes de instalar, una página ofrece **texturas extra (opcional)**: los mapas de los
+planetas de Parallax (color y alturas de los 15 cuerpos, 234 MB) y sus texturas de
+superficie (hierba, roca, arena y nieve de cerca para el vuelo, 1,9 GB). Si ya las tienes
+en tu KSP la página lo dice y no hace falta bajarlas. Son de su autor, Gameslinx, con
+«todos los derechos reservados», así que **no van dentro del instalador ni se suben a
+ningún sitio**: se bajan en tu equipo desde [la release oficial de Parallax
+Continued](https://github.com/Gameslinx/Parallax-Continued/releases/tag/1.0.3), como haría
+un gestor de mods, y de cada zip solo se guardan los paquetes de Unity y los `.cfg` en
+`%LOCALAPPDATA%\KoogleKerbin\parallax`. Si una descarga falla, la aplicación queda
+instalada igual y se avisa al final. Al desinstalar se borran. Las nubes no se ofrecen
+porque son de un mod de pago.
+
 Opciones para instalar sin ventanas: `/silent`, `/dir=<carpeta>`, `/noshortcuts`,
-`/noregistry`; y `desinstalar.exe /uninstall /silent` para quitarlo.
+`/noregistry`, `/texturas=planetas,suelo` (sale con código 5 si alguna no se pudo bajar);
+y `desinstalar.exe /uninstall /silent` para quitarlo.
 
 ## Usarla
 
@@ -215,7 +228,17 @@ Lo que no se reproduce:
 
 ## Mapas de los demás cuerpos
 
-El visor solo trae mapas de Kerbin. Si tienes volcadas a PNG las texturas de KSP (con
+El visor solo trae mapas de Kerbin. **Si tienes Parallax Continued** (en tu KSP o bajado
+por el instalador), los demás cuerpos salen con su color y sus alturas sin hacer nada: se
+leen directamente de su paquete `parallax-stock-planet-textures.unity3d`, sin volcar
+nada a PNG. Es un UnityFS de 2 GB comprimido en bloques LZ4; se abre en milisegundos
+porque solo se descomprimen los bloques de la textura que hace falta, y el DXT se
+descodifica en el visor. Las texturas de Unity van de abajo arriba; volteadas, son byte a
+byte las del volcado, y a partir de ahí se tratan igual (espejo y 90°, ver abajo). Se
+desactiva con «Usar las de Parallax si está instalado», y una carpeta elegida a mano
+manda sobre Parallax para los cuerpos que tenga.
+
+Si tienes volcadas a PNG las texturas de KSP (con
 cualquier extractor de assets), en «Cuerpo celeste» → **Carpeta de mapas…** se apunta a
 esa carpeta y cada cuerpo se ve con su mapa de verdad, sus alturas y sus biomas si los
 hay. Se reconocen por el nombre: `Duna_Color.png`, `Mun_Height.png`,
@@ -367,9 +390,16 @@ Dos detalles que costó afinar:
 De cerca, el mapa del cuerpo no da más de sí: un texel son cientos de metros. Encima se
 pone una textura que se repite cada pocos metros, elegida por la pendiente y por el color
 del sitio (hierba en lo verde, arena en lo claro, roca en lo empinado, nieve en lo
-blanco), y que se desvanece a partir de un kilómetro y medio para que no haga muaré. Son
-las del **Community Terrain Texture Pack** de tu instalación, que es lo que usan Parallax
-y compañía.
+blanco), y que se desvanece a partir de un kilómetro y medio para que no haga muaré.
+
+**Con Parallax Continued** se usan las suyas, las de cada cuerpo (la hierba de Kerbin, el
+regolito de la Mun, la arena roja de Duna...), mezcladas como las mezcla el mod: baja,
+media y alta según la altitud, con los umbrales en metros de su `Terrain.cfg`, y la de
+pendiente con su potencia, contraste y punto medio; la escala de repetición también es la
+suya. Se leen de su paquete de Unity (solo los niveles de hasta 2048 de ancho) y su color
+se ajusta al del mapa del cuerpo en ese sitio, para que de lejos no cambie el tono. Sin
+Parallax se usan las del **Community Terrain Texture Pack**, elegidas por el color del
+sitio.
 
 Las **nubes** salen del mapa de los mods de nubes que tengas (Stock Volumetric Clouds,
 EVE): una capa esférica a la altura que elijas, con la cobertura del propio mapa e
@@ -438,7 +468,7 @@ proyecto.
 | `src\Core` | Lo que no depende de la pantalla: geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`, más lo que la web no tiene: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
 | `src\Gfx` | Enlaces a OpenGL, el control con el contexto (con antialias multimuestra), shaders, texturas, dibujo 2D por lotes y rótulos. |
 | `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`) y el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble). |
-| `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves. |
+| `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, y los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques; `DxtDecoder.cs`; `ParallaxPlanets.cs` y `ParallaxTerrain.cs`). |
 | `src\UI` | La ventana, el panel lateral y los controles de tema oscuro. `MainForm` está repartida como `app.js`: mapas, naves, herramientas y cielo. |
 
 Decisiones que no son evidentes:

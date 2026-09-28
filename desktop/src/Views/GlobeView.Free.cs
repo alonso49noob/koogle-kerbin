@@ -37,6 +37,12 @@ namespace KerbinMaps.Views
 
         public bool HasDetail => DetGrass != null || DetSand != null || DetRock != null || DetSnow != null;
 
+        /* Con Parallax las cuatro ranuras son baja, media, alta y pendiente (en ese orden:
+           DetGrass, DetSand, DetSnow y DetRock) y se mezclan con sus parámetros. */
+        public bool DetailParallax;
+        public (double a, double b) PxLowMid = (0, 1), PxMidHigh = (1e6, 1e6 + 1);
+        public (double power, double contrast, double mid) PxSteep = (8, 4, 0.7);
+
         /* Altura del terreno bajo un punto, en metros sobre el nivel del mar. La pone la
            ventana con el mapa de alturas del cuerpo; sin mapa, todo a cero. */
         public Func<double, double, double> GroundAt;
@@ -106,6 +112,18 @@ namespace KerbinMaps.Views
             double suelo = FreeGround;
             if (FreeAlt < suelo + 2) FreeAlt = suelo + 2;
             if (FreeAlt > Body.Radius * 2) FreeAlt = Body.Radius * 2;
+            return true;
+        }
+
+        /* Si el suelo ha subido por debajo de la cámara (el mapa de alturas llega cuando
+           ya estaba colocada, o se ha cambiado su calibración), se la sube encima. Dentro
+           del terreno todos los rayos chocan al salir y la pantalla queda de un gris liso. */
+        public bool ClampFree()
+        {
+            if (Mode != CamMode.Free) return false;
+            double suelo = FreeGround;
+            if (FreeAlt >= suelo + 2) return false;
+            FreeAlt = suelo + 2;
             return true;
         }
 

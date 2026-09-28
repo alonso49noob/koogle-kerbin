@@ -64,6 +64,7 @@ namespace KerbinMaps.UI
         void PasoDeVuelo(double now)
         {
             if (!isFree) return;
+            if (globe.ClampFree()) { UpdateFreeHud(); RequestRender(); }
             double dt = ultimoVuelo > 0 ? Math.Min(0.1, now - ultimoVuelo) : 0;
             ultimoVuelo = now;
             if (dt <= 0 || teclas.Count == 0) return;
@@ -129,9 +130,9 @@ namespace KerbinMaps.UI
         {
             if (vueloInfo == null) return;
             var partes = new List<string>();
-            partes.Add(globe.HasDetail
-                ? Lang.T("Texturas de suelo: cargadas de tu instalación de KSP.")
-                : Lang.T("Sin texturas de suelo: no encontré CTTP en tu instalación."));
+            partes.Add(globe.HasDetail && terrenoOrigen != null
+                ? Lang.F("Texturas de suelo: {0}.", terrenoOrigen)
+                : Lang.T("Sin texturas de suelo: no encontré Parallax ni CTTP en tu instalación."));
             partes.Add(globe.CloudTex != null
                 ? Lang.F("Nubes de {0}: cargadas del juego.", Body.Current.Label)
                 : Lang.F("Sin mapa de nubes para {0} en tu instalación.", Body.Current.Label));

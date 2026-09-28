@@ -17,7 +17,6 @@ namespace KerbinMaps.UI
        sí a esa distancia. */
     public sealed partial class MainForm
     {
-        bool terrenoCargado;
 
         /* Candidatos por ranura, en orden de preferencia y relativos a GameData. */
         static readonly (string Slot, string[] Rutas)[] Detalles =
@@ -28,13 +27,71 @@ namespace KerbinMaps.UI
             ("snow", new[] { @"CTTP\Textures\PluginData\snow.dds", @"CTTP\Textures\PluginData\ice.dds" }),
         };
 
+        /* Las del CTTP sirven para todos los cuerpos: se cargan una vez y se guardan. */
+        Texture cttpGrass, cttpSand, cttpRock, cttpSnow;
+        bool cttpLeido;
+
+        /* Las de Parallax son de cada cuerpo: se cambian al cambiar de cuerpo. */
+        Texture[] parallaxTex;
+        string terrenoDe;
+        string terrenoOrigen;                   // para el panel: de dónde salen las texturas
+
         async Task CargarTexturasDeTerreno()
         {
-            if (terrenoCargado) return;
-            terrenoCargado = true;
+            if (terrenoDe == Body.Name + "|" + state.UseParallax) return;
+            terrenoDe = Body.Name + "|" + state.UseParallax;
             string gd = FindGameData();
             if (gd == null) return;
+            string cuerpo = Body.Name;
 
+            ParallaxTerrain px = null;
+            if (state.UseParallax)
+                px = await Task.Run(() =>
+                {
+                    try { return ParallaxTerrain.Load(gd, cuerpo); }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[parallax] " + ex.Message); return null; }
+                });
+            if (cuerpo != Body.Name) return;                    // se cambió de cuerpo mientras tanto
+
+            if (!glOk || !surface.MakeCurrent()) return;
+            if (parallaxTex != null) { foreach (var t in parallaxTex) t?.Dispose(); parallaxTex = null; }
+
+            if (px != null)
+            {
+                var d = new System.Collections.Generic.Dictionary<string, TextureFile>
+                    { ["low"] = px.Low, ["mid"] = px.Mid, ["high"] = px.High, ["steep"] = px.Steep };
+                // si dos ranuras comparten textura, se sube una sola vez
+                var subidas = new System.Collections.Generic.Dictionary<TextureFile, Texture>();
+                Texture Una(string k) => d[k] == null ? null : subidas.TryGetValue(d[k], out var ya) ? ya : subidas[d[k]] = Subir(d, k);
+                globe.DetGrass = Una("low");
+                globe.DetSand = Una("mid");
+                globe.DetSnow = Una("high");
+                globe.DetRock = Una("steep");
+                parallaxTex = new System.Collections.Generic.List<Texture>(subidas.Values).ToArray();
+                globe.DetailParallax = true;
+                globe.DetailTile = px.MetrosPorRepeticion;
+                globe.PxLowMid = (px.LowMidStart, px.LowMidEnd);
+                globe.PxMidHigh = (px.MidHighStart, px.MidHighEnd);
+                globe.PxSteep = (px.SteepPower, px.SteepContrast, px.SteepMidpoint);
+                terrenoOrigen = Lang.F("Parallax ({0})", Body.Current.Label);
+            }
+            else
+            {
+                await CargarCttp(gd);
+                if (!surface.MakeCurrent()) return;
+                globe.DetGrass = cttpGrass; globe.DetSand = cttpSand; globe.DetRock = cttpRock; globe.DetSnow = cttpSnow;
+                globe.DetailParallax = false;
+                globe.DetailTile = 22;
+                terrenoOrigen = globe.HasDetail ? "CTTP" : null;
+            }
+            RenderVueloInfo();
+            RequestRender();
+        }
+
+        async Task CargarCttp(string gd)
+        {
+            if (cttpLeido) return;
+            cttpLeido = true;
             var leidas = await Task.Run(() =>
             {
                 var res = new System.Collections.Generic.Dictionary<string, TextureFile>();
@@ -48,19 +105,16 @@ namespace KerbinMaps.UI
                     }
                 return res;
             });
-
             if (leidas.Count == 0 || !glOk || !surface.MakeCurrent()) return;
-            globe.DetGrass = Subir(leidas, "grass");
-            globe.DetSand = Subir(leidas, "sand");
-            globe.DetRock = Subir(leidas, "rock");
-            globe.DetSnow = Subir(leidas, "snow");
+            cttpGrass = Subir(leidas, "grass");
+            cttpSand = Subir(leidas, "sand");
+            cttpRock = Subir(leidas, "rock");
+            cttpSnow = Subir(leidas, "snow");
             // las ranuras que falten se cubren con otra, para no dejar huecos negros
-            globe.DetGrass ??= globe.DetSand ?? globe.DetRock;
-            globe.DetSand ??= globe.DetGrass ?? globe.DetRock;
-            globe.DetRock ??= globe.DetSand ?? globe.DetGrass;
-            globe.DetSnow ??= globe.DetRock ?? globe.DetSand;
-            RenderVueloInfo();
-            RequestRender();
+            cttpGrass ??= cttpSand ?? cttpRock;
+            cttpSand ??= cttpGrass ?? cttpRock;
+            cttpRock ??= cttpSand ?? cttpGrass;
+            cttpSnow ??= cttpRock ?? cttpSand;
         }
 
         /* Mapa de nubes del cuerpo, de los mods de nubes que haya instalados. Es de

@@ -30,7 +30,14 @@ What it does:
   point on the surface and a free camera you fly at ground level, all sharing observer,
   time and selection. The flight view ray-marches the body's height map, so the horizon
   and the mountain silhouettes are exact, and it dresses the ground with the game's own
-  terrain textures and cloud maps when you have them installed.
+  terrain textures and cloud maps when you have them installed. With Parallax
+  Continued, each body gets its own surface textures, blended by altitude and slope the
+  way the mod does, and every planet's colour and height maps are read straight from
+  its Unity bundle, no dumping needed.
+- **Optional extra textures in the installer.** If you don't have Parallax, the
+  installer can fetch its planet maps (234 MB) and surface textures (1.9 GB) from the
+  author's official GitHub release on your machine. They are Gameslinx's work (all
+  rights reserved), so they are never bundled or re-hosted here.
 - **Day and night.** Rayleigh and Mie single scattering with a Chapman function
   for the sun's optical depth, aerial perspective and a filmic tone map, so
   sunrises, the terminator and the night side look the way they should. Each body

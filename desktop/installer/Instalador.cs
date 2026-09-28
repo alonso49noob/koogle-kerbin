@@ -16,6 +16,7 @@
      /noshortcuts     sin accesos directos
      /noregistry      sin entrada en «Aplicaciones»
      /nolaunch        no proponer abrir la aplicación al terminar
+     /texturas=planetas,suelo   bajar también las texturas de Parallax (ver Extras)
      /uninstall       desinstalar
 
    Está escrito en C# 7.3 para compilar con cualquier Roslyn contra .NET Framework. */
@@ -28,6 +29,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -63,7 +65,7 @@ namespace KoogleKerbinSetup
     sealed class Options
     {
         public bool Uninstall, Silent, NoShortcuts, NoRegistry, NoLaunch, FromTemp;
-        public string Dir, Lang;
+        public string Dir, Lang, Texturas;   // /texturas=planetas,suelo
 
         public static Options Parse(string[] args)
         {
@@ -79,6 +81,7 @@ namespace KoogleKerbinSetup
                 else if (l == "/fromtemp") o.FromTemp = true;
                 else if (l.StartsWith("/dir=")) o.Dir = a.Substring(5).Trim('"');
                 else if (l.StartsWith("/lang=")) o.Lang = l.Substring(6).Trim('"');
+                else if (l.StartsWith("/texturas=")) o.Texturas = l.Substring(10).Trim('"');
             }
             return o;
         }
@@ -120,6 +123,23 @@ namespace KoogleKerbinSetup
             { "Opciones", "Options" },
             { "Instalación", "Installation" },
             { "Listo", "Done" },
+            { "Texturas", "Textures" },
+            { "Texturas extra (opcional)", "Extra textures (optional)" },
+            { "Mapas de los planetas", "Planet maps" },
+            { "Texturas de superficie", "Surface textures" },
+            { "La vista de vuelo y los mapas de los demás planetas se ven mucho mejor con las texturas de Parallax. Si ya las tienes en tu KSP, la aplicación las usa directamente y no hace falta bajarlas.", "The flight view and the maps of the other planets look much better with the Parallax textures. If you already have them in your KSP, the app uses them directly and there is no need to download them." },
+            { "color y alturas de los 15 cuerpos, para todas las vistas", "colour and heights of the 15 bodies, for every view" },
+            { "hierba, arena, roca y nieve de cerca, para la vista de vuelo", "close-up grass, sand, rock and snow, for the flight view" },
+            { "Ya lo tienes en tu KSP: no hace falta ({0}).", "You already have it in your KSP: not needed ({0})." },
+            { "Ya está bajado de una instalación anterior ({0}).", "Already downloaded by a previous install ({0})." },
+            { "Se bajan de la página oficial de su autor, {0}, y son suyas (todos los derechos reservados): se usan solo en tu equipo y no se redistribuyen. Las nubes no se ofrecen porque son de un mod de pago.", "They are downloaded from the official page of their author, {0}, and they are theirs (all rights reserved): they are only used on your computer and are not redistributed. Clouds are not offered because they come from a paid mod." },
+            { "Ver la página del autor", "See the author's page" },
+            { "Descargando {0}…", "Downloading {0}…" },
+            { "Descomprimiendo {0}…", "Unpacking {0}…" },
+            { "{0}: {1} de {2}", "{0}: {1} of {2}" },
+            { "No se pudieron bajar las {0}: {1}", "Could not download the {0}: {1}" },
+            { "Puedes volver a intentarlo reinstalando.", "You can try again by reinstalling." },
+            { "El zip del autor no trae lo que se esperaba.", "The author's zip doesn't contain what was expected." },
             { "Te damos la bienvenida", "Welcome" },
             { "Requisitos del equipo", "System requirements" },
             { "Dónde instalarlo", "Where to install it" },
@@ -128,8 +148,8 @@ namespace KoogleKerbinSetup
             { "No se pudo instalar", "Installation failed" },
             { "Versión {0}", "Version {0}" },
 
-            { "Este asistente instala {0} {1}, un visor de Kerbin para Kerbal Space Program: mapa plano, globo 3D, vista del cielo con día y noche, y las naves de tu partida con sus órbitas y sus modelos.",
-              "This wizard installs {0} {1}, a Kerbin viewer for Kerbal Space Program: flat map, 3D globe, sky view with day and night, and the vessels from your save with their orbits and their models." },
+            { "Este asistente instala {0} {1}, un visor de los mundos de Kerbal Space Program: mapa plano, globo 3D, vista del cielo, vuelo libre a ras de suelo con día y noche, y las naves de tu partida con sus órbitas y sus modelos.",
+              "This wizard installs {0} {1}, a viewer for the worlds of Kerbal Space Program: flat map, 3D globe, sky view, free flight at ground level with day and night, and the vessels from your save with their orbits and their models." },
             { "Ya tienes instalada la versión {0}. Se actualizará en la misma carpeta; tus ajustes, marcadores y la partida guardada se conservan.",
               "You already have version {0} installed. It will be updated in the same folder; your settings, markers and saved game are kept." },
             { "Se instala solo para tu usuario y no pide permisos de administrador. Necesita Windows de 64 bits y el runtime de escritorio de .NET 10, que se comprueba en el paso siguiente.",
@@ -243,7 +263,15 @@ namespace KoogleKerbinSetup
             try
             {
                 new Installer { Dir = dir, Desktop = !o.NoShortcuts, StartMenu = !o.NoShortcuts, Register = !o.NoRegistry }.Run();
-                return 0;
+                int codigo = 0;
+                foreach (var nombre in (o.Texturas ?? "").Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var e = nombre.Trim() == "planetas" ? Extras.Planetas : nombre.Trim() == "suelo" ? Extras.Suelo : null;
+                    if (e == null) continue;
+                    try { Extras.Instalar(e, (a, b) => { }, t => { }); }
+                    catch (Exception ex) { Util.Log(ex); codigo = 5; }   // 5: instalado, pero sin alguna textura
+                }
+                return codigo;
             }
             catch (Exception ex)
             {
@@ -614,6 +642,158 @@ namespace KoogleKerbinSetup
 
     /* ------------------------------------------------------------------ desinstalación */
 
+    /* ------------------------------------------------------------ texturas extra */
+
+    /* Texturas de Parallax, para quien no las tenga en su KSP.
+
+       Son de su autor (Gameslinx) y en su repositorio dice «All Rights Reserved», así que
+       no van dentro de este instalador ni se suben a ningún otro sitio: se bajan en el
+       equipo de cada uno desde la página oficial del autor, igual que haría un gestor de
+       mods, y se quedan para uso local en %LOCALAPPDATA%\KoogleKerbin\parallax. De cada zip
+       solo se guarda lo que la aplicación lee: los paquetes de Unity y su configuración.
+
+       Las nubes no se ofrecen: son de un mod de pago. */
+    sealed class Extra
+    {
+        public string Nombre, Carpeta, Url;
+        public long Tam;                          // lo que pesa el zip, para avisar antes
+    }
+
+    static class Extras
+    {
+        public const string Autor = "Gameslinx";
+        public const string Pagina = "https://github.com/Gameslinx/Parallax-Continued/releases/tag/1.0.3";
+
+        public static readonly Extra Planetas = new Extra
+        {
+            Nombre = "Mapas de los planetas",
+            Carpeta = "Parallax_StockPlanetTextures",
+            // la variable de entorno solo sirve para probar el instalador contra un zip local
+            Url = Environment.GetEnvironmentVariable("KOOGLE_EXTRAS_PLANETAS") ??
+                  "https://github.com/Gameslinx/Parallax-Continued/releases/download/1.0.3/ParallaxContinued_StockPlanetTextures-1.0.3.zip",
+            Tam = 245859412L,
+        };
+
+        public static readonly Extra Suelo = new Extra
+        {
+            Nombre = "Texturas de superficie",
+            Carpeta = "Parallax_StockTerrainTextures",
+            Url = Environment.GetEnvironmentVariable("KOOGLE_EXTRAS_SUELO") ??
+                  "https://github.com/Gameslinx/Parallax-Continued/releases/download/1.0.3/ParallaxContinued_StockTerrainTextures-1.0.3.zip",
+            Tam = 1990694985L,
+        };
+
+        public static string Raiz
+        {
+            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KoogleKerbin", "parallax"); }
+        }
+
+        public static string Destino { get { return Path.Combine(Raiz, "GameData"); } }
+
+        public static bool Bajadas(Extra e)
+        {
+            string d = Path.Combine(Destino, e.Carpeta);
+            return Directory.Exists(d) && Directory.GetFiles(d, "*.unity3d").Length > 0;
+        }
+
+        /* ¿Lo tiene ya en su KSP? Se mira la carpeta de Steam por defecto y la que diga el
+           registro; si está, bajarlo otra vez no aporta nada. */
+        public static bool EnKsp(Extra e)
+        {
+            foreach (var gd in GameDatas())
+            {
+                string d = Path.Combine(gd, e.Carpeta);
+                if (Directory.Exists(d) && Directory.GetFiles(d, "*.unity3d").Length > 0) return true;
+            }
+            return false;
+        }
+
+        static IEnumerable<string> GameDatas()
+        {
+            var raices = new List<string>();
+            try
+            {
+                using (var k = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
+                {
+                    var p = k == null ? null : k.GetValue("SteamPath") as string;
+                    if (!string.IsNullOrEmpty(p)) raices.Add(p.Replace('/', '\\'));
+                }
+            }
+            catch { }
+            raices.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"));
+            foreach (var r in raices.Distinct(StringComparer.OrdinalIgnoreCase))
+                yield return Path.Combine(r, "steamapps", "common", "Kerbal Space Program", "GameData");
+        }
+
+        /* Baja el zip a un temporal, con progreso, y se queda solo con lo que hace falta. */
+        public static void Instalar(Extra e, Action<long, long> progreso, Action<string> estado)
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            string zip = Path.Combine(Path.GetTempPath(), "KoogleKerbin-" + e.Carpeta + ".zip");
+            try
+            {
+                estado(L.F("Descargando {0}…", L.T(e.Nombre)));
+                var req = (HttpWebRequest)WebRequest.Create(e.Url);
+                req.UserAgent = App.Name + "-Setup";
+                req.AllowAutoRedirect = true;
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                using (var src = resp.GetResponseStream())
+                using (var dst = File.Create(zip))
+                {
+                    long total = resp.ContentLength > 0 ? resp.ContentLength : e.Tam, hecho = 0;
+                    var buf = new byte[1 << 16];
+                    int n;
+                    var ultimo = Stopwatch.StartNew();
+                    while ((n = src.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        dst.Write(buf, 0, n);
+                        hecho += n;
+                        if (ultimo.ElapsedMilliseconds > 120) { progreso(hecho, total); ultimo.Restart(); }
+                    }
+                    progreso(hecho, total);
+                }
+
+                estado(L.F("Descomprimiendo {0}…", L.T(e.Nombre)));
+                Extraer(zip, e.Carpeta);
+            }
+            finally
+            {
+                try { File.Delete(zip); } catch { }
+            }
+        }
+
+        /* Del zip del autor se guardan los paquetes de Unity y los .cfg de la carpeta del mod,
+           con su estructura; el resto (normales, dispersión, lo que no se lee) se deja. */
+        static void Extraer(string zip, string carpeta)
+        {
+            string raizMod = Path.Combine(Destino, carpeta);
+            using (var fs = File.OpenRead(zip))
+            using (var za = new ZipArchive(fs, ZipArchiveMode.Read))
+            {
+                int guardados = 0;
+                foreach (var ent in za.Entries)
+                {
+                    string ruta = ent.FullName.Replace('\\', '/');
+                    int i = ruta.IndexOf(carpeta + "/", StringComparison.OrdinalIgnoreCase);
+                    if (i < 0 || ruta.EndsWith("/")) continue;
+                    string rel = ruta.Substring(i + carpeta.Length + 1);
+                    string ext = Path.GetExtension(rel).ToLowerInvariant();
+                    if (ext != ".unity3d" && ext != ".cfg") continue;
+                    string dest = Path.GetFullPath(Path.Combine(raizMod, rel.Replace('/', '\\')));
+                    if (!Util.Inside(raizMod, dest)) continue;          // nada fuera de la carpeta
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                    // sin ExtractToFile, que vive en otra biblioteca: se copia el flujo a mano
+                    using (var src = ent.Open())
+                    using (var dst = File.Create(dest)) src.CopyTo(dst, 1 << 16);
+                    guardados++;
+                }
+                if (guardados == 0) throw new InvalidDataException(L.T("El zip del autor no trae lo que se esperaba."));
+            }
+        }
+
+        public static void Borrar() { Util.TryDeleteDir(Raiz); }
+    }
+
     static class Uninstaller
     {
         public static int Run(Options o)
@@ -674,6 +854,8 @@ namespace KoogleKerbinSetup
                 if (lnk.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) Util.TryDelete(lnk);
             Util.RemoveEmptyDirs(dir, false);
             if (!o.NoRegistry) Registration.DeleteIf(dir);
+            // las texturas que bajó el instalador: son parte de la aplicación, no datos tuyos
+            Extras.Borrar();
 
             if (deleteData)
             {
@@ -717,7 +899,7 @@ namespace KoogleKerbinSetup
     {
         public static readonly Color Bg = Color.FromArgb(11, 17, 26), Bg2 = Color.FromArgb(20, 29, 41), Line = Color.FromArgb(40, 54, 72);
         public static readonly Color Fg = Color.FromArgb(219, 230, 242), Dim = Color.FromArgb(138, 160, 184), Accent = Color.FromArgb(78, 163, 255);
-        public static readonly Color Ok = Color.FromArgb(126, 231, 135), Bad = Color.FromArgb(255, 122, 122);
+        public static readonly Color Ok = Color.FromArgb(126, 231, 135), Bad = Color.FromArgb(255, 122, 122), Warn = Color.FromArgb(255, 180, 84);
 
         public static float DpiScale(Control c)
         {
@@ -773,10 +955,11 @@ namespace KoogleKerbinSetup
 
     sealed class Wizard : Form
     {
-        static readonly string[] Steps = { "Bienvenida", "Requisitos", "Opciones", "Instalación", "Listo" };
+        static readonly string[] Steps = { "Bienvenida", "Requisitos", "Opciones", "Texturas", "Instalación", "Listo" };
         static readonly string[] Titles =
         {
-            "Te damos la bienvenida", "Requisitos del equipo", "Dónde instalarlo", "Instalando…", "Instalación completada"
+            "Te damos la bienvenida", "Requisitos del equipo", "Dónde instalarlo", "Texturas extra (opcional)",
+            "Instalando…", "Instalación completada"
         };
 
         readonly Options opts;
@@ -784,7 +967,9 @@ namespace KoogleKerbinSetup
         readonly Panel side;
         readonly Label title;
         readonly Button back, next, cancel;
-        readonly Panel pWelcome, pReq, pOptions, pProgress, pDone;
+        readonly Panel pWelcome, pReq, pOptions, pTex, pProgress, pDone;
+        readonly CheckBox chkPlanetas, chkSuelo;
+        readonly List<string> avisos = new List<string>();
         readonly Label reqOs, reqNet, reqHelp, spaceLabel, barFile, doneText, doneHint;
         readonly Button reqDownload, reqRetry;
         readonly System.Windows.Forms.Timer reqTimer;
@@ -855,14 +1040,14 @@ namespace KoogleKerbinSetup
             back.Location = new Point(next.Left - S(8) - back.Width, by);
             cancel.Click += (s, e) => Close();
             next.Click += (s, e) => OnNext();
-            back.Click += (s, e) => { if (page == 1 || page == 2) ShowPage(page - 1); };
+            back.Click += (s, e) => { if (page >= 1 && page <= 3) ShowPage(page - 1); };
             Controls.AddRange(new Control[] { back, next, cancel });
             AcceptButton = next;
 
             /* Bienvenida */
             pWelcome = NewPage();
-            int y = Para(pWelcome, L.F("Este asistente instala {0} {1}, un visor de Kerbin para Kerbal Space Program: mapa plano, " +
-                                       "globo 3D, vista del cielo con día y noche, y las naves de tu partida con sus órbitas y sus modelos.",
+            int y = Para(pWelcome, L.F("Este asistente instala {0} {1}, un visor de los mundos de Kerbal Space Program: mapa plano, " +
+                                       "globo 3D, vista del cielo, vuelo libre a ras de suelo con día y noche, y las naves de tu partida con sus órbitas y sus modelos.",
                                        App.Name, Build.Version), 0).Bottom + S(14);
             if (existingVersion != null)
                 y = Para(pWelcome, L.F("Ya tienes instalada la versión {0}. Se actualizará en la misma carpeta; tus ajustes, marcadores " +
@@ -912,6 +1097,29 @@ namespace KoogleKerbinSetup
             dirBox.TextChanged += (s, e) => UpdateSpace();
             UpdateSpace();
 
+            /* Texturas extra */
+            pTex = NewPage();
+            int ty = Para(pTex, "La vista de vuelo y los mapas de los demás planetas se ven mucho mejor con las texturas de " +
+                                "Parallax. Si ya las tienes en tu KSP, la aplicación las usa directamente y no hace falta bajarlas.",
+                          0).Bottom + S(14);
+            chkPlanetas = Ui.Check(pTex, L.F("{0}  ·  {1}", L.T(Extras.Planetas.Nombre), Util.Size(Extras.Planetas.Tam)), 0, ty,
+                                   !Extras.EnKsp(Extras.Planetas) && !Extras.Bajadas(Extras.Planetas));
+            ty = Para(pTex, EstadoExtra(Extras.Planetas, "color y alturas de los 15 cuerpos, para todas las vistas"),
+                      chkPlanetas.Bottom + S(2), Ui.Dim, 9f).Bottom + S(10);
+            chkSuelo = Ui.Check(pTex, L.F("{0}  ·  {1}", L.T(Extras.Suelo.Nombre), Util.Size(Extras.Suelo.Tam)), 0, ty, false);
+            ty = Para(pTex, EstadoExtra(Extras.Suelo, "hierba, arena, roca y nieve de cerca, para la vista de vuelo"),
+                      chkSuelo.Bottom + S(2), Ui.Dim, 9f).Bottom + S(14);
+            ty = Para(pTex, L.F("Se bajan de la página oficial de su autor, {0}, y son suyas (todos los derechos reservados): " +
+                                "se usan solo en tu equipo y no se redistribuyen. Las nubes no se ofrecen porque son de un mod de pago.",
+                                Extras.Autor), ty, Ui.Dim, 9f).Bottom + S(6);
+            var verPagina = new LinkLabel
+            {
+                Text = L.T("Ver la página del autor"), AutoSize = true, Location = new Point(0, ty),
+                LinkColor = Ui.Accent, ActiveLinkColor = Ui.Accent, Font = new Font("Segoe UI", 9f)
+            };
+            verPagina.LinkClicked += (s, e) => Util.OpenUrl(Extras.Pagina);
+            pTex.Controls.Add(verPagina);
+
             /* Progreso */
             pProgress = NewPage();
             var pl = Para(pProgress, L.F("Copiando los ficheros de {0}…", App.Name), 0);
@@ -948,18 +1156,26 @@ namespace KoogleKerbinSetup
         void ShowPage(int i)
         {
             page = i;
-            var pages = new[] { pWelcome, pReq, pOptions, pProgress, pDone };
+            var pages = new[] { pWelcome, pReq, pOptions, pTex, pProgress, pDone };
             for (int j = 0; j < pages.Length; j++) pages[j].Visible = j == i;
             title.Text = L.T(Titles[i]);
-            back.Visible = i < 3;
-            back.Enabled = i == 1 || i == 2;
-            cancel.Visible = i < 3;
-            next.Text = L.T(i == 2 ? "Instalar" : i == 4 ? "Finalizar" : "Siguiente  ›");
-            next.Enabled = i != 3;
+            back.Visible = i < 4;
+            back.Enabled = i >= 1 && i <= 3;
+            cancel.Visible = i < 4;
+            next.Text = L.T(i == 3 ? "Instalar" : i == 5 ? "Finalizar" : "Siguiente  ›");
+            next.Enabled = i != 4;
             reqTimer.Enabled = i == 1;
             if (i == 1) CheckRequirements();
             side.Invalidate();
-            if (i == 3) StartInstall();
+            if (i == 4) StartInstall();
+        }
+
+        /* Qué hay ya de cada paquete: en el KSP, bajado antes o nada. */
+        static string EstadoExtra(Extra e, string para)
+        {
+            if (Extras.EnKsp(e)) return L.F("Ya lo tienes en tu KSP: no hace falta ({0}).", L.T(para));
+            if (Extras.Bajadas(e)) return L.F("Ya está bajado de una instalación anterior ({0}).", L.T(para));
+            return L.T(para) + ".";
         }
 
         void PaintSide(object sender, PaintEventArgs e)
@@ -1109,7 +1325,8 @@ namespace KoogleKerbinSetup
                 case 0: ShowPage(1); break;
                 case 1: if (reqOk) ShowPage(2); break;
                 case 2: if (ValidateDir()) ShowPage(3); break;
-                case 4:
+                case 3: ShowPage(4); break;
+                case 5:
                     if (!failed && chkLaunch.Checked) Util.Launch(Path.Combine(installedDir, App.Exe));
                     finished = true;
                     Close();
@@ -1131,11 +1348,36 @@ namespace KoogleKerbinSetup
                     barFile.Text = file;
                 }));
             };
+            var extras = new List<Extra>();
+            if (chkPlanetas.Checked) extras.Add(Extras.Planetas);
+            if (chkSuelo.Checked) extras.Add(Extras.Suelo);
             var th = new Thread(() =>
             {
                 Exception error = null;
                 try { inst.Run(); }
                 catch (Exception ex) { error = ex; Util.Log(ex); }
+                /* Las texturas van después y aparte: si una descarga falla, la aplicación ya
+                   está instalada y funciona igual, así que se avisa sin dar la instalación
+                   por fallida. */
+                if (error == null)
+                    foreach (var e in extras)
+                    {
+                        try
+                        {
+                            Extras.Instalar(e,
+                                (hecho, total) => BeginInvoke((Action)(() =>
+                                {
+                                    bar.Value = (int)Math.Min(1000, hecho * 1000 / Math.Max(1, total));
+                                    barFile.Text = L.F("{0}: {1} de {2}", L.T(e.Nombre), Util.Size(hecho), Util.Size(total));
+                                })),
+                                txt => BeginInvoke((Action)(() => { barFile.Text = txt; })));
+                        }
+                        catch (Exception ex)
+                        {
+                            Util.Log(ex);
+                            lock (avisos) avisos.Add(L.F("No se pudieron bajar las {0}: {1}", L.T(e.Nombre).ToLowerInvariant(), ex.Message));
+                        }
+                    }
                 BeginInvoke((Action)(() => Finish(dir, error)));
             }) { IsBackground = true };
             th.Start();
@@ -1153,7 +1395,12 @@ namespace KoogleKerbinSetup
                 chkLaunch.Visible = false;
             }
             else doneText.Text = L.F("{0} {1} está instalado en:\n{2}", App.Name, Build.Version, dir);
-            ShowPage(4);
+            if (!failed && avisos.Count > 0)
+            {
+                doneText.Text += "\n\n" + string.Join("\n", avisos) + "\n" + L.T("Puedes volver a intentarlo reinstalando.");
+                doneText.ForeColor = Ui.Warn;
+            }
+            ShowPage(5);
             if (failed) title.Text = L.T("No se pudo instalar");
             // la etiqueta solo se mide bien con la página ya visible; y otra vez cuando termina de ajustarse
             pDone.PerformLayout();
@@ -1170,7 +1417,7 @@ namespace KoogleKerbinSetup
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             if (installing) { e.Cancel = true; return; }
-            if (!finished && page < 4 && e.CloseReason == CloseReason.UserClosing &&
+            if (!finished && page < 5 && e.CloseReason == CloseReason.UserClosing &&
                 MessageBox.Show(this, L.F("¿Salir del instalador? {0} no se instalará.", App.Name), Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 e.Cancel = true;
             base.OnFormClosing(e);

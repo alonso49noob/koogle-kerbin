@@ -43,6 +43,11 @@ uniform sampler2D uDetGrass, uDetSand, uDetRock, uDetSnow;
 uniform int uHasDetail;
 uniform float uDetTile, uDetAmt;
 uniform vec2 uDetOrigin;
+/* Modo Parallax: las cuatro ranuras son baja, media, alta y pendiente, y se mezclan por
+   la altitud del sitio y por la pendiente con los números de Terrain.cfg. */
+uniform int uModoParallax;
+uniform vec2 uPxLowMid, uPxMidHigh;
+uniform vec3 uPxSteep;                  // potencia, contraste y punto medio
 uniform int uDebug;
 uniform sampler2D uCloudTex;
 uniform int uHasClouds;
@@ -136,6 +141,14 @@ float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
    cada pocos metros, elegida por la pendiente y por el color del sitio: hierba en lo
    verde, arena en lo claro, roca en lo empinado y nieve en lo blanco. Se desvanece con
    la distancia para que no haga muare. */
+/* Paso suave de 0 a 1 entre a y b. Parallax usa rangos al revés (b < a) para decir
+   «siempre la de arriba»: ahí es un escalón en a. */
+float rampa(float a, float b, float x) {
+  if (b <= a) return x >= a ? 1.0 : 0.0;
+  float t = clamp((x - a) / (b - a), 0.0, 1.0);
+  return t * t * (3.0 - 2.0 * t);
+}
+
 vec3 detalle(vec3 p, vec3 n, vec3 base, float dist) {
   if (uHasDetail == 0 || uDetAmt <= 0.0) return base;
   float amt = uDetAmt * (1.0 - smoothstep(1500.0, 9000.0, dist));
@@ -145,6 +158,35 @@ vec3 detalle(vec3 p, vec3 n, vec3 base, float dist) {
   vec2 uv = (vec2(dot(rel, uEast), dot(rel, uNorth)) + uDetOrigin) / uDetTile;
 
   vec3 up = normalize(p);
+
+  if (uModoParallax != 0) {
+    // altitud del sitio para elegir textura, como hace Parallax
+    float alt = uHasHeight != 0 ? max(terrainH(up), 0.0) : 0.0;
+    float lm = rampa(uPxLowMid.x, uPxLowMid.y, alt);
+    float mh = rampa(uPxMidHigh.x, uPxMidHigh.y, alt);
+    float nUp = clamp(dot(n, up), 0.0, 1.0);
+    float st = 1.0 - pow(nUp, uPxSteep.x);
+    st = clamp((st - uPxSteep.z) * uPxSteep.y + uPxSteep.z, 0.0, 1.0);
+
+    vec3 cL = texture(uDetGrass, uv).rgb, cM = texture(uDetSand, uv).rgb;
+    vec3 cH = texture(uDetSnow, uv).rgb, cS = texture(uDetRock, uv).rgb;
+    // el color medio de cada textura es su último mipmap
+    vec3 aL = textureLod(uDetGrass, vec2(0.5), 20.0).rgb, aM = textureLod(uDetSand, vec2(0.5), 20.0).rgb;
+    vec3 aH = textureLod(uDetSnow, vec2(0.5), 20.0).rgb, aS = textureLod(uDetRock, vec2(0.5), 20.0).rgb;
+    vec3 c = mix(mix(mix(cL, cM, lm), cH, mh), cS, st);
+    vec3 a = mix(mix(mix(aL, aM, lm), aH, mh), aS, st);
+
+    /* De cerca manda la textura de Parallax, con su dibujo y su color, pero a la
+       luminosidad del mapa: así el suelo encaja con lo que se ve de lejos. La mitad del
+       tono sale del mapa y la otra mitad de la textura. */
+    vec3 rel2 = c / max(a, vec3(0.02));
+    float lumBase = dot(base, vec3(0.2126, 0.7152, 0.0722));
+    float lumA = max(dot(a, vec3(0.2126, 0.7152, 0.0722)), 0.02);
+    vec3 propio = c * (lumBase / lumA);
+    vec3 cerca = mix(base * clamp(rel2, 0.3, 2.2), propio, 0.5);
+    return mix(base, cerca, amt);
+  }
+
   float pend = 1.0 - clamp(dot(n, up), 0.0, 1.0);          // 0 llano, crece con la pendiente
   float roca = smoothstep(0.02, 0.12, pend);
   float verde = clamp((base.g - max(base.r, base.b)) * 6.0, 0.0, 1.0);
@@ -415,6 +457,10 @@ void main() {
             BindTex(7, CloudTex); skyProg.Int("uCloudTex", 7);
             skyProg.Int("uHasDetail", det ? 1 : 0);
             skyProg.Float("uDetTile", DetailTile);
+            skyProg.Int("uModoParallax", DetailParallax ? 1 : 0);
+            skyProg.Vec2("uPxLowMid", PxLowMid.a, PxLowMid.b);
+            skyProg.Vec2("uPxMidHigh", PxMidHigh.a, PxMidHigh.b);
+            skyProg.Vec3("uPxSteep", PxSteep.power, PxSteep.contrast, PxSteep.mid);
             skyProg.Float("uDetAmt", det ? DetailAmount : 0);
             double lat0 = Mode == CamMode.Free ? FreeLat : ObsLat, lon0 = Mode == CamMode.Free ? FreeLon : ObsLon;
             double este0 = lon0 * D2R * Body.Radius * Math.Cos(lat0 * D2R), norte0 = lat0 * D2R * Body.Radius;

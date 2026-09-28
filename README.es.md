@@ -4,7 +4,8 @@ Visor de Kerbin (KSP stock) en dos versiones:
 
 - **[Aplicación de escritorio para Windows](desktop/README.md)** (`desktop/`, C# y
   OpenGL): mapa plano, globo 3D, vista del cielo, vuelo libre a ras de suelo con el
-  relieve y las texturas del juego, día y noche, las naves de una
+  relieve y las texturas del juego (las de Parallax por cuerpo, si lo tienes o las
+  baja el instalador desde la página de su autor), día y noche, las naves de una
   partida con sus modelos de verdad, cualquier cuerpo del sistema con sus mapas, lo
   que llevas escaneado con SCANsat, filtro de altimetría, waypoints en la partida,
   asistente de aterrizaje y ventanas de lanzamiento. Instalador en las

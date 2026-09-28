@@ -11,7 +11,7 @@ namespace KerbinMaps.UI
     {
         Section globeSection;
         Section secCuerpo, secScan, secAltim, secTransfer, secAterrizaje, secNaves, secMarcadores, secVuelo;
-        DarkCheck chkRelieve, chkDetalle, chkNubes;
+        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax;
         DarkSlider velSlider, nubeAltSlider;
         FieldHeader velHeader, nubeAltHeader;
         RichLabel vueloInfo;
@@ -346,7 +346,14 @@ namespace KerbinMaps.UI
             chkDetalle.CheckedChanged += (s, e) => { state.FreeDetail = chkDetalle.Checked; globe.Detail = chkDetalle.Checked; SaveSettings(); RequestRender(); };
             chkNubes = new DarkCheck("Nubes", state.Clouds);
             chkNubes.CheckedChanged += (s, e) => { state.Clouds = chkNubes.Checked; globe.Clouds = chkNubes.Checked; SaveSettings(); RenderVueloInfo(); RequestRender(); };
-            vuelo.Add(Checks(chkRelieve, chkDetalle, chkNubes));
+            chkParallax = new DarkCheck("Usar las de Parallax si está instalado", state.UseParallax);
+            chkParallax.CheckedChanged += async (s, e) =>
+            {
+                state.UseParallax = chkParallax.Checked;
+                SaveSettings();
+                await CargarTexturasDeTerreno();
+            };
+            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkNubes));
             velSlider = new DarkSlider(1, 100, VelocidadAPaso(state.FreeSpeed));
             velSlider.ValueChanged += (s, e) =>
             {

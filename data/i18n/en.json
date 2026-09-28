@@ -358,5 +358,10 @@
  "Sin mapa de nubes para {0} en tu instalación.": "No cloud map for {0} in your install.",
  "Sin mapa de alturas de {0}: el terreno sale liso.": "No height map for {0}: the terrain comes out smooth.",
  "sobre el suelo": "above ground",
- "rumbo": "heading"
+ "rumbo": "heading",
+ "Mapas de Parallax para <b>{0}</b> cuerpos, leídos de su paquete.": "Parallax maps for <b>{0}</b> bodies, read from its bundle.",
+ "Usar las de Parallax si está instalado": "Use Parallax's if installed",
+ "Texturas de suelo: {0}.": "Ground textures: {0}.",
+ "Sin texturas de suelo: no encontré Parallax ni CTTP en tu instalación.": "No ground textures: I couldn't find Parallax or CTTP in your install.",
+ "Parallax ({0})": "Parallax ({0})"
 }

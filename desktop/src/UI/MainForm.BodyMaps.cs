@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using KerbinMaps.Core;
 using KerbinMaps.Gfx;
+using KerbinMaps.Ksp;
 
 namespace KerbinMaps.UI
 {
@@ -20,6 +21,9 @@ namespace KerbinMaps.UI
         Dictionary<string, BodyMapSet> bodyMapIndex = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, (double Min, double Max)> bodyHeightRanges = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, (double Min, double Max)> parallaxRanges = new(StringComparer.OrdinalIgnoreCase);
+        string parallaxBundle;                       // paquete de Parallax con los mapas de los cuerpos
+        HashSet<string> parallaxCuerpos = new(StringComparer.OrdinalIgnoreCase);
+        string bodyMapsSource;                       // de dónde salen los del cuerpo actual
         readonly Dictionary<string, ImageData> bodyImages = new();
         readonly Dictionary<string, Texture> bodyTextures = new();
         string bodyMapsLoaded;                       // el cuerpo cuyas imágenes están cargadas
@@ -71,6 +75,8 @@ namespace KerbinMaps.UI
         {
             bodyMapIndex = BodyMaps.Index(state.BodyMapsDir);
             string gd = FindGameData();
+            parallaxBundle = ParallaxPlanets.FindBundle(gd);
+            parallaxCuerpos = ParallaxPlanets.Cuerpos(parallaxBundle);
             if (bodyHeightRanges.Count == 0) bodyHeightRanges = BodyMaps.Ranges(gd);
             if (parallaxRanges.Count == 0) parallaxRanges = BodyMaps.ParallaxRanges(gd);
             RenderBodyMapsInfo();
@@ -79,9 +85,12 @@ namespace KerbinMaps.UI
         void RenderBodyMapsInfo()
         {
             if (bodyMapsInfo == null) return;
+            string px = parallaxBundle != null && state.UseParallax
+                ? Lang.F("Mapas de Parallax para <b>{0}</b> cuerpos, leídos de su paquete.", parallaxCuerpos.Count)
+                : null;
             if (string.IsNullOrEmpty(state.BodyMapsDir))
             {
-                bodyMapsInfo.SetText(Lang.T("Sin carpeta: los demás cuerpos se ven con su color y la retícula."));
+                bodyMapsInfo.SetText(px ?? Lang.T("Sin carpeta: los demás cuerpos se ven con su color y la retícula."));
                 return;
             }
             int ficheros = bodyMapIndex.Values.Sum(s => (s.Color != null ? 1 : 0) + (s.Height != null ? 1 : 0) + (s.Biome != null ? 1 : 0));
@@ -149,12 +158,19 @@ namespace KerbinMaps.UI
             SoltarMapasDeCuerpo();
             bodyMapsLoaded = Body.Name;
             var set = bodyMapIndex.GetValueOrDefault(Body.Name);
-            if (set == null || !set.Any) { ApplyMapTextures(); SyncGlobe(); RequestRender(); return; }
+            string cuerpo = Body.Name;
+            /* Primero la carpeta elegida a mano; si no tiene este cuerpo, Parallax (del KSP
+               del jugador o de lo que bajó el instalador), leído directo de su paquete. */
+            bool deParallax = (set == null || !set.Any) && state.UseParallax && parallaxBundle != null && parallaxCuerpos.Contains(cuerpo);
+            if ((set == null || !set.Any) && !deParallax) { ApplyMapTextures(); SyncGlobe(); RequestRender(); return; }
 
             var rutas = new List<(string slot, string path)>();
-            if (set.Color != null) rutas.Add(("color", set.Color));
-            if (set.Height != null) rutas.Add(("height", set.Height));
-            if (set.Biome != null) rutas.Add(("biome", set.Biome));
+            if (!deParallax)
+            {
+                if (set.Color != null) rutas.Add(("color", set.Color));
+                if (set.Height != null) rutas.Add(("height", set.Height));
+                if (set.Biome != null) rutas.Add(("biome", set.Biome));
+            }
 
             List<(string slot, ImageData img)> cargadas;
             try
@@ -162,6 +178,18 @@ namespace KerbinMaps.UI
                 cargadas = await Task.Run(() =>
                 {
                     var res = new List<(string, ImageData)>();
+                    if (deParallax)
+                    {
+                        try
+                        {
+                            var (c, h) = ParallaxPlanets.Load(parallaxBundle, cuerpo);
+                            if (state.BodyMapMirror) { c?.MirrorX(); h?.MirrorX(); }
+                            if (c != null) res.Add(("color", c));
+                            if (h != null) res.Add(("height", h));
+                        }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[mapas] parallax " + cuerpo + ": " + ex.Message); }
+                        return res;
+                    }
                     foreach (var (slot, path) in rutas)
                     {
                         token.ThrowIfCancellationRequested();
@@ -177,6 +205,7 @@ namespace KerbinMaps.UI
                 }, token);
             }
             catch (OperationCanceledException) { return; }
+            bodyMapsSource = deParallax ? "Parallax" : null;
 
             if (token.IsCancellationRequested || bodyMapsLoaded != Body.Name) return;
 

@@ -64,6 +64,7 @@ namespace KerbinMaps.Core
         public double FreeAlt = 150, FreeAz = 90, FreeSpeed = 120;
         public bool FreeRelief = true;            // relieve del terreno al volar
         public bool FreeDetail = true;            // texturas de suelo del juego
+        public bool UseParallax = true;           // las de Parallax si está instalado
         public int FreeDebug;                     // diagnóstico del relieve (0 = normal)
         public bool Clouds = true;                // nubes del juego en cielo y vuelo
         public double CloudAlt = 5200;            // altura de la capa, m
