@@ -16,6 +16,15 @@ namespace KerbinMaps.Ksp
     {
         public string Body;
         public TextureFile Low, Mid, High, Steep;
+        /* Lo que da variedad al suelo en Parallax, en mosaico como las otras cuatro y con un
+           canal por textura (r baja, g media, b alta, a pendiente):
+           - influencia: cuánto manda la textura frente al color del planeta;
+           - desplazamiento: el relieve fino, con el que se decide la mezcla entre texturas
+             (la hierba asoma entre las piedras en vez de fundirse con ellas);
+           - oclusión: las sombras de ese relieve. */
+        public TextureFile Influence, Displacement, Occlusion;
+        /* Mapas de normales de cada textura: el relieve fino que da la luz al suelo. */
+        public TextureFile BumpLow, BumpMid, BumpHigh, BumpSteep;
         public double LowMidStart, LowMidEnd, MidHighStart, MidHighEnd;
         public double SteepPower = 8, SteepContrast = 4, SteepMidpoint = 0.7;
         public double Tiling = 0.03;                 // repeticiones por metro
@@ -88,6 +97,13 @@ namespace KerbinMaps.Ksp
             t.Mid = Leer("_MainTexMid");
             t.High = Leer("_MainTexHigh");
             t.Steep = Leer("_MainTexSteep");
+            t.Influence = Leer("_InfluenceMap");
+            t.Displacement = Leer("_DisplacementMap");
+            t.Occlusion = Leer("_OcclusionMap");
+            t.BumpLow = Leer("_BumpMapLow");
+            t.BumpMid = Leer("_BumpMapMid");
+            t.BumpHigh = Leer("_BumpMapHigh");
+            t.BumpSteep = Leer("_BumpMapSteep");
             if (t.Low == null && t.Mid == null && t.High == null && t.Steep == null) return null;
             // las que falten se cubren con otra, para no dejar ranuras vacías
             t.Mid ??= t.Low ?? t.High ?? t.Steep;
@@ -95,10 +111,11 @@ namespace KerbinMaps.Ksp
             return t;
         }
 
-        /* De textura de Unity a una lista de niveles lista para la GPU. Solo DXT1 y DXT5,
-           que es lo que usa Parallax; los niveles más anchos que `maxAncho` se saltan para
-           no llenar la memoria de vídeo con texturas de 4096 que de cerca no se notan. */
-        static TextureFile Convertir(UnitySerialized.Textura u, int maxAncho)
+        /* De textura de Unity a una lista de niveles lista para la GPU. DXT1 y DXT5, que es
+           lo que usa Parallax, se suben tal cual; los niveles más anchos que `maxAncho` se
+           saltan para no llenar la memoria de vídeo con texturas de 4096 que de cerca no se
+           notan. Lo demás (algún mapa en R8 o RGBA32) se descomprime a RGBA. */
+        internal static TextureFile Convertir(UnitySerialized.Textura u, int maxAncho)
         {
             int block;
             uint fmt;
@@ -106,7 +123,13 @@ namespace KerbinMaps.Ksp
             {
                 case 10: block = 8; fmt = TextureFile.DXT1; break;       // DXT1
                 case 12: block = 16; fmt = TextureFile.DXT5; break;      // DXT5
-                default: throw new NotSupportedException("formato de textura de Unity " + u.Formato);
+                default:
+                {
+                    var img = ParallaxPlanets.Decodificar(u, maxAncho) ?? throw new InvalidDataException("sin niveles utilizables");
+                    var rgba = new TextureFile { Width = img.Width, Height = img.Height, HasAlpha = true };
+                    rgba.Levels.Add(img.Rgba);
+                    return rgba;
+                }
             }
             var tf = new TextureFile { CompressedFormat = fmt, HasAlpha = u.Formato == 12 };
             int w = u.Ancho, h = u.Alto, off = 0;

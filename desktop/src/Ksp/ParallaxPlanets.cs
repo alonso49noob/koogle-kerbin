@@ -94,7 +94,7 @@ namespace KerbinMaps.Ksp
         }
 
         /* Elige el primer nivel de mipmap que quepa en `maxAncho` y lo pasa a RGBA. */
-        static ImageData Decodificar(UnitySerialized.Textura t, int maxAncho)
+        internal static ImageData Decodificar(UnitySerialized.Textura t, int maxAncho)
         {
             int bpp;           // en bloques de 4×4 para DXT, en bytes por píxel para R8
             bool dxt = t.Formato == 10 || t.Formato == 12;

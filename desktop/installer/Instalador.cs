@@ -16,7 +16,7 @@
      /noshortcuts     sin accesos directos
      /noregistry      sin entrada en «Aplicaciones»
      /nolaunch        no proponer abrir la aplicación al terminar
-     /texturas=planetas,suelo   bajar también las texturas de Parallax (ver Extras)
+     /texturas=planetas,suelo,scatters   bajar también las texturas de Parallax (ver Extras)
      /uninstall       desinstalar
 
    Está escrito en C# 7.3 para compilar con cualquier Roslyn contra .NET Framework. */
@@ -65,7 +65,7 @@ namespace KoogleKerbinSetup
     sealed class Options
     {
         public bool Uninstall, Silent, NoShortcuts, NoRegistry, NoLaunch, FromTemp;
-        public string Dir, Lang, Texturas;   // /texturas=planetas,suelo
+        public string Dir, Lang, Texturas;   // /texturas=planetas,suelo,scatters
 
         public static Options Parse(string[] args)
         {
@@ -127,12 +127,14 @@ namespace KoogleKerbinSetup
             { "Texturas extra (opcional)", "Extra textures (optional)" },
             { "Mapas de los planetas", "Planet maps" },
             { "Texturas de superficie", "Surface textures" },
-            { "La vista de vuelo y los mapas de los demás planetas se ven mucho mejor con las texturas de Parallax. Si ya las tienes en tu KSP, la aplicación las usa directamente y no hace falta bajarlas.", "The flight view and the maps of the other planets look much better with the Parallax textures. If you already have them in your KSP, the app uses them directly and there is no need to download them." },
-            { "color y alturas de los 15 cuerpos, para todas las vistas", "colour and heights of the 15 bodies, for every view" },
-            { "hierba, arena, roca y nieve de cerca, para la vista de vuelo", "close-up grass, sand, rock and snow, for the flight view" },
-            { "Ya lo tienes en tu KSP: no hace falta ({0}).", "You already have it in your KSP: not needed ({0})." },
-            { "Ya está bajado de una instalación anterior ({0}).", "Already downloaded by a previous install ({0})." },
-            { "Se bajan de la página oficial de su autor, {0}, y son suyas (todos los derechos reservados): se usan solo en tu equipo y no se redistribuyen. Las nubes no se ofrecen porque son de un mod de pago.", "They are downloaded from the official page of their author, {0}, and they are theirs (all rights reserved): they are only used on your computer and are not redistributed. Clouds are not offered because they come from a paid mod." },
+            { "Vegetación y rocas", "Vegetation and rocks" },
+            { "hierba, flores, árboles y rocas en 3D", "grass, flowers, trees and rocks in 3D" },
+            { "Con Parallax, el vuelo y los mapas de los planetas ganan mucho. Si ya lo tienes en tu KSP, la aplicación lo usa directamente y no hace falta bajarlo.", "Parallax makes the flight view and the planet maps much better. If you already have it in your KSP, the app uses it directly and there is no need to download it." },
+            { "color y alturas de los 15 cuerpos", "colour and heights of the 15 bodies" },
+            { "hierba, arena, roca y nieve de cerca", "close-up grass, sand, rock and snow" },
+            { "{0} · ya está en tu KSP", "{0} · already in your KSP" },
+            { "{0} · ya bajado antes", "{0} · already downloaded" },
+            { "Se bajan de la página oficial de su autor, {0} (todos los derechos reservados): solo para tu equipo, no se redistribuyen. Las nubes no se ofrecen: son de un mod de pago.", "Downloaded from the official page of their author, {0} (all rights reserved): for your computer only, never redistributed. Clouds are not offered: they come from a paid mod." },
             { "Ver la página del autor", "See the author's page" },
             { "Descargando {0}…", "Downloading {0}…" },
             { "Descomprimiendo {0}…", "Unpacking {0}…" },
@@ -266,7 +268,8 @@ namespace KoogleKerbinSetup
                 int codigo = 0;
                 foreach (var nombre in (o.Texturas ?? "").Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    var e = nombre.Trim() == "planetas" ? Extras.Planetas : nombre.Trim() == "suelo" ? Extras.Suelo : null;
+                    string nt = nombre.Trim();
+                    var e = nt == "planetas" ? Extras.Planetas : nt == "suelo" ? Extras.Suelo : nt == "scatters" ? Extras.Scatters : null;
                     if (e == null) continue;
                     try { Extras.Instalar(e, (a, b) => { }, t => { }); }
                     catch (Exception ex) { Util.Log(ex); codigo = 5; }   // 5: instalado, pero sin alguna textura
@@ -657,6 +660,8 @@ namespace KoogleKerbinSetup
     {
         public string Nombre, Carpeta, Url;
         public long Tam;                          // lo que pesa el zip, para avisar antes
+        // lo que se guarda del zip: los paquetes de Unity y la configuración, y los modelos si los hay
+        public string[] Guardar = { ".unity3d", ".cfg" };
     }
 
     static class Extras
@@ -681,6 +686,18 @@ namespace KoogleKerbinSetup
             Url = Environment.GetEnvironmentVariable("KOOGLE_EXTRAS_SUELO") ??
                   "https://github.com/Gameslinx/Parallax-Continued/releases/download/1.0.3/ParallaxContinued_StockTerrainTextures-1.0.3.zip",
             Tam = 1990694985L,
+        };
+
+        /* Hierba, flores, arbustos, árboles y rocas: además del paquete de texturas hacen
+           falta los modelos .mu de cada uno. */
+        public static readonly Extra Scatters = new Extra
+        {
+            Nombre = "Vegetación y rocas",
+            Carpeta = "Parallax_StockScatterTextures",
+            Url = Environment.GetEnvironmentVariable("KOOGLE_EXTRAS_SCATTERS") ??
+                  "https://github.com/Gameslinx/Parallax-Continued/releases/download/1.0.3/ParallaxContinued_StockScatterTextures-1.0.3.zip",
+            Tam = 1171119601L,
+            Guardar = new[] { ".unity3d", ".cfg", ".mu" },
         };
 
         public static string Raiz
@@ -754,7 +771,7 @@ namespace KoogleKerbinSetup
                 }
 
                 estado(L.F("Descomprimiendo {0}…", L.T(e.Nombre)));
-                Extraer(zip, e.Carpeta);
+                Extraer(zip, e.Carpeta, e.Guardar);
             }
             finally
             {
@@ -762,9 +779,10 @@ namespace KoogleKerbinSetup
             }
         }
 
-        /* Del zip del autor se guardan los paquetes de Unity y los .cfg de la carpeta del mod,
-           con su estructura; el resto (normales, dispersión, lo que no se lee) se deja. */
-        static void Extraer(string zip, string carpeta)
+        /* Del zip del autor se guarda lo que lee la aplicación (paquetes de Unity, .cfg y, de
+           los scatters, sus modelos) dentro de la carpeta del mod y con su estructura; el
+           resto se deja. */
+        static void Extraer(string zip, string carpeta, string[] guardar)
         {
             string raizMod = Path.Combine(Destino, carpeta);
             using (var fs = File.OpenRead(zip))
@@ -778,7 +796,7 @@ namespace KoogleKerbinSetup
                     if (i < 0 || ruta.EndsWith("/")) continue;
                     string rel = ruta.Substring(i + carpeta.Length + 1);
                     string ext = Path.GetExtension(rel).ToLowerInvariant();
-                    if (ext != ".unity3d" && ext != ".cfg") continue;
+                    if (Array.IndexOf(guardar, ext) < 0) continue;
                     string dest = Path.GetFullPath(Path.Combine(raizMod, rel.Replace('/', '\\')));
                     if (!Util.Inside(raizMod, dest)) continue;          // nada fuera de la carpeta
                     Directory.CreateDirectory(Path.GetDirectoryName(dest));
@@ -968,7 +986,7 @@ namespace KoogleKerbinSetup
         readonly Label title;
         readonly Button back, next, cancel;
         readonly Panel pWelcome, pReq, pOptions, pTex, pProgress, pDone;
-        readonly CheckBox chkPlanetas, chkSuelo;
+        readonly CheckBox chkPlanetas, chkSuelo, chkScatters;
         readonly List<string> avisos = new List<string>();
         readonly Label reqOs, reqNet, reqHelp, spaceLabel, barFile, doneText, doneHint;
         readonly Button reqDownload, reqRetry;
@@ -1099,18 +1117,21 @@ namespace KoogleKerbinSetup
 
             /* Texturas extra */
             pTex = NewPage();
-            int ty = Para(pTex, "La vista de vuelo y los mapas de los demás planetas se ven mucho mejor con las texturas de " +
-                                "Parallax. Si ya las tienes en tu KSP, la aplicación las usa directamente y no hace falta bajarlas.",
-                          0).Bottom + S(14);
+            int ty = Para(pTex, "Con Parallax, el vuelo y los mapas de los planetas ganan mucho. Si ya lo tienes en tu KSP, " +
+                                "la aplicación lo usa directamente y no hace falta bajarlo.",
+                          0).Bottom + S(10);
             chkPlanetas = Ui.Check(pTex, L.F("{0}  ·  {1}", L.T(Extras.Planetas.Nombre), Util.Size(Extras.Planetas.Tam)), 0, ty,
                                    !Extras.EnKsp(Extras.Planetas) && !Extras.Bajadas(Extras.Planetas));
-            ty = Para(pTex, EstadoExtra(Extras.Planetas, "color y alturas de los 15 cuerpos, para todas las vistas"),
-                      chkPlanetas.Bottom + S(2), Ui.Dim, 9f).Bottom + S(10);
+            ty = Para(pTex, EstadoExtra(Extras.Planetas, "color y alturas de los 15 cuerpos"),
+                      chkPlanetas.Bottom + S(2), Ui.Dim, 9f).Bottom + S(6);
             chkSuelo = Ui.Check(pTex, L.F("{0}  ·  {1}", L.T(Extras.Suelo.Nombre), Util.Size(Extras.Suelo.Tam)), 0, ty, false);
-            ty = Para(pTex, EstadoExtra(Extras.Suelo, "hierba, arena, roca y nieve de cerca, para la vista de vuelo"),
-                      chkSuelo.Bottom + S(2), Ui.Dim, 9f).Bottom + S(14);
-            ty = Para(pTex, L.F("Se bajan de la página oficial de su autor, {0}, y son suyas (todos los derechos reservados): " +
-                                "se usan solo en tu equipo y no se redistribuyen. Las nubes no se ofrecen porque son de un mod de pago.",
+            ty = Para(pTex, EstadoExtra(Extras.Suelo, "hierba, arena, roca y nieve de cerca"),
+                      chkSuelo.Bottom + S(2), Ui.Dim, 9f).Bottom + S(6);
+            chkScatters = Ui.Check(pTex, L.F("{0}  ·  {1}", L.T(Extras.Scatters.Nombre), Util.Size(Extras.Scatters.Tam)), 0, ty, false);
+            ty = Para(pTex, EstadoExtra(Extras.Scatters, "hierba, flores, árboles y rocas en 3D"),
+                      chkScatters.Bottom + S(2), Ui.Dim, 9f).Bottom + S(10);
+            ty = Para(pTex, L.F("Se bajan de la página oficial de su autor, {0} (todos los derechos reservados): solo para tu " +
+                                "equipo, no se redistribuyen. Las nubes no se ofrecen: son de un mod de pago.",
                                 Extras.Autor), ty, Ui.Dim, 9f).Bottom + S(6);
             var verPagina = new LinkLabel
             {
@@ -1173,9 +1194,10 @@ namespace KoogleKerbinSetup
         /* Qué hay ya de cada paquete: en el KSP, bajado antes o nada. */
         static string EstadoExtra(Extra e, string para)
         {
-            if (Extras.EnKsp(e)) return L.F("Ya lo tienes en tu KSP: no hace falta ({0}).", L.T(para));
-            if (Extras.Bajadas(e)) return L.F("Ya está bajado de una instalación anterior ({0}).", L.T(para));
-            return L.T(para) + ".";
+            // en una sola línea: con tres paquetes la página no da para más
+            if (Extras.EnKsp(e)) return L.F("{0} · ya está en tu KSP", L.T(para));
+            if (Extras.Bajadas(e)) return L.F("{0} · ya bajado antes", L.T(para));
+            return L.T(para);
         }
 
         void PaintSide(object sender, PaintEventArgs e)
@@ -1351,6 +1373,7 @@ namespace KoogleKerbinSetup
             var extras = new List<Extra>();
             if (chkPlanetas.Checked) extras.Add(Extras.Planetas);
             if (chkSuelo.Checked) extras.Add(Extras.Suelo);
+            if (chkScatters.Checked) extras.Add(Extras.Scatters);
             var th = new Thread(() =>
             {
                 Exception error = null;

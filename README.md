@@ -32,10 +32,16 @@ What it does:
   and the mountain silhouettes are exact, and it dresses the ground with the game's own
   terrain textures and cloud maps when you have them installed. With Parallax
   Continued, each body gets its own surface textures, blended by altitude and slope the
-  way the mod does, and every planet's colour and height maps are read straight from
-  its Unity bundle, no dumping needed.
+  way the mod does (biplanar mapping, influence, displacement blending, occlusion and
+  normal maps, plus anti-tiling variation), and every planet's colour and height maps
+  are read straight from its Unity bundle, no dumping needed.
+- **Parallax scatters.** Grass, ferns, flowers, bushes, oaks, pines, palms and cacti on
+  Kerbin, rocks on the Mun and elsewhere: the mod's own models and textures, placed by
+  its own distribution rules (noise, slope, altitude, biome blacklists) and depth-tested
+  against the ray-marched ground, so a hill hides the trees behind it.
 - **Optional extra textures in the installer.** If you don't have Parallax, the
-  installer can fetch its planet maps (234 MB) and surface textures (1.9 GB) from the
+  installer can fetch its planet maps (234 MB), surface textures (1.9 GB) and scatters
+  (1.1 GB) from the
   author's official GitHub release on your machine. They are Gameslinx's work (all
   rights reserved), so they are never bundled or re-hosted here.
 - **Day and night.** Rayleigh and Mie single scattering with a Chapman function

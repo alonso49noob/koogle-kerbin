@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using KerbinMaps.Core;
 using KerbinMaps.Gfx;
 
@@ -42,19 +43,36 @@ uniform vec2 uHeightSize, uColorSize;
 uniform sampler2D uDetGrass, uDetSand, uDetRock, uDetSnow;
 uniform int uHasDetail;
 uniform float uDetTile, uDetAmt;
-uniform vec2 uDetOrigin;
+/* Posición del ojo en metros desde el centro del cuerpo, reducida módulo un múltiplo de
+   todos los periodos de las texturas: sumándole la distancia al punto se tienen sus
+   coordenadas en el mundo sin perder precisión, y la textura queda clavada al suelo. */
+uniform vec3 uEyeMod;
+uniform float uPeriodo;                 // ese módulo, en repeticiones de la textura
 /* Modo Parallax: las cuatro ranuras son baja, media, alta y pendiente, y se mezclan por
    la altitud del sitio y por la pendiente con los números de Terrain.cfg. */
 uniform int uModoParallax;
 uniform vec2 uPxLowMid, uPxMidHigh;
 uniform vec3 uPxSteep;                  // potencia, contraste y punto medio
+/* Lo que da variedad al suelo en Parallax: influencia, desplazamiento y oclusión, con un
+   canal por textura (ver ParallaxTerrain). */
+uniform sampler2D uPxInf, uPxDisp, uPxOcc;
+uniform int uPxHasInf, uPxHasDisp, uPxHasOcc;
+uniform int uVariacion;                 // romper la repetición del mosaico
+uniform sampler2D uPxBumpL, uPxBumpM, uPxBumpH, uPxBumpS;
+uniform int uPxHasBump;
 uniform int uDebug;
 uniform sampler2D uCloudTex;
 uniform int uHasClouds;
 uniform float uCloudR, uCloudAmt, uCloudOff;
 uniform float uColorOff, uBiomeOff, uBiomeAmt;
 uniform vec3 uSun, uTint;
+/* Profundidad para los scatters, que se pintan después con prueba de profundidad: la
+   distancia a la que choca el rayo, en escala logarítmica (ver GlobeView.Scatters). */
+uniform int uWriteDepth;
+uniform float uDepthFar;
 out vec4 frag;
+
+float profundidad(float z) { return clamp(log2(1.0 + max(z, 0.0)) / log2(1.0 + uDepthFar), 0.0, 1.0); }
 
 /* El mapa de alturas se sube sin filtrar, porque los biomas se leen por color exacto.
    Aqui se interpola a mano: sin esto el terreno sale a escalones del tamano de un texel
@@ -85,8 +103,11 @@ float terrainH(vec3 n) {
 }
 
 /* Radio de la superficie en ese punto. Bajo el nivel del mar manda el mar: el agua
-   es una esfera lisa y el rayo no tiene que bajar al fondo. */
-float terrainR(vec3 p) { return 1.0 + max(terrainH(normalize(p)), 0.0) / uRadiusM; }
+   es una esfera lisa y el rayo no tiene que bajar al fondo. El fondo se deja un metro
+   por debajo del agua y no justo en ella: si no, la ultima muestra del rayo cae sobre la
+   esfera del mar y el redondeo decide al azar si es tierra o agua, y a ras del mar
+   salian franjas de las dos. */
+float terrainR(vec3 p) { return 1.0 + max(terrainH(normalize(p)), -1.0) / uRadiusM; }
 
 /* Normal del terreno por diferencias en el mapa de alturas, a unas decenas de metros. */
 vec3 terrainNormal(vec3 p) {
@@ -137,54 +158,190 @@ float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
 }
 
 /* Detalle del suelo con las texturas del juego. Cerca, el mapa del cuerpo no da mas de
-   si (un texel son cientos de metros), asi que se le superpone una textura que se repite
-   cada pocos metros, elegida por la pendiente y por el color del sitio: hierba en lo
-   verde, arena en lo claro, roca en lo empinado y nieve en lo blanco. Se desvanece con
-   la distancia para que no haga muare. */
-/* Paso suave de 0 a 1 entre a y b. Parallax usa rangos al revés (b < a) para decir
-   «siempre la de arriba»: ahí es un escalón en a. */
-float rampa(float a, float b, float x) {
-  if (b <= a) return x >= a ? 1.0 : 0.0;
-  float t = clamp((x - a) / (b - a), 0.0, 1.0);
-  return t * t * (3.0 - 2.0 * t);
+   si (un texel son cientos de metros), asi que se le superponen texturas que se repiten
+   cada pocos metros. Se desvanecen con la distancia para que no hagan muare. */
+
+/* Paso de 0 a 1 entre a y b, lineal, exactamente como GetPercentageAltitudeBetween de
+   Parallax: con el rango al reves (b < a) da 0 por encima de a, que es como la Mun y
+   otros cuerpos dicen «siempre la textura de abajo». */
+float pct(float a, float b, float x) {
+  if (b == a) return x >= a ? 1.0 : 0.0;
+  return clamp((x - a) / (b - a), 0.0, 1.0);
 }
 
-vec3 detalle(vec3 p, vec3 n, vec3 base, float dist) {
+float hash12(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+/* Ruido de valor periodico: al dar la vuelta el modulo de las coordenadas, el dibujo de
+   la variacion sigue igual. */
+float ruidoP(vec2 p, float per) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  vec2 i1 = mod(i + 1.0, per);
+  i = mod(i, per);
+  return mix(mix(hash12(i), hash12(vec2(i1.x, i.y)), f.x), mix(hash12(vec2(i.x, i1.y)), hash12(i1), f.x), f.y);
+}
+
+/* Variacion de textura (la tecnica de Inigo Quilez): cada zona lee la textura con un
+   desplazamiento distinto, elegido por un ruido suave, y las zonas se funden donde el
+   dibujo de las dos se parece. El mosaico deja de verse repetido con solo dos lecturas. */
+vec4 variada(sampler2D s, vec2 uv, vec2 gx, vec2 gy, float per) {
+  if (uVariacion == 0) return textureGrad(s, uv, gx, gy);
+  float k = ruidoP(uv * 0.125, per * 0.125) * 8.0;
+  float ia = floor(k), f = fract(k);
+  vec2 offa = sin(vec2(3.0, 7.0) * ia), offb = sin(vec2(3.0, 7.0) * (ia + 1.0));
+  vec4 a = textureGrad(s, uv + offa, gx, gy), b = textureGrad(s, uv + offb, gx, gy);
+  return mix(a, b, smoothstep(0.2, 0.8, f - 0.1 * dot(a.rgb - b.rgb, vec3(1.0))));
+}
+
+/* Proyeccion biplanar, como Parallax: la textura se proyecta sobre los dos planos de los
+   ejes del mundo que mas miran hacia la normal, asi no se estira en las laderas. */
+ivec2 gEjes;
+vec2 gPesos;
+
+void biplanar(vec3 n) {
+  vec3 m = abs(n);
+  int ma = m.x > m.y ? (m.x > m.z ? 0 : 2) : (m.y > m.z ? 1 : 2);
+  int mi = m.x < m.y ? (m.x < m.z ? 0 : 2) : (m.y < m.z ? 1 : 2);
+  if (mi == ma) mi = (ma + 1) % 3;
+  int me = 3 - ma - mi;
+  gEjes = ivec2(ma, me);
+  vec2 w = pow(vec2(m[ma], m[me]), vec2(8.0));
+  w = w / (w.x + w.y);
+  // la segunda solo si pesa algo: casi siempre basta una lectura
+  if (w.y < 0.02) w = vec2(1.0, 0.0);
+  gPesos = w / (w.x + w.y);
+}
+
+vec2 plano(vec3 c, int e) { return e == 0 ? c.yz : (e == 1 ? c.zx : c.xy); }
+
+/* Una textura en coordenadas del mundo (metros), a esc metros por repeticion. */
+vec4 bip(sampler2D s, vec3 c, vec3 dx, vec3 dy, float esc, float per, bool conVar) {
+  vec4 acc = vec4(0.0);
+  for (int k = 0; k < 2; k++) {
+    float w = k == 0 ? gPesos.x : gPesos.y;
+    if (w <= 0.0) continue;
+    int e = k == 0 ? gEjes.x : gEjes.y;
+    vec2 uv = plano(c, e) / esc;
+    vec2 gx = plano(dx, e) / esc, gy = plano(dy, e) / esc;
+    acc += w * (conVar ? variada(s, uv, gx, gy, per) : textureGrad(s, uv, gx, gy));
+  }
+  return acc;
+}
+
+/* Las dos escalas de Parallax: cerca la textura se repite mas a menudo y lejos menos, en
+   potencias de dos segun la distancia, y entre una y otra se funden. Asi el mosaico nunca
+   se ve demasiado pequeno ni demasiado grande en pantalla. */
+float gLb, gS0, gS1;
+
+vec4 dosEscalas(sampler2D s, vec3 c, vec3 dx, vec3 dy, bool conVar) {
+  vec4 a = gLb < 0.999 ? bip(s, c, dx, dy, uDetTile * gS0, uPeriodo / gS0, conVar) : vec4(0.0);
+  vec4 b = gLb > 0.001 ? bip(s, c, dx, dy, uDetTile * gS1, uPeriodo / gS1, conVar) : vec4(0.0);
+  return mix(a, b, gLb);
+}
+
+/* Relieve de un mapa de normales (DXT5nm de Unity: x en alfa, y en verde) proyectado en
+   los mismos planos: cuanto se inclina la normal, en ejes del mundo. */
+vec3 bipRelieve(sampler2D s, vec3 c, vec3 dx, vec3 dy, float esc, float per) {
+  vec3 acc = vec3(0.0);
+  for (int k = 0; k < 2; k++) {
+    float w = k == 0 ? gPesos.x : gPesos.y;
+    if (w <= 0.0) continue;
+    int e = k == 0 ? gEjes.x : gEjes.y;
+    vec2 uv = plano(c, e) / esc;
+    vec2 gx = plano(dx, e) / esc, gy = plano(dy, e) / esc;
+    vec4 t = variada(s, uv, gx, gy, per);
+    vec2 xy = vec2(t.a, t.g) * 2.0 - 1.0;
+    acc += w * (e == 0 ? vec3(0.0, xy.x, xy.y) : (e == 1 ? vec3(xy.y, 0.0, xy.x) : vec3(xy.x, xy.y, 0.0)));
+  }
+  return acc;
+}
+
+vec3 relieveDos(sampler2D s, vec3 c, vec3 dx, vec3 dy) {
+  vec3 a = gLb < 0.999 ? bipRelieve(s, c, dx, dy, uDetTile * gS0, uPeriodo / gS0) : vec3(0.0);
+  vec3 b = gLb > 0.001 ? bipRelieve(s, c, dx, dy, uDetTile * gS1, uPeriodo / gS1) : vec3(0.0);
+  return mix(a, b, gLb);
+}
+
+/* Mezcla por desplazamiento (GetDisplacementLerpFactor de Parallax): en la transicion
+   entre dos texturas gana la que tiene mas relieve en cada punto, asi la hierba asoma
+   entre las piedras en vez de fundirse con ellas. De lejos se suaviza. */
+float mezclaDesp(float h, float d1, float d2, float logD) {
+  float suave = mix(0.15, 1.0, clamp(logD * 0.15 - 0.5, 0.0, 1.0));
+  d2 = clamp(d2 + h, 0.0, 1.0);
+  d1 = clamp(d1 * (1.0 - h), 0.0, 1.0);
+  return clamp((d2 - d1) * h / suave, 0.0, 1.0);
+}
+
+/* Influencia: cuanto manda la textura frente al color del planeta. Donde manda poco, se
+   queda el color del mapa con el dibujo (la luminosidad) de la textura. */
+vec3 conInfluencia(vec3 t, float inf, vec3 base) {
+  float lum = dot(t, vec3(0.21, 0.72, 0.07)) + 0.5;
+  return mix(base * lum, t, inf);
+}
+
+/* Devuelve el color del suelo con su detalle y, con los mapas de normales de Parallax,
+   inclina `n` con el relieve fino de las texturas, que es lo que les da luz y sombra. */
+vec3 detalle(vec3 p, inout vec3 n, vec3 base, float dist) {
   if (uHasDetail == 0 || uDetAmt <= 0.0) return base;
   float amt = uDetAmt * (1.0 - smoothstep(1500.0, 9000.0, dist));
   if (amt <= 0.001) return base;
 
-  vec3 rel = (p - uEye) * uRadiusM;
-  vec2 uv = (vec2(dot(rel, uEast), dot(rel, uNorth)) + uDetOrigin) / uDetTile;
-
+  // coordenadas del punto en el mundo, en metros y sin perder precision
+  vec3 c = uEyeMod + (p - uEye) * uRadiusM;
+  vec3 dx = dFdx(c), dy = dFdy(c);
   vec3 up = normalize(p);
+  biplanar(n);
+  float logD = log2(dist * 0.2 + 0.4);
+  float fl = floor(logD);
+  gS1 = exp2(fl); gS0 = gS1 * 0.5;
+  gLb = clamp(logD - fl, 0.0, 1.0);
 
   if (uModoParallax != 0) {
-    // altitud del sitio para elegir textura, como hace Parallax
+    // mascara de Parallax: baja-media (r), media-alta (g), pendiente (b)
     float alt = uHasHeight != 0 ? max(terrainH(up), 0.0) : 0.0;
-    float lm = rampa(uPxLowMid.x, uPxLowMid.y, alt);
-    float mh = rampa(uPxMidHigh.x, uPxMidHigh.y, alt);
-    float nUp = clamp(dot(n, up), 0.0, 1.0);
-    float st = 1.0 - pow(nUp, uPxSteep.x);
-    st = clamp((st - uPxSteep.z) * uPxSteep.y + uPxSteep.z, 0.0, 1.0);
+    float r = pct(uPxLowMid.x, uPxLowMid.y, alt);
+    float g = pct(uPxMidHigh.x, uPxMidHigh.y, alt);
+    float nUp = abs(dot(n, up));
+    float b = 1.0 - clamp((pow(nUp, uPxSteep.x) - uPxSteep.z) * uPxSteep.y + uPxSteep.z, 0.0, 1.0);
+    bool bajo = alt / max(uPxMidHigh.x + uPxLowMid.y, 1.0) < 0.5;
 
-    vec3 cL = texture(uDetGrass, uv).rgb, cM = texture(uDetSand, uv).rgb;
-    vec3 cH = texture(uDetSnow, uv).rgb, cS = texture(uDetRock, uv).rgb;
-    // el color medio de cada textura es su último mipmap
-    vec3 aL = textureLod(uDetGrass, vec2(0.5), 20.0).rgb, aM = textureLod(uDetSand, vec2(0.5), 20.0).rgb;
-    vec3 aH = textureLod(uDetSnow, vec2(0.5), 20.0).rgb, aS = textureLod(uDetRock, vec2(0.5), 20.0).rgb;
-    vec3 c = mix(mix(mix(cL, cM, lm), cH, mh), cS, st);
-    vec3 a = mix(mix(mix(aL, aM, lm), aH, mh), aS, st);
+    if (uPxHasDisp != 0) {
+      vec4 d = dosEscalas(uPxDisp, c, dx, dy, false);
+      float r2 = mezclaDesp(r, d.r, d.g, logD);
+      float g2 = mezclaDesp(g, d.g, d.b, logD);
+      float dAlt = bajo ? mix(d.r, d.g, r) : mix(d.g, d.b, g);
+      b = mezclaDesp(b, dAlt, d.a, logD);
+      r = r2; g = g2;
+    }
+    float wL = bajo ? 1.0 - r : 0.0, wM = bajo ? r : 1.0 - g, wH = bajo ? 0.0 : g;
+    wL *= 1.0 - b; wM *= 1.0 - b; wH *= 1.0 - b;
+    float wS = b;
 
-    /* De cerca manda la textura de Parallax, con su dibujo y su color, pero a la
-       luminosidad del mapa: así el suelo encaja con lo que se ve de lejos. La mitad del
-       tono sale del mapa y la otra mitad de la textura. */
-    vec3 rel2 = c / max(a, vec3(0.02));
-    float lumBase = dot(base, vec3(0.2126, 0.7152, 0.0722));
-    float lumA = max(dot(a, vec3(0.2126, 0.7152, 0.0722)), 0.02);
-    vec3 propio = c * (lumBase / lumA);
-    vec3 cerca = mix(base * clamp(rel2, 0.3, 2.2), propio, 0.5);
-    return mix(base, cerca, amt);
+    vec4 inf = uPxHasInf != 0 ? dosEscalas(uPxInf, c, dx, dy, false) : vec4(1.0);
+    vec3 col = vec3(0.0);
+    if (wL > 0.001) col += wL * conInfluencia(dosEscalas(uDetGrass, c, dx, dy, true).rgb, inf.r, base);
+    if (wM > 0.001) col += wM * conInfluencia(dosEscalas(uDetSand, c, dx, dy, true).rgb, inf.g, base);
+    if (wH > 0.001) col += wH * conInfluencia(dosEscalas(uDetSnow, c, dx, dy, true).rgb, inf.b, base);
+    if (wS > 0.001) col += wS * conInfluencia(dosEscalas(uDetRock, c, dx, dy, true).rgb, inf.a, base);
+
+    if (uPxHasOcc != 0) {
+      vec4 o = dosEscalas(uPxOcc, c, dx, dy, false);
+      float oAlt = bajo ? mix(o.r, o.g, r) : mix(o.g, o.b, g);
+      col *= mix(1.0, mix(oAlt, o.a, b), 0.8);
+    }
+    if (uPxHasBump != 0) {
+      vec3 dn = vec3(0.0);
+      if (wL > 0.001) dn += wL * relieveDos(uPxBumpL, c, dx, dy);
+      if (wM > 0.001) dn += wM * relieveDos(uPxBumpM, c, dx, dy);
+      if (wH > 0.001) dn += wH * relieveDos(uPxBumpH, c, dx, dy);
+      if (wS > 0.001) dn += wS * relieveDos(uPxBumpS, c, dx, dy);
+      n = normalize(n + dn * amt);
+    }
+    return mix(base, col, amt);
   }
 
   float pend = 1.0 - clamp(dot(n, up), 0.0, 1.0);          // 0 llano, crece con la pendiente
@@ -193,12 +350,12 @@ vec3 detalle(vec3 p, vec3 n, vec3 base, float dist) {
   float blanco = smoothstep(0.62, 0.82, min(min(base.r, base.g), base.b));
   float arena = clamp(1.0 - verde - blanco, 0.0, 1.0);
 
-  vec3 d = texture(uDetGrass, uv).rgb * verde
-         + texture(uDetSand, uv).rgb * arena
-         + texture(uDetSnow, uv).rgb * blanco;
+  vec3 d = dosEscalas(uDetGrass, c, dx, dy, true).rgb * verde
+         + dosEscalas(uDetSand, c, dx, dy, true).rgb * arena
+         + dosEscalas(uDetSnow, c, dx, dy, true).rgb * blanco;
   float suma = max(verde + arena + blanco, 0.001);
   d /= suma;
-  d = mix(d, texture(uDetRock, uv).rgb, roca);
+  d = mix(d, dosEscalas(uDetRock, c, dx, dy, true).rgb, roca);
 
   // el detalle modula, no pinta: mantiene el color del mapa y le pone grano
   float lum = dot(d, vec3(0.2126, 0.7152, 0.0722));
@@ -206,6 +363,7 @@ vec3 detalle(vec3 p, vec3 n, vec3 base, float dist) {
 }
 
 void main() {
+  gl_FragDepth = 1.0;
   vec2 ndc = gl_FragCoord.xy / uView * 2.0 - 1.0;
   /* Diagnostico: 1 pinta el gris del mapa de alturas donde el rayo cruza el nivel del
      mar, 2 pinta la altura en metros y 3 la distancia al choque con el terreno. */
@@ -238,6 +396,7 @@ void main() {
     if (relieve) t = marchTerrain(uEye, d, nRel, esMar);
     if (t > 0.0) {
       vec3 p = uEye + d * t;
+      if (uWriteDepth != 0) gl_FragDepth = profundidad(t * uRadiusM * dot(d, uF));
       float lat = asin(clamp(p.y, -1.0, 1.0));
       float lon = atan(p.x, p.z);
       float u = lon / (2.0 * PI) + 0.5, v = 0.5 - lat / PI;
@@ -320,6 +479,8 @@ void main() {
         vec3 trN = vec3(1.0), insN = vec3(0.0);
         if (uAtmos != 0) insN = inscatter(uEye, d, max(ta.x, 0.0), tc, uSun, jit, trN);
         col = mix(col, colNube * trN + insN, a);
+        // una nube espesa tapa lo que haya detrás, también los árboles
+        if (uWriteDepth != 0 && a > 0.5) gl_FragDepth = min(gl_FragDepth, profundidad(tc * uRadiusM * dot(d, uF)));
       }
     }
   }
@@ -463,15 +624,54 @@ void main() {
             skyProg.Vec3("uPxSteep", PxSteep.power, PxSteep.contrast, PxSteep.mid);
             skyProg.Float("uDetAmt", det ? DetailAmount : 0);
             double lat0 = Mode == CamMode.Free ? FreeLat : ObsLat, lon0 = Mode == CamMode.Free ? FreeLon : ObsLon;
-            double este0 = lon0 * D2R * Body.Radius * Math.Cos(lat0 * D2R), norte0 = lat0 * D2R * Body.Radius;
-            skyProg.Vec2("uDetOrigin", este0 % DetailTile, norte0 % DetailTile);
+            /* El módulo es un múltiplo de todos los periodos de las texturas (4096 repeticiones:
+               la escala más grande que se usa es de 1024) y de su ruido de variación. */
+            double periodo = DetailTile * 4096;
+            double Mod(double v) => ((v % periodo) + periodo) % periodo;
+            skyProg.Vec3("uEyeMod", Mod(eye[0] * Body.Radius), Mod(eye[1] * Body.Radius), Mod(eye[2] * Body.Radius));
+            skyProg.Float("uPeriodo", 4096);
+            skyProg.Int("uVariacion", DetailVariation ? 1 : 0);
+            skyProg.Int("uPxHasInf", DetailParallax && PxInfluence != null ? 1 : 0);
+            skyProg.Int("uPxHasDisp", DetailParallax && PxDisplacement != null ? 1 : 0);
+            skyProg.Int("uPxHasOcc", DetailParallax && PxOcclusion != null ? 1 : 0);
+            BindTex(8, PxInfluence); skyProg.Int("uPxInf", 8);
+            BindTex(9, PxDisplacement); skyProg.Int("uPxDisp", 9);
+            BindTex(10, PxOcclusion); skyProg.Int("uPxOcc", 10);
+            bool bump = DetailParallax && PxBump != null && PxBump.All(t => t != null);
+            skyProg.Int("uPxHasBump", bump ? 1 : 0);
+            BindTex(11, bump ? PxBump[0] : null); skyProg.Int("uPxBumpL", 11);
+            BindTex(12, bump ? PxBump[1] : null); skyProg.Int("uPxBumpM", 12);
+            BindTex(13, bump ? PxBump[2] : null); skyProg.Int("uPxBumpH", 13);
+            BindTex(14, bump ? PxBump[3] : null); skyProg.Int("uPxBumpS", 14);
             BindTex(3, DetGrass); skyProg.Int("uDetGrass", 3);
             BindTex(4, DetSand); skyProg.Int("uDetSand", 4);
             BindTex(5, DetRock); skyProg.Int("uDetRock", 5);
             BindTex(6, DetSnow); skyProg.Int("uDetSnow", 6);
+            /* Con scatters, el cielo deja en el búfer de profundidad dónde está el suelo. Solo
+               se escribe con la prueba activada, así que se activa sin descartar nada. */
+            bool scatters = ScattersActive;
+            skyProg.Int("uWriteDepth", scatters ? 1 : 0);
+            skyProg.Float("uDepthFar", ScatterFar);
+            if (scatters)
+            {
+                GL.Enable(GL.DEPTH_TEST);
+                GL.DepthFunc(GL.ALWAYS);
+                GL.DepthMask(true);
+            }
             GL.BindVertexArray(skyVao);
             GL.DrawArrays(GL.TRIANGLES, 0, 3);
             GL.BindVertexArray(0);
+            if (scatters)
+            {
+                try { DrawScatters(eye, right, camUp, tan, lat0, lon0); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[scatters] " + ex.Message); }
+                // lo que viene después (órbitas, rótulos) no cuenta con esta profundidad
+                GL.DepthFunc(GL.LESS);
+                GL.Clear(GL.DEPTH_BUFFER_BIT);
+                GL.Disable(GL.DEPTH_TEST);
+                GL.Disable(GL.CULL_FACE);
+            }
+            else ScatterVisibleReset();
 
             // órbitas y trazas, tapadas por el planeta con el corte de rayo del shader
             DrawOrbits(eye, occlude: true);

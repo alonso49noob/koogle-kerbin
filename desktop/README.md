@@ -39,7 +39,8 @@ información › Ejecutar de todas formas».
 
 Antes de instalar, una página ofrece **texturas extra (opcional)**: los mapas de los
 planetas de Parallax (color y alturas de los 15 cuerpos, 234 MB) y sus texturas de
-superficie (hierba, roca, arena y nieve de cerca para el vuelo, 1,9 GB). Si ya las tienes
+superficie (hierba, roca, arena y nieve de cerca para el vuelo, 1,9 GB), y su vegetación y
+rocas en 3D (1,1 GB; de ese zip se guardan también los modelos `.mu`). Si ya las tienes
 en tu KSP la página lo dice y no hace falta bajarlas. Son de su autor, Gameslinx, con
 «todos los derechos reservados», así que **no van dentro del instalador ni se suben a
 ningún sitio**: se bajan en tu equipo desde [la release oficial de Parallax
@@ -50,7 +51,7 @@ instalada igual y se avisa al final. Al desinstalar se borran. Las nubes no se o
 porque son de un mod de pago.
 
 Opciones para instalar sin ventanas: `/silent`, `/dir=<carpeta>`, `/noshortcuts`,
-`/noregistry`, `/texturas=planetas,suelo` (sale con código 5 si alguna no se pudo bajar);
+`/noregistry`, `/texturas=planetas,suelo,scatters` (sale con código 5 si alguna no se pudo bajar);
 y `desinstalar.exe /uninstall /silent` para quitarlo.
 
 ## Usarla
@@ -396,18 +397,72 @@ blanco), y que se desvanece a partir de un kilómetro y medio para que no haga m
 regolito de la Mun, la arena roja de Duna...), mezcladas como las mezcla el mod: baja,
 media y alta según la altitud, con los umbrales en metros de su `Terrain.cfg`, y la de
 pendiente con su potencia, contraste y punto medio; la escala de repetición también es la
-suya. Se leen de su paquete de Unity (solo los niveles de hasta 2048 de ancho) y su color
-se ajusta al del mapa del cuerpo en ese sitio, para que de lejos no cambie el tono. Sin
+suya. Se leen de su paquete de Unity (solo los niveles de hasta 2048 de ancho). Sin
 Parallax se usan las del **Community Terrain Texture Pack**, elegidas por el color del
 sitio.
+
+**Variación de texturas.** El suelo se pinta como lo pinta el shader de terreno de
+Parallax (`Parallax.shader` y `ParallaxUtils.cginc` en su código):
+
+- **Proyección biplanar** en coordenadas del mundo: la textura va sobre los dos planos de
+  los ejes que más miran hacia la normal, así no se estira en las laderas. Las
+  coordenadas salen de la posición del ojo reducida módulo un múltiplo de todos los
+  periodos, con lo que la textura queda clavada al suelo sin perder precisión (antes se
+  deslizaba al volar en latitudes medias).
+- **Dos escalas según la distancia**: cerca la textura se repite más a menudo y lejos
+  menos, en potencias de dos, fundidas entre sí.
+- **Mapa de influencia**: cuánto manda cada textura frente al color del planeta. Donde
+  manda poco queda el color del mapa con el dibujo de la textura; en Kerbin la hierba es
+  casi toda así, igual que en el juego.
+- **Mezcla por desplazamiento**: en la transición entre dos texturas gana la de más relieve
+  en cada punto (la hierba asoma entre las piedras).
+- **Oclusión y mapas de normales** de cada textura: el relieve fino que les da luz y sombra.
+- Encima, la **variación antimosaico** de Inigo Quilez: cada zona lee la textura con un
+  desplazamiento distinto elegido por un ruido suave, y el mosaico deja de verse repetido.
+  Se apaga con «Variación de texturas».
+
+### Scatters de Parallax: hierba, árboles y rocas
+
+Con `Parallax_StockScatterTextures` (en tu KSP o bajado por el instalador) el suelo se
+llena de lo que pone el mod: hierba, helechos, margaritas, rosales, arbustos, robles, pinos,
+palmeras, cactus y baobabs en Kerbin; rocas en la Mun, Minmus, Duna, Ike, Eeloo...; losas y
+cristales en otros. Son sus modelos `.mu` y sus texturas, leídas del paquete de Unity.
+
+**Dónde va cada uno** sigue las reglas del mod (`TerrainScatters.compute` en su código): por
+cada trozo de terreno, `populationMultiplier` candidatos al azar; cada uno sale o no según
+una probabilidad que baja con la pendiente y cerca de los límites de altitud, según un
+ruido fractal sobre la esfera por encima de un umbral (que además decide el tamaño) y
+según la lista de biomas en los que no sale. Aquí no hay triángulos del terreno de KSP, así
+que se reparte por celdas de latitud y longitud con los candidatos que tendría un triángulo
+de su nivel más fino (unos 2150 m²), y lejos hay menos, como en el juego, donde el terreno
+lejano es más basto. Las celdas se generan en segundo plano y todo es determinista: al
+volver a un sitio están los mismos árboles. Las copas (los `SharedScatter`) van sobre sus
+troncos con el mismo tamaño.
+
+Los biomas de Kerbin se identifican por su color en el mapa de biomas del juego, con los
+nombres que usa el mod («Grasslands», «Deserts»...). En los demás cuerpos esa lista no se
+aplica, porque su mapa de biomas no dice los nombres.
+
+**Cómo se pintan.** El suelo se traza por rayos y no tiene malla, así que el shader del
+cielo escribe en el búfer de profundidad dónde choca cada rayo y los modelos se pintan
+encima con prueba de profundidad: una colina tapa los árboles de detrás. La profundidad va
+en escala logarítmica en los dos sitios; con la lineal, a diez kilómetros el búfer de 24
+bits no distingue 30 m. Cada objeto se pinta con su nivel de detalle según la distancia y
+con los límites de objetos por nivel del propio mod, instanciado. Las hojas y briznas dejan
+pasar parte de la luz que les da por detrás. En una RTX 5060 a 1500×900, con unos 30 000
+objetos a la vista junto al KSC, el cielo tarda unos 3 ms y los scatters unos 5.
+
+Lo que no se reproduce: el viento, las burbujas de Eve (refractan lo que tienen detrás) y
+las sombras de unos objetos sobre otros. La densidad se puede bajar en «Densidad de los
+scatters».
 
 Las **nubes** salen del mapa de los mods de nubes que tengas (Stock Volumetric Clouds,
 EVE): una capa esférica a la altura que elijas, con la cobertura del propio mapa e
 iluminada por el Sol. Ese mapa es de 16384×8192 y pesa 179 MB con sus mipmaps, así que se
 lee **solo un nivel de 2048 de ancho**, que para pintarlas sobra y se carga al instante.
 
-Las tres cosas se apagan por separado en la sección «Vuelo», y sin esos mods instalados
-el vuelo funciona igual: el suelo de cerca queda liso y no hay nubes.
+Todo se apaga por separado en la sección «Vuelo», y sin esos mods instalados el vuelo
+funciona igual: el suelo de cerca queda liso, sin vegetación y sin nubes.
 
 ## Controles
 
@@ -467,8 +522,8 @@ proyecto.
 |---|---|
 | `src\Core` | Lo que no depende de la pantalla: geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`, más lo que la web no tiene: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
 | `src\Gfx` | Enlaces a OpenGL, el control con el contexto (con antialias multimuestra), shaders, texturas, dibujo 2D por lotes y rótulos. |
-| `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`) y el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble). |
-| `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, y los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques; `DxtDecoder.cs`; `ParallaxPlanets.cs` y `ParallaxTerrain.cs`). |
+| `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`), el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble) y los scatters de Parallax (`ScatterField.cs` los reparte en segundo plano; `GlobeView.Scatters.cs` los pinta). |
+| `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, y los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques; `DxtDecoder.cs`; `ParallaxPlanets.cs`, `ParallaxTerrain.cs` y `ParallaxScatters.cs`). |
 | `src\UI` | La ventana, el panel lateral y los controles de tema oscuro. `MainForm` está repartida como `app.js`: mapas, naves, herramientas y cielo. |
 
 Decisiones que no son evidentes:

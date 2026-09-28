@@ -11,7 +11,9 @@ namespace KerbinMaps.UI
     {
         Section globeSection;
         Section secCuerpo, secScan, secAltim, secTransfer, secAterrizaje, secNaves, secMarcadores, secVuelo;
-        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax;
+        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax, chkVariacion, chkScatters;
+        DarkSlider densidadSlider;
+        FieldHeader densidadHeader;
         DarkSlider velSlider, nubeAltSlider;
         FieldHeader velHeader, nubeAltHeader;
         RichLabel vueloInfo;
@@ -353,7 +355,33 @@ namespace KerbinMaps.UI
                 SaveSettings();
                 await CargarTexturasDeTerreno();
             };
-            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkNubes));
+            chkVariacion = new DarkCheck("Variación de texturas (sin mosaico repetido)", state.TextureVariation);
+            chkVariacion.CheckedChanged += (s, e) =>
+            {
+                state.TextureVariation = chkVariacion.Checked;
+                globe.DetailVariation = chkVariacion.Checked;
+                SaveSettings();
+                RequestRender();
+            };
+            chkScatters = new DarkCheck("Scatters de Parallax: hierba, árboles y rocas", state.Scatters);
+            chkScatters.CheckedChanged += async (s, e) =>
+            {
+                state.Scatters = chkScatters.Checked;
+                globe.Scatters = chkScatters.Checked;
+                SaveSettings();
+                await CargarScatters();
+            };
+            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkVariacion, chkScatters, chkNubes));
+            densidadSlider = new DarkSlider(10, 100, (int)Math.Round(state.ScatterDensity * 100));
+            densidadSlider.ValueChanged += (s, e) =>
+            {
+                state.ScatterDensity = densidadSlider.Value / 100.0;
+                globe.ScatterDensity = state.ScatterDensity;
+                densidadHeader.Value = densidadSlider.Value + " %";
+                SaveSettings();
+                RequestRender();
+            };
+            vuelo.Add(Field("Densidad de los scatters", densidadSlider, out densidadHeader, (int)Math.Round(state.ScatterDensity * 100) + " %"));
             velSlider = new DarkSlider(1, 100, VelocidadAPaso(state.FreeSpeed));
             velSlider.ValueChanged += (s, e) =>
             {
@@ -375,9 +403,9 @@ namespace KerbinMaps.UI
             };
             vuelo.Add(Field("Altura de las nubes", nubeAltSlider, out nubeAltHeader, (int)Math.Round(state.CloudAlt / 1000) + " km"));
             vueloInfo = vuelo.Add(Readout());
-            vuelo.Add(Hint("El terreno sale del mapa de alturas del cuerpo, y las texturas de cerca y las nubes, de tu " +
-                           "instalación de KSP (CTTP y los mods de nubes). Sin ellos el vuelo funciona igual, solo que el " +
-                           "suelo de cerca queda liso y no hay nubes."));
+            vuelo.Add(Hint("El terreno sale del mapa de alturas del cuerpo, y las texturas de cerca, los scatters y las " +
+                           "nubes, de tu instalación de KSP (Parallax, CTTP y los mods de nubes). Sin ellos el vuelo funciona " +
+                           "igual, solo que el suelo de cerca queda liso, sin vegetación y sin nubes."));
             RenderVueloInfo();
 
             /* ------------------------------------------------------------- Vista 3D */

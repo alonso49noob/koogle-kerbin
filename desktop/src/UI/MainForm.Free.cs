@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using KerbinMaps.Core;
+using KerbinMaps.Ksp;
 using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
@@ -41,21 +42,23 @@ namespace KerbinMaps.UI
             globe.Detail = state.FreeDetail;
             globe.Debug = state.FreeDebug;
             globe.EnterFree();
-            globe.Clouds = state.Clouds;
-            _ = CargarTexturasDeTerreno();
-            _ = CargarNubes();
+            CargarSuelo();
             teclas.Clear();
             ultimoVuelo = 0;
         }
 
         /* Altura del terreno bajo un punto, con el mapa de alturas del cuerpo y su
-           calibración. Sin mapa, el nivel del mar. */
-        double AlturaDelSuelo(double lat, double lon)
+           calibración, interpolada igual que en el shader. Sin mapa, el nivel del mar. */
+        double AlturaDelSuelo(double lat, double lon) => Math.Max(0, AlturaCruda(lat, lon));
+
+        /* La misma sin cortar en el nivel del mar: el fondo marino, para los scatters que
+           solo salen en la costa o bajo el agua. */
+        double AlturaCruda(double lat, double lon)
         {
             var img = MapImg("height");
             if (img == null) return 0;
             var (hmin, hmax) = RangoAltura();
-            return Math.Max(0, img.Height_(lat, Geo.WrapLon(lon), hmin, hmax, HeightOffNow));
+            return img.HeightSmooth(lat, Geo.WrapLon(lon), hmin, hmax, (int)HeightOffNow);
         }
 
         /* Un paso de vuelo con las teclas que estén pulsadas. Lo llama el bucle de
@@ -126,6 +129,19 @@ namespace KerbinMaps.UI
         static double PasoAVelocidad(int paso) =>
             GlobeView.FreeMinSpeed * Math.Pow(GlobeView.FreeMaxSpeed / GlobeView.FreeMinSpeed, (paso - 1) / 99.0);
 
+        /* Lo que viste el suelo en el vuelo y en el cielo: texturas, nubes y scatters, con
+           los ajustes del panel. */
+        void CargarSuelo()
+        {
+            globe.Clouds = state.Clouds;
+            globe.DetailVariation = state.TextureVariation;
+            globe.Scatters = state.Scatters;
+            globe.ScatterDensity = state.ScatterDensity;
+            _ = CargarTexturasDeTerreno();
+            _ = CargarNubes();
+            _ = CargarScatters();
+        }
+
         void RenderVueloInfo()
         {
             if (vueloInfo == null) return;
@@ -133,6 +149,12 @@ namespace KerbinMaps.UI
             partes.Add(globe.HasDetail && terrenoOrigen != null
                 ? Lang.F("Texturas de suelo: {0}.", terrenoOrigen)
                 : Lang.T("Sin texturas de suelo: no encontré Parallax ni CTTP en tu instalación."));
+            if (state.Scatters)
+                partes.Add(globe.ScatterField != null
+                    ? Lang.F("Scatters de Parallax: {0} tipos, {1} objetos a la vista.", globe.ScatterField.Layers.Count, Geo.F(globe.ScatterVisible, 0))
+                    : scattersDe != null && FindGameData() != null && ParallaxScatters.FindDir(FindGameData()) == null
+                        ? Lang.T("Sin scatters: Parallax_StockScatterTextures no está instalado.")
+                        : Lang.F("Sin scatters de Parallax para {0}.", Body.Current.Label));
             partes.Add(globe.CloudTex != null
                 ? Lang.F("Nubes de {0}: cargadas del juego.", Body.Current.Label)
                 : Lang.F("Sin mapa de nubes para {0} en tu instalación.", Body.Current.Label));

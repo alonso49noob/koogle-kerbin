@@ -59,7 +59,11 @@ namespace KerbinMaps.UI
             if (px != null)
             {
                 var d = new System.Collections.Generic.Dictionary<string, TextureFile>
-                    { ["low"] = px.Low, ["mid"] = px.Mid, ["high"] = px.High, ["steep"] = px.Steep };
+                {
+                    ["low"] = px.Low, ["mid"] = px.Mid, ["high"] = px.High, ["steep"] = px.Steep,
+                    ["inf"] = px.Influence, ["disp"] = px.Displacement, ["occ"] = px.Occlusion,
+                    ["bl"] = px.BumpLow, ["bm"] = px.BumpMid, ["bh"] = px.BumpHigh, ["bs"] = px.BumpSteep,
+                };
                 // si dos ranuras comparten textura, se sube una sola vez
                 var subidas = new System.Collections.Generic.Dictionary<TextureFile, Texture>();
                 Texture Una(string k) => d[k] == null ? null : subidas.TryGetValue(d[k], out var ya) ? ya : subidas[d[k]] = Subir(d, k);
@@ -67,6 +71,10 @@ namespace KerbinMaps.UI
                 globe.DetSand = Una("mid");
                 globe.DetSnow = Una("high");
                 globe.DetRock = Una("steep");
+                globe.PxInfluence = Una("inf");
+                globe.PxDisplacement = Una("disp");
+                globe.PxOcclusion = Una("occ");
+                globe.PxBump = new[] { Una("bl"), Una("bm"), Una("bh"), Una("bs") };
                 parallaxTex = new System.Collections.Generic.List<Texture>(subidas.Values).ToArray();
                 globe.DetailParallax = true;
                 globe.DetailTile = px.MetrosPorRepeticion;
@@ -80,6 +88,8 @@ namespace KerbinMaps.UI
                 await CargarCttp(gd);
                 if (!surface.MakeCurrent()) return;
                 globe.DetGrass = cttpGrass; globe.DetSand = cttpSand; globe.DetRock = cttpRock; globe.DetSnow = cttpSnow;
+                globe.PxInfluence = globe.PxDisplacement = globe.PxOcclusion = null;
+                globe.PxBump = null;
                 globe.DetailParallax = false;
                 globe.DetailTile = 22;
                 terrenoOrigen = globe.HasDetail ? "CTTP" : null;

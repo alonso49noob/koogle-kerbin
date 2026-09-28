@@ -129,6 +129,57 @@ namespace KerbinMaps.Core
             return min + Luminance(r, g, b) * (max - min);
         }
 
+        /* Altura interpolada exactamente como la interpola el shader del vuelo (grisSuave):
+           entre los cuatro texeles vecinos con curva quíntica, la longitud dando la vuelta y
+           la latitud recortada. Lo que se coloque en el suelo (la cámara, la hierba, los
+           árboles) tiene que usar esta y no la del píxel más cercano: en Kerbin un texel son
+           460 m y la diferencia entre las dos llega a decenas de metros. */
+        public double HeightSmooth(double lat, double lon, double min, double max, double lonOffset)
+        {
+            double u = (Geo.WrapLon(lon + lonOffset) + 180) / 360;
+            double v = (90 - lat) / 180;
+            double tx = u * Width - 0.5, ty = v * Height - 0.5;
+            double fx = tx - Math.Floor(tx), fy = ty - Math.Floor(ty);
+            int ix = (int)Math.Floor(tx), iy = (int)Math.Floor(ty);
+            fx = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
+            fy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
+            double a = Lerp(Gris(ix, iy), Gris(ix + 1, iy), fx);
+            double b = Lerp(Gris(ix, iy + 1), Gris(ix + 1, iy + 1), fx);
+            return min + Lerp(a, b, fy) * (max - min);
+        }
+
+        double Gris(int x, int y)
+        {
+            x = ((x % Width) + Width) % Width;
+            y = Math.Clamp(y, 0, Height - 1);
+            long i = ((long)y * Width + x) * 4;
+            return Luminance(Rgba[i], Rgba[i + 1], Rgba[i + 2]);
+        }
+
+        static double Lerp(double a, double b, double t) => a + (b - a) * t;
+
+        /* Color interpolado entre los cuatro texeles vecinos, de 0 a 1. Para teñir la hierba
+           con el color del suelo: con el píxel más cercano, cada texel de cientos de metros
+           se vería como un parche de otro color. */
+        public (float R, float G, float B) SampleBilinear(double lat, double lon, double lonOffset)
+        {
+            double tx = (Geo.WrapLon(lon + lonOffset) + 180) / 360 * Width - 0.5;
+            double ty = (90 - lat) / 180 * Height - 0.5;
+            int ix = (int)Math.Floor(tx), iy = (int)Math.Floor(ty);
+            double fx = tx - ix, fy = ty - iy;
+            float r = 0, g = 0, b = 0;
+            for (int k = 0; k < 4; k++)
+            {
+                int x = ix + (k & 1), y = iy + (k >> 1);
+                double w = ((k & 1) == 1 ? fx : 1 - fx) * ((k >> 1) == 1 ? fy : 1 - fy);
+                x = ((x % Width) + Width) % Width;
+                y = Math.Clamp(y, 0, Height - 1);
+                long i = ((long)y * Width + x) * 4;
+                r += (float)(Rgba[i] * w); g += (float)(Rgba[i + 1] * w); b += (float)(Rgba[i + 2] * w);
+            }
+            return (r / 255f, g / 255f, b / 255f);
+        }
+
         /* Color crudo del mapa de biomas; null si el píxel es transparente. */
         public string BiomeHex(double lat, double lon, double lonOffset)
         {

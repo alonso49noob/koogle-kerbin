@@ -1130,6 +1130,7 @@ void main() {
             prog?.Dispose(); atmProg?.Dispose(); lineProg?.Dispose();
             modelRenderer?.Dispose();
             DisposeSky();
+            DisposeScatters();
             GL.DeleteBuffer(posBuf); GL.DeleteBuffer(uvBuf); GL.DeleteBuffer(idxBuf); GL.DeleteVertexArray(vao);
             foreach (var lb in new[] { trackG, trackS, orbits })
                 if (lb != null) { GL.DeleteBuffer(lb.Buf); GL.DeleteVertexArray(lb.Vao); }

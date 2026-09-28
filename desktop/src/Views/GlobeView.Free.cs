@@ -42,6 +42,11 @@ namespace KerbinMaps.Views
         public bool DetailParallax;
         public (double a, double b) PxLowMid = (0, 1), PxMidHigh = (1e6, 1e6 + 1);
         public (double power, double contrast, double mid) PxSteep = (8, 4, 0.7);
+        public Texture PxInfluence, PxDisplacement, PxOcclusion;
+        public Texture[] PxBump;                  // normales de baja, media, alta y pendiente
+
+        /* Variación de textura: que el mosaico no se vea repetido (ver detalle en el shader). */
+        public bool DetailVariation = true;
 
         /* Altura del terreno bajo un punto, en metros sobre el nivel del mar. La pone la
            ventana con el mapa de alturas del cuerpo; sin mapa, todo a cero. */

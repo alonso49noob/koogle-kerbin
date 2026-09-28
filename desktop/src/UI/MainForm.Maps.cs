@@ -128,6 +128,7 @@ namespace KerbinMaps.UI
             bool hasHeight = MapImg("height") != null;
             Vis.Set(reliefWrap, hasHeight);
             Vis.Set(reliefHint, !hasHeight);
+            ActualizarCampoScatters();
             RequestRender();
         }
 

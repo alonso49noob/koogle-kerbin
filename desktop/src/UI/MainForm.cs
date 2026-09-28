@@ -718,6 +718,7 @@ namespace KerbinMaps.UI
                     ConstruirAnillos();
                     PushTrack();
                     globe.EnterSky();
+                    CargarSuelo();
                     break;
             }
 

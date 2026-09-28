@@ -363,5 +363,12 @@
  "Usar las de Parallax si está instalado": "Use Parallax's if installed",
  "Texturas de suelo: {0}.": "Ground textures: {0}.",
  "Sin texturas de suelo: no encontré Parallax ni CTTP en tu instalación.": "No ground textures: I couldn't find Parallax or CTTP in your install.",
- "Parallax ({0})": "Parallax ({0})"
+ "Parallax ({0})": "Parallax ({0})",
+ "Variación de texturas (sin mosaico repetido)": "Texture variation (no repeating tiles)",
+ "Scatters de Parallax: hierba, árboles y rocas": "Parallax scatters: grass, trees and rocks",
+ "Densidad de los scatters": "Scatter density",
+ "Scatters de Parallax: {0} tipos, {1} objetos a la vista.": "Parallax scatters: {0} kinds, {1} objects in view.",
+ "Sin scatters: Parallax_StockScatterTextures no está instalado.": "No scatters: Parallax_StockScatterTextures is not installed.",
+ "Sin scatters de Parallax para {0}.": "No Parallax scatters for {0}.",
+ "El terreno sale del mapa de alturas del cuerpo, y las texturas de cerca, los scatters y las nubes, de tu instalación de KSP (Parallax, CTTP y los mods de nubes). Sin ellos el vuelo funciona igual, solo que el suelo de cerca queda liso, sin vegetación y sin nubes.": "The terrain comes from the body's height map, and the close-up textures, scatters and clouds from your KSP install (Parallax, CTTP and the cloud mods). Without them the flight view still works, only the ground up close stays plain, with no vegetation and no clouds."
 }

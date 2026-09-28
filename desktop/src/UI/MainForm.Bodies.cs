@@ -73,6 +73,7 @@ namespace KerbinMaps.UI
             // las texturas de suelo de Parallax y las nubes son de cada cuerpo
             if (terrenoDe != null) _ = CargarTexturasDeTerreno();
             if (nubesDe != null) _ = CargarNubes();
+            if (scattersDe != null) _ = CargarScatters();
             transfer = null;
             trList?.SetItems(new List<object>());
             RenderTransferInfo();

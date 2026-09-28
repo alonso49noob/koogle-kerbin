@@ -34,7 +34,8 @@ namespace KerbinMaps.Gfx
         public const uint ARRAY_BUFFER = 0x8892, ELEMENT_ARRAY_BUFFER = 0x8893, STATIC_DRAW = 0x88E4, DYNAMIC_DRAW = 0x88E8, STREAM_DRAW = 0x88E0;
         public const uint VENDOR = 0x1F00, RENDERER = 0x1F01, VERSION = 0x1F02, EXTENSIONS = 0x1F03, NUM_EXTENSIONS = 0x821D;
         public const uint MAX_TEXTURE_SIZE = 0x0D33, SAMPLES = 0x80A9;
-        public const uint TEXTURE_MAX_LEVEL = 0x813D, LEQUAL = 0x0203;
+        public const uint TEXTURE_MAX_LEVEL = 0x813D, LEQUAL = 0x0203, ALWAYS = 0x0207, LESS = 0x0201;
+        public const uint SAMPLE_ALPHA_TO_COVERAGE = 0x809E;
 
         [DllImport("opengl32.dll", CharSet = CharSet.Ansi, ExactSpelling = true)]
         static extern IntPtr wglGetProcAddress(string name);
@@ -63,6 +64,9 @@ namespace KerbinMaps.Gfx
         static delegate* unmanaged<uint, uint, void> _blendFunc;
         static delegate* unmanaged<byte, void> _depthMask;
         static delegate* unmanaged<uint, void> _cullFace;
+        static delegate* unmanaged<uint, void> _depthFunc;
+        static delegate* unmanaged<uint, uint, void> _vertexAttribDivisor;
+        static delegate* unmanaged<uint, int, uint, void*, int, void> _drawElementsInstanced;
         static delegate* unmanaged<int, uint*, void> _genTextures;
         static delegate* unmanaged<int, uint*, void> _deleteTextures;
         static delegate* unmanaged<uint, uint, void> _bindTexture;
@@ -129,6 +133,9 @@ namespace KerbinMaps.Gfx
             _blendFunc = (delegate* unmanaged<uint, uint, void>)Proc("glBlendFunc");
             _depthMask = (delegate* unmanaged<byte, void>)Proc("glDepthMask");
             _cullFace = (delegate* unmanaged<uint, void>)Proc("glCullFace");
+            _depthFunc = (delegate* unmanaged<uint, void>)Proc("glDepthFunc");
+            _vertexAttribDivisor = (delegate* unmanaged<uint, uint, void>)Proc("glVertexAttribDivisor");
+            _drawElementsInstanced = (delegate* unmanaged<uint, int, uint, void*, int, void>)Proc("glDrawElementsInstanced");
             _genTextures = (delegate* unmanaged<int, uint*, void>)Proc("glGenTextures");
             _deleteTextures = (delegate* unmanaged<int, uint*, void>)Proc("glDeleteTextures");
             _bindTexture = (delegate* unmanaged<uint, uint, void>)Proc("glBindTexture");
@@ -198,6 +205,7 @@ namespace KerbinMaps.Gfx
         public static void BlendFunc(uint s, uint d) => _blendFunc(s, d);
         public static void DepthMask(bool on) => _depthMask(on ? (byte)1 : (byte)0);
         public static void CullFace(uint mode) => _cullFace(mode);
+        public static void DepthFunc(uint func) => _depthFunc(func);
 
         public static uint GenTexture() { uint id; _genTextures(1, &id); return id; }
         public static void DeleteTexture(uint id) { if (id != 0) _deleteTextures(1, &id); }
@@ -285,6 +293,9 @@ namespace KerbinMaps.Gfx
         public static void VertexAttribPointer(uint index, int size, uint type, bool normalized, int stride, int offset)
             => _vertexAttribPointer(index, size, type, normalized ? (byte)1 : (byte)0, stride, (void*)offset);
         public static void DrawArrays(uint mode, int first, int count) => _drawArrays(mode, first, count);
+        public static void VertexAttribDivisor(uint index, uint divisor) => _vertexAttribDivisor(index, divisor);
+        public static void DrawElementsInstanced(uint mode, int count, uint type, int offset, int instances)
+            => _drawElementsInstanced(mode, count, type, (void*)offset, instances);
         public static void DrawElements(uint mode, int count, uint type, int offset) => _drawElements(mode, count, type, (void*)offset);
 
         public static string GetString(uint name) => Marshal.PtrToStringAnsi((IntPtr)_getString(name)) ?? "";
