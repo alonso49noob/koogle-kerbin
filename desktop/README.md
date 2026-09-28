@@ -145,6 +145,16 @@ El globo y la vista del cielo usan el mismo modelo de luz, con base física:
 - **Estrellas** de fondo también en el globo; un cielo luminoso las tapa.
 - La luz se calcula en lineal y se lleva a pantalla con un tonemapping filmic
   (ACES), así que ni el cielo ni el reflejo del mar se queman.
+- **A ras de suelo la exposición es otra**, como la de una cámara que expone para el
+  paisaje. Con el ajuste del globo, el suelo de mediodía se lavaba: la arena del
+  desierto salía casi blanca, con saturación 0,10. En el cielo y en el vuelo el
+  albedo baja un poco (compensando la luz ambiente, para que el crepúsculo quede
+  igual), la curva va sobre la luminancia en vez de canal a canal, y el color se
+  escala entero en lugar de recortarse. La misma arena sale ahora de color arena
+  (saturación 0,30, sin ningún canal quemado), el mar deja de verse lechoso y la
+  nieve sigue blanca. El globo visto desde fuera no cambia en nada: comparado píxel a
+  píxel con el de antes, sale idéntico, porque allí manda la bruma y el ajuste de
+  siempre funcionaba.
 
 Con «Día y noche» apagado se vuelve a la vista plana de siempre, y con «Atmósfera»
 apagada se quita el aire (sin bruma ni cielo sobre el globo).

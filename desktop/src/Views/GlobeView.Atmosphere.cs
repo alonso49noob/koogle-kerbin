@@ -34,6 +34,10 @@ const float PI = 3.14159265;
 uniform vec3 BETA_R;
 uniform float BETA_M, BETA_ME, HR, HM, ATM_TOP;
 uniform float uSunI, uExposure;
+/* 0 = el planeta visto desde fuera; 1 = a ras de suelo (cielo y vuelo). Desde fuera
+   manda la bruma y el ajuste de siempre funciona; a ras de suelo manda el Sol directo, y
+   con ese mismo ajuste el suelo de mediodía se lavaba. */
+uniform float uCerca;
 uniform int uAtmos, uSteps;
 
 /* Distancias de entrada y salida del rayo en la esfera. Si no la toca, las dos
@@ -105,8 +109,12 @@ vec3 inscatter(vec3 o, vec3 d, float t0, float t1, vec3 s, float jitter, out vec
 /* Luz que sale de un punto del suelo hacia el observador (v, unitario hacia él). */
 vec3 shadeGround(vec3 p, vec3 n, vec3 v, vec3 s, vec3 albedo, float water) {
   /* Los mapas de color de Kerbin ya vienen «iluminados»: tomados como albedo, la tierra a
-     pleno Sol sale más clara que el cielo. Se rebajan a un albedo creíble. */
-  albedo *= 0.5;
+     pleno Sol sale más clara que el cielo. Se rebajan a un albedo creíble. A ras de suelo
+     algo más: con 0,5 el suelo de mediodía se iba a la parte alta de la curva y perdía el
+     color. La luz ambiente se compensa para que el crepúsculo quede igual. */
+  float alb = mix(0.5, 0.36, uCerca);
+  float comp = 0.5 / alb;
+  albedo *= alb;
   vec3 up = normalize(p);
   vec3 sun = uSunI * sunTransmittance(p, s);
   // el cielo como luz ambiente: azulada, y más débil cuanto más bajo está el Sol
@@ -114,27 +122,42 @@ vec3 shadeGround(vec3 p, vec3 n, vec3 v, vec3 s, vec3 albedo, float water) {
   vec3 skyE = uSunI * (uAtmos != 0 ? vec3(0.05, 0.085, 0.16) : vec3(0.012)) * smoothstep(-0.12, 0.4, dot(up, s));
   // de noche, un resto de luz fría para adivinar el terreno
   const vec3 nightE = vec3(0.35, 0.42, 0.62);
-  vec3 L = albedo / PI * (sun * max(dot(n, s), 0.0) + skyE * (0.75 + 0.25 * dot(n, up)) + nightE);
+  vec3 L = albedo / PI * (sun * max(dot(n, s), 0.0) + (skyE * (0.75 + 0.25 * dot(n, up)) + nightE) * comp);
   if (water > 0.0) {
     // el agua es lisa: refleja el cielo según Fresnel y el Sol como un brillo concentrado
     float cosV = clamp(dot(up, v), 0.0, 1.0);
     float F = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);
     vec3 h = normalize(s + v);
-    const float SP = 900.0;
+    // a ras de suelo el brillo del Sol en el agua es más concentrado y menos intenso:
+    // si no, a mediodía todo el mar sale blanco
+    float SP = mix(900.0, 1500.0, uCerca);
     float spec = (SP + 8.0) / (8.0 * PI) * pow(max(dot(up, h), 0.0), SP);
     float Fh = 0.02 + 0.98 * pow(1.0 - clamp(dot(h, v), 0.0, 1.0), 5.0);
     float cosS = max(dot(up, s), 0.0);
     // el agua absorbe casi todo lo que entra: su color del mapa, más oscuro que el de la tierra
-    vec3 W = albedo * 0.7 / PI * (sun * cosS + skyE + nightE) * (1.0 - F) + skyE / PI * 1.4 * F + sun * spec * Fh * cosS * 0.5;
+    vec3 W = albedo * 0.7 / PI * (sun * cosS + (skyE + nightE) * comp) * (1.0 - F) + skyE / PI * 1.4 * F + sun * spec * Fh * cosS * mix(0.5, 0.32, uCerca);
     L = mix(L, W, water);
   }
   return L;
 }
 
+float aces(float x) { return (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14); }
+
+/* A ras de suelo la curva va sobre todo sobre la luminancia, conservando el color.
+   Aplicada canal a canal, a pleno Sol el suelo se lavaba: la arena de un mapa
+   (200,180,140) salía casi blanca, con la quinta parte de su viveza. Se deja una parte
+   por canal porque lo muy brillante sí tiende a blanco, como en una película. Desde
+   fuera se queda canal a canal: conservar el azul de la bruma volvía el planeta más
+   velado. */
 vec3 toneMap(vec3 c) {
   c *= uExposure;
-  c = (c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14);
-  return pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2));
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  vec3 porLum = l > 1e-6 ? c * (aces(l) / l) : vec3(0.0);
+  /* Conservar la luminancia puede dejar un canal por encima de 1 (la arena, en rojo):
+     recortarlo cambia el tono, así que se escala el color entero. */
+  porLum /= max(1.0, max(porLum.r, max(porLum.g, porLum.b)));
+  vec3 porCanal = vec3(aces(c.r), aces(c.g), aces(c.b));
+  return pow(clamp(mix(porLum, porCanal, mix(1.0, 0.4, uCerca)), 0.0, 1.0), vec3(1.0 / 2.2));
 }
 ";
 
@@ -198,6 +221,7 @@ void main() {
             if (tau > 0.25) k *= 0.15 / tau;
             p.Float("uSunI", sunOn ? SunIntensity : 0);
             p.Float("uExposure", Exposure);
+            p.Float("uCerca", 0);                 // desde fuera; el cielo y el vuelo lo cambian
             p.Int("uSteps", steps);
             p.Int("uAtmos", Atmosphere && b.HasAir ? 1 : 0);
             p.Vec3("BETA_R", c[0] * k, c[1] * k, c[2] * k);

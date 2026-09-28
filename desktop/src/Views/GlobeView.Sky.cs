@@ -379,6 +379,8 @@ void main() {
             skyProg.Vec3("uSun", sun[0], sun[1], sun[2]);
             skyProg.Float("uSunRad", Math.Max(SunAngularRadius, 0.0015));
             AtmosUniforms(skyProg, 24, sunOn: !SkyForceNight);
+            // a ras de suelo, el ajuste de exposición para paisaje (ver shadeGround)
+            skyProg.Float("uCerca", 1);
             skyProg.Float("uColorOff", ColorOff / 360);
             skyProg.Float("uBiomeOff", BiomeOff / 360);
             skyProg.Float("uBiomeAmt", BiomeTex != null ? BiomeAmt : 0);
