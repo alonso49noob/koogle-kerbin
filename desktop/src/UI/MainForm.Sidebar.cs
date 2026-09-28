@@ -534,6 +534,8 @@ namespace KerbinMaps.UI
             idioma.Add(Hint("Se aplica al reiniciar el visor. Lo que no esté traducido se queda en español; " +
                             "las traducciones están en <code>data/i18n/</code> y puedes corregirlas."));
 
+            BuildUpdateSection();
+
             searchList.DrawItem = DrawSearchRow;
             searchList.ItemClick = (item, pt, r) => SearchRowClick(item);
 

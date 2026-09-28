@@ -734,6 +734,9 @@ namespace KerbinMaps.UI
             foreach (var a in startArgs)
                 if (File.Exists(a)) await OpenFiles(new[] { a });
             RequestRender();
+
+            Updater.Cleanup();
+            _ = ComprobarActualizacion(false);
         }
     }
 }

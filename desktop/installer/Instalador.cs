@@ -12,6 +12,9 @@
    Opciones de línea de órdenes:
      /silent          sin ventanas. Códigos de salida: 0 bien, 1 falta .NET 10, 2 error,
                       3 cancelado, 4 la aplicación está abierta
+     /update          actualización automática desde la propia aplicación: como /silent, pero
+                      espera a que la aplicación se cierre, conserva los accesos directos que
+                      hubiera y vuelve a abrirla al terminar
      /dir=<carpeta>   carpeta de instalación
      /noshortcuts     sin accesos directos
      /noregistry      sin entrada en «Aplicaciones»
@@ -64,7 +67,7 @@ namespace KoogleKerbinSetup
 
     sealed class Options
     {
-        public bool Uninstall, Silent, NoShortcuts, NoRegistry, NoLaunch, FromTemp;
+        public bool Uninstall, Silent, Update, NoShortcuts, NoRegistry, NoLaunch, FromTemp;
         public string Dir, Lang, Texturas;   // /texturas=planetas,suelo,scatters
 
         public static Options Parse(string[] args)
@@ -75,6 +78,7 @@ namespace KoogleKerbinSetup
                 string a = raw.Trim(), l = a.ToLowerInvariant();
                 if (l == "/uninstall") o.Uninstall = true;
                 else if (l == "/silent") o.Silent = true;
+                else if (l == "/update") o.Update = o.Silent = true;
                 else if (l == "/noshortcuts") o.NoShortcuts = true;
                 else if (l == "/noregistry") o.NoRegistry = true;
                 else if (l == "/nolaunch") o.NoLaunch = true;
@@ -238,6 +242,7 @@ namespace KoogleKerbinSetup
                     if (!o.Silent) MessageBox.Show(L.T("Este ejecutable no lleva dentro los ficheros de la aplicación."), App.Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 2;
                 }
+                if (o.Update) return UpdateInstall(o);
                 if (o.Silent) return SilentInstall(o);
                 // cambiar de idioma rehace el asistente: los textos se traducen al crear los controles
                 while (true)
@@ -255,6 +260,45 @@ namespace KoogleKerbinSetup
                 if (!o.Silent) MessageBox.Show(ex.Message, App.Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 2;
             }
+        }
+
+        /* La aplicación lanza este instalador y se cierra: se espera a que termine (hasta un
+           minuto) y se instala encima. Si algo falla, se vuelve a abrir la versión que había,
+           para que quien actualizó no se quede sin visor. */
+        static int UpdateInstall(Options o)
+        {
+            string dir = Path.GetFullPath(o.Dir ?? Registration.InstalledDir() ?? App.DefaultDir);
+            string exe = Path.Combine(dir, App.Exe);
+            int code = 2;
+            try
+            {
+                if (!Requirements.Os64 || Requirements.DesktopRuntime() == null) code = 1;
+                else
+                {
+                    for (int i = 0; i < 240 && Util.RunningIn(dir).Count > 0; i++) Thread.Sleep(250);
+                    if (Util.RunningIn(dir).Count > 0) code = 4;
+                    else
+                    {
+                        // los accesos directos que tenía se rehacen; los que no, no se inventan
+                        var old = InstallManifest.Read(dir);
+                        string desk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                        string prog = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+                        bool first = old.Files.Count == 0;
+                        Func<string, bool> tiene = carpeta => old.Shortcuts.Any(l => string.Equals(Path.GetDirectoryName(l), carpeta, StringComparison.OrdinalIgnoreCase));
+                        new Installer
+                        {
+                            Dir = dir,
+                            Desktop = !o.NoShortcuts && (first || tiene(desk)),
+                            StartMenu = !o.NoShortcuts && (first || tiene(prog)),
+                            Register = !o.NoRegistry
+                        }.Run();
+                        code = 0;
+                    }
+                }
+            }
+            catch (Exception ex) { Util.Log(ex); }
+            if (!o.NoLaunch && code != 4 && File.Exists(exe)) Util.Launch(exe);
+            return code;
         }
 
         static int SilentInstall(Options o)

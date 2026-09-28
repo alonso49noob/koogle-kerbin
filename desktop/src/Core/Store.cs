@@ -85,6 +85,9 @@ namespace KerbinMaps.Core
         public bool Progresion;                   // enseñar solo lo que la partida ha descubierto
         public bool ShowScan = true;              // cobertura de SCANsat sobre el mapa
         public bool ShowAnomalies = true;         // anomalías del catálogo
+        public bool AutoUpdate = true;            // buscar versiones nuevas al abrir
+        public DateTime? LastUpdateCheck;         // UTC de la última consulta a GitHub
+        public string SkippedVersion;             // versión que se dijo «omitir»
         public int WinX = int.MinValue, WinY = int.MinValue, WinW = 1400, WinH = 880;
         public bool WinMax;
     }
