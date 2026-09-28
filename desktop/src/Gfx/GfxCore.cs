@@ -65,14 +65,14 @@ namespace KerbinMaps.Gfx
         public int Width { get; private set; }
         public int Height { get; private set; }
 
-        public static Texture FromRgba(byte[] rgba, int w, int h, TexFilter filter, bool repeatS)
+        public static Texture FromRgba(byte[] rgba, int w, int h, TexFilter filter, bool repeatS, bool repeatT = false)
         {
             uint id = GL.GenTexture();
             GL.BindTexture(GL.TEXTURE_2D, id);
             GL.PixelStore(GL.UNPACK_ALIGNMENT, 1);
             GL.TexImage2D(GL.TEXTURE_2D, 0, (int)GL.RGBA8, w, h, GL.RGBA, GL.UNSIGNED_BYTE, rgba);
             GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, repeatS ? GL.REPEAT : GL.CLAMP_TO_EDGE);
-            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, repeatT ? GL.REPEAT : GL.CLAMP_TO_EDGE);
             switch (filter)
             {
                 case TexFilter.Nearest:

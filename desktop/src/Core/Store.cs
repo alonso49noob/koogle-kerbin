@@ -68,9 +68,11 @@ namespace KerbinMaps.Core
         public bool TextureVariation = true;      // que el mosaico de las texturas de suelo no se vea repetido
         public bool Scatters = true;              // hierba, árboles y rocas de Parallax
         public double ScatterDensity = 1;         // fracción de los que pone Parallax
+        public bool Wind = true;                  // la vegetación se mueve con el viento
         public int FreeDebug;                     // diagnóstico del relieve (0 = normal)
         public bool Clouds = true;                // nubes del juego en cielo y vuelo
         public double CloudAlt = 5200;            // altura de la capa, m
+        public bool GlobeClouds = true;           // y en el globo 3D
         public string TransferTo;                 // destino de la calculadora de ventanas
         public double TransferPark = 100000;      // órbita de aparcamiento, m
         public double TransferCapture = 100000;   // órbita a la que capturar, m

@@ -390,6 +390,7 @@
  "Variación de texturas (sin mosaico repetido)": "Texture variation (no repeating tiles)",
  "Scatters de Parallax: hierba, árboles y rocas": "Parallax scatters: grass, trees and rocks",
  "Densidad de los scatters": "Scatter density",
+ "Viento en la vegetación": "Wind in the vegetation",
  "El terreno sale del mapa de alturas del cuerpo, y las texturas de cerca, los scatters y las nubes, de tu instalación de KSP (Parallax, CTTP y los mods de nubes). Sin ellos el vuelo funciona igual, solo que el suelo de cerca queda liso, sin vegetación y sin nubes.": "The terrain comes from the body's height map, and the close-up textures, scatters and clouds from your KSP install (Parallax, CTTP and the cloud mods). Without them the flight view still works, only the ground up close stays plain, with no vegetation and no clouds.",
  "Scatters de Parallax: {0} tipos, {1} objetos a la vista.": "Parallax scatters: {0} kinds, {1} objects in view.",
  "Sin scatters: Parallax_StockScatterTextures no está instalado.": "No scatters: Parallax_StockScatterTextures is not installed.",

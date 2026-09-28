@@ -277,7 +277,7 @@ namespace KerbinMaps.UI
 
         static bool AppIdle => !PeekMessage(out _, IntPtr.Zero, 0, 0, 0);
 
-        bool WantsFrames => needsFrame || map.Animating || globe.Animating || SimWantsFrames || VolandoConTeclas;
+        bool WantsFrames => needsFrame || map.Animating || globe.Animating || globe.WindAnimating || SimWantsFrames || VolandoConTeclas;
 
         void OnIdle(object sender, EventArgs e)
         {
@@ -705,6 +705,9 @@ namespace KerbinMaps.UI
                     if (globe.Mode == CamMode.Free) { globe.SetCenter(globe.FreeLat, globe.FreeLon, 1.5); globe.ExitFree(); }
                     if (globe.Mode == CamMode.Sky) globe.ExitSky(Math.Max(1.6, ZoomToDist(map.Zoom)));
                     SyncGlobe();
+                    globe.GlobeClouds = state.GlobeClouds;
+                    globe.CloudAlt = state.CloudAlt;
+                    if (state.GlobeClouds) _ = CargarNubes();
                     ConstruirAnillos();
                     PushTrack();
                     if (Following && sv.Sel != null) globe.EnterFocus(SelPos());

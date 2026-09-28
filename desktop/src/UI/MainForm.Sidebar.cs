@@ -11,7 +11,7 @@ namespace KerbinMaps.UI
     {
         Section globeSection;
         Section secCuerpo, secScan, secAltim, secTransfer, secAterrizaje, secNaves, secMarcadores, secVuelo;
-        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax, chkVariacion, chkScatters;
+        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax, chkVariacion, chkScatters, chkViento;
         DarkSlider densidadSlider;
         FieldHeader densidadHeader;
         DarkSlider velSlider, nubeAltSlider;
@@ -22,7 +22,7 @@ namespace KerbinMaps.UI
         DarkTextBox customUrl, hMinBox, hMaxBox, fpAlt, orbPe, orbAp, orbInc, orbLan, orbArgp, orbN, svRot;
         FieldHeader opHeader, biomeOpHeader, reliefHeader, svOrbHeader;
         DarkSlider opSlider, biomeOpSlider, reliefSlider, svOrbits;
-        DarkCheck chkBiome, chkGrid, chkLandmarks, chkLight, chkAtm, chkSvAll, chkNight2D;
+        DarkCheck chkBiome, chkGrid, chkLandmarks, chkLight, chkAtm, chkNubes3D, chkSvAll, chkNight2D;
         RichLabel presetNote, biomeSummary, calOut, reliefHint, toolHint, orbOut, svInfo, bodyInfo;
         readonly Dictionary<string, SlotRow> slotRows = new();
         DrawList biomeLegend, svTipos, svList, mkList;
@@ -371,7 +371,9 @@ namespace KerbinMaps.UI
                 SaveSettings();
                 await CargarScatters();
             };
-            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkVariacion, chkScatters, chkNubes));
+            chkViento = new DarkCheck("Viento en la vegetación", state.Wind);
+            chkViento.CheckedChanged += (s, e) => { state.Wind = chkViento.Checked; globe.Wind = chkViento.Checked; SaveSettings(); RequestRender(); };
+            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkVariacion, chkScatters, chkViento, chkNubes));
             densidadSlider = new DarkSlider(10, 100, (int)Math.Round(state.ScatterDensity * 100));
             densidadSlider.ValueChanged += (s, e) =>
             {
@@ -414,7 +416,16 @@ namespace KerbinMaps.UI
             chkAtm = new DarkCheck("Atmósfera", true);
             chkLight.CheckedChanged += (s, e) => SetDayNight(chkLight.Checked);
             chkAtm.CheckedChanged += (s, e) => { globe.Atmosphere = chkAtm.Checked; RequestRender(); };
-            globeSection.Add(Checks(chkLight, chkAtm));
+            chkNubes3D = new DarkCheck("Nubes", state.GlobeClouds);
+            chkNubes3D.CheckedChanged += (s, e) =>
+            {
+                state.GlobeClouds = chkNubes3D.Checked;
+                globe.GlobeClouds = chkNubes3D.Checked;
+                SaveSettings();
+                if (chkNubes3D.Checked) _ = CargarNubes();
+                RequestRender();
+            };
+            globeSection.Add(Checks(chkLight, chkAtm, chkNubes3D));
             reliefSlider = new DarkSlider(0, 60, 0);
             reliefSlider.ValueChanged += (s, e) =>
             {

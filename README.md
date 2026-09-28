@@ -30,7 +30,8 @@ What it does:
   point on the surface and a free camera you fly at ground level, all sharing observer,
   time and selection. The flight view ray-marches the body's height map, so the horizon
   and the mountain silhouettes are exact, and it dresses the ground with the game's own
-  terrain textures and cloud maps when you have them installed. With Parallax
+  terrain textures and cloud maps when you have them installed (the cloud layer shows on
+  the 3D globe too). With Parallax
   Continued, each body gets its own surface textures, blended by altitude and slope the
   way the mod does (biplanar mapping, influence, displacement blending, occlusion and
   normal maps, plus anti-tiling variation), and every planet's colour and height maps
@@ -38,7 +39,8 @@ What it does:
 - **Parallax scatters.** Grass, ferns, flowers, bushes, oaks, pines, palms and cacti on
   Kerbin, rocks on the Mun and elsewhere: the mod's own models and textures, placed by
   its own distribution rules (noise, slope, altitude, biome blacklists) and depth-tested
-  against the ray-marched ground, so a hill hides the trees behind it.
+  against the ray-marched ground, so a hill hides the trees behind it. Grass and foliage
+  sway in the wind the way the mod animates them.
 - **Optional extra textures in the installer.** If you don't have Parallax, the
   installer can fetch its planet maps (234 MB), surface textures (1.9 GB) and scatters
   (1.1 GB) from the

@@ -134,9 +134,11 @@ namespace KerbinMaps.UI
         void CargarSuelo()
         {
             globe.Clouds = state.Clouds;
+            globe.CloudAlt = state.CloudAlt;
             globe.DetailVariation = state.TextureVariation;
             globe.Scatters = state.Scatters;
             globe.ScatterDensity = state.ScatterDensity;
+            globe.Wind = state.Wind;
             _ = CargarTexturasDeTerreno();
             _ = CargarNubes();
             _ = CargarScatters();

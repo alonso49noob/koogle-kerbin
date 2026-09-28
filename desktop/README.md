@@ -454,7 +454,14 @@ con los límites de objetos por nivel del propio mod, instanciado. Las hojas y b
 pasar parte de la luz que les da por detrás. En una RTX 5060 a 1500×900, con unos 30 000
 objetos a la vista junto al KSC, el cielo tarda unos 3 ms y los scatters unos 5.
 
-Lo que no se reproduce: el viento, las burbujas de Eve (refractan lo que tienen detrás) y
+**El viento** mueve la hierba, los helechos y las copas como en el mod (`Wind` en su
+`ParallaxScatterUtils.cginc`): un mapa de ruido que se desplaza con el tiempo, leído en los
+tres planos del mundo según la vertical, empuja cada vértice de lado y un poco hacia arriba
+según su altura dentro del modelo, con la escala, velocidad e intensidad que da cada
+material. Mientras se vea algo que se mueva el visor pinta sin parar; si no, vuelve a pintar
+solo cuando cambia algo. Se apaga con «Viento en la vegetación».
+
+Lo que no se reproduce: las burbujas de Eve (refractan lo que tienen detrás) y
 las sombras de unos objetos sobre otros. La densidad se puede bajar en «Densidad de los
 scatters».
 
@@ -462,6 +469,10 @@ Las **nubes** salen del mapa de los mods de nubes que tengas (Stock Volumetric C
 EVE): una capa esférica a la altura que elijas, con la cobertura del propio mapa e
 iluminada por el Sol. Ese mapa es de 16384×8192 y pesa 179 MB con sus mipmaps, así que se
 lee **solo un nivel de 2048 de ancho**, que para pintarlas sobra y se carga al instante.
+
+La misma capa se ve también **en el globo 3D**, por encima del suelo y con la bruma del
+aire que queda entre la cámara y la nube. Con el relieve exagerado sube con él, para que
+las montañas no la atraviesen. Se apaga con «Nubes» en «Vista 3D».
 
 Todo se apaga por separado en la sección «Vuelo», y sin esos mods instalados el vuelo
 funciona igual: el suelo de cerca queda liso, sin vegetación y sin nubes.

@@ -53,7 +53,7 @@ namespace KerbinMaps.Views
                 {
                     g.Textures[k] = t.CompressedFormat != 0
                         ? Texture.FromCompressed(t.CompressedFormat, t.Width, t.Height, t.Levels)
-                        : Texture.FromRgba(t.Levels[0], t.Width, t.Height, TexFilter.Mipmap, true);
+                        : Texture.FromRgba(t.Levels[0], t.Width, t.Height, TexFilter.Mipmap, true, true);   // el viento se lee fuera de [0, 1]
                 }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[scatters] textura " + k + ": " + ex.Message); }
             }
@@ -90,6 +90,13 @@ namespace KerbinMaps.Views
         public double ScatterDensity = 1;
         public int ScatterVisible { get; private set; }
         public int MsaaSamples;                   // muestras del antialias: el alfa se vuelve cobertura
+        public bool Wind = true;
+
+        /* Con viento hay que pintar sin parar mientras se vea algo que se mueva. */
+        public bool WindAnimating => Wind && ScattersActive && ScatterWindy > 0;
+        int ScatterWindy;                         // de los visibles, los que mueve el viento
+
+        static readonly System.Diagnostics.Stopwatch relojViento = System.Diagnostics.Stopwatch.StartNew();
 
         /* Hasta dónde llega la escala de profundidad (el scatter más lejano de Kerbin, los
            icebergs, llega a 20 km). */
@@ -122,6 +129,13 @@ uniform vec3 uF, uR, uU, uEyeR, uSun;
 uniform float uTan, uAspect, uNear, uFar, uRadiusM;
 uniform vec3 uMinScale, uMaxScale;
 uniform int uBillboard;                 // 0 no; 1 cartel; 2 cartel con las normales de la malla
+/* Viento, como lo hace Parallax (Wind en ParallaxScatterUtils.cginc): un mapa que se
+   desplaza con el tiempo, leído en los tres planos del mundo segun la vertical, empuja
+   cada vertice en horizontal (y un poco en vertical) segun su altura en el modelo. */
+uniform int uWind;
+uniform sampler2D uWindMap;
+uniform vec3 uWindEye;                  // posicion del ojo por la escala del viento, sin la parte entera
+uniform float uWindScale, uWindSpeed, uWindIntensity, uWindHS, uWindHF, uTime;
 out vec2 vUv;
 out vec3 vN, vRel, vCol, vIns, vTr, vLocal, vNLocal;
 out float vZ;
@@ -147,6 +161,18 @@ void main() {
     if (uBillboard == 1) ln = vec3(0.0, 0.0, 1.0);
   }
   vec3 w = aI0.xyz + X * lp.x + up * lp.y + Z * lp.z;
+  if (uWind != 0 && aPos.y > uWindHS) {
+    vec3 tw = abs(up);
+    tw /= tw.x + tw.y + tw.z;
+    vec3 c = uWindEye + w * uWindScale;
+    float off = fract(uTime / 20.0 * uWindSpeed);
+    vec3 m = textureLod(uWindMap, c.yz + off, 0.0).rgb * tw.x
+           + textureLod(uWindMap, c.zx + off, 0.0).rgb * tw.y
+           + textureLod(uWindMap, c.xy + off, 0.0).rgb * tw.z;
+    vec3 dir = -normalize(vec3(1.0) - up * dot(vec3(1.0), up) + vec3(1e-5));
+    float h = pow(aPos.y, uWindHF) * uWindIntensity;
+    w += (dir * m + up * m * 0.4) * h;
+  }
   vN = normalize(X * ln.x + up * ln.y + Z * ln.z);
   vRel = w;
   vUv = aUv;
@@ -350,10 +376,12 @@ void main() {
             AtmosUniforms(p, 4, sunOn: !SkyForceNight);
             p.Float("uCerca", 1);
             p.Int("uTex", 0);
+            p.Int("uWindMap", 1);
+            p.Float("uTime", relojViento.Elapsed.TotalSeconds);
             bool a2c = MsaaSamples > 1;
             p.Int("uA2C", a2c ? 1 : 0);
 
-            int visibles = 0;
+            int visibles = 0, conViento = 0;
             for (int c = 0; c < capas.Length; c++)
             {
                 var d = capas[c].Def;
@@ -382,6 +410,21 @@ void main() {
                     p.Float("uTiling", mat.Tiling);
                     p.Vec4("uSub", mat.SubsurfaceColor[0], mat.SubsurfaceColor[1], mat.SubsurfaceColor[2], mat.Subsurface ? mat.SubsurfaceIntensity : 0);
                     p.Float("uSubPow", Math.Max(mat.SubsurfacePower, 0.5));
+                    gpu.Textures.TryGetValue(mat.WindMap ?? "", out var mapaViento);
+                    bool viento = Wind && mat.Wind && mapaViento != null;
+                    p.Int("uWind", viento ? 1 : 0);
+                    if (viento)
+                    {
+                        conViento += lote.N;
+                        BindTex(1, mapaViento);
+                        double kv = mat.WindScale;
+                        p.Vec3("uWindEye", Frac(ex * kv), Frac(ey * kv), Frac(ez * kv));
+                        p.Float("uWindScale", kv);
+                        p.Float("uWindSpeed", mat.WindSpeed);
+                        p.Float("uWindIntensity", mat.WindIntensity);
+                        p.Float("uWindHS", mat.WindHeightStart);
+                        p.Float("uWindHF", mat.WindHeightFactor);
+                    }
                     bool cobertura = a2c && mat.AlphaCutoff;
                     if (cobertura) GL.Enable(GL.SAMPLE_ALPHA_TO_COVERAGE);
                     GL.BindVertexArray(lote.Vao);
@@ -392,11 +435,12 @@ void main() {
                 }
             }
             ScatterVisible = visibles;
+            ScatterWindy = conViento;
         }
 
         static double Frac(double x) => x - Math.Floor(x);
 
-        void ScatterVisibleReset() => ScatterVisible = 0;
+        void ScatterVisibleReset() => ScatterVisible = ScatterWindy = 0;
 
         static void CrearVao(Lote lote, ScatterGpu.Mesh mesh)
         {

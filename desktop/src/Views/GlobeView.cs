@@ -77,7 +77,7 @@ namespace KerbinMaps.Views
 
         public CamMode Mode { get; private set; } = CamMode.Planet;
 
-        ShaderProgram prog, atmProg, lineProg;
+        ShaderProgram prog, atmProg, lineProg, cloudProg;
         uint vao, posBuf, uvBuf, idxBuf;
         int count;
         readonly float[] proj = new float[16], view = new float[16];
@@ -282,6 +282,41 @@ void main() {
   fragTrans = vec4(tr * clamp(1.0 - 1.6 * dot(col, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0), 1.0);
 }";
 
+        /* Las nubes vistas desde fuera: el mapa del mod de nubes sobre una esfera a la altura
+           de la capa, con la misma luz que en el cielo y la bruma del aire que queda entre
+           la cámara y la nube. */
+        const string CloudFS = Header + AtmosphereGlsl + @"
+in vec2 vUv;
+in vec3 vDir;
+in vec3 vWorld;
+uniform sampler2D uCloudTex;
+uniform float uCloudOff, uCloudAmt, uCloudR;
+uniform vec3 uCamPos, uLightDir;
+uniform int uLit;
+out vec4 frag;
+void main() {
+  vec4 nube = textureGrad(uCloudTex, vec2(fract(vUv.x + uCloudOff), vUv.y), dFdx(vUv), dFdy(vUv));
+  float a = clamp(nube.a * uCloudAmt, 0.0, 1.0);
+  if (a < 0.002) discard;
+  if (uLit == 0) { frag = vec4(nube.rgb, a); return; }
+  vec3 nc = normalize(vDir);
+  // la luz a la altura real de la capa, aunque se dibuje más alta con el relieve exagerado
+  vec3 luz = uSunI * sunTransmittance(nc * uCloudR, uLightDir) * max(dot(nc, uLightDir), 0.0) * 0.55
+           + uSunI * vec3(0.05, 0.07, 0.12) * 0.5;
+  vec3 col = nube.rgb * luz / PI;
+  if (uAtmos != 0) {
+    vec3 d = normalize(vWorld - uCamPos);
+    vec2 ta = raySphere(uCamPos, d, ATM_TOP);
+    float t0 = max(ta.x, 0.0), t1 = min(length(vWorld - uCamPos), ta.y);
+    if (t1 > t0) {
+      vec3 tr;
+      vec3 ins = inscatter(uCamPos, d, t0, t1, uLightDir, ign(gl_FragCoord.xy), tr);
+      col = col * tr + ins;
+    }
+  }
+  frag = vec4(toneMap(col), a);
+}";
+
         /* Dirección unitaria + radio por separado: el shader puede levantar la línea
            sobre el relieve y girar los anillos sin renormalizar nada. En la vista del
            cielo no hay búfer de profundidad que valga (el suelo está a metros y las
@@ -363,6 +398,7 @@ void main() {
             if (prog != null) return;
             prog = new ShaderProgram(VS, FS, ("aPos", 0), ("aUv", 1));
             atmProg = new ShaderProgram(VS, AtmFS, ("aPos", 0), ("aUv", 1));
+            cloudProg = new ShaderProgram(VS, CloudFS, ("aPos", 0), ("aUv", 1));
             lineProg = new ShaderProgram(LineVS, LineFS, ("aDir", 0), ("aRad", 1), ("aUv", 2));
 
             const int cols = 192, rows = 96;
@@ -844,6 +880,37 @@ void main() {
             fovL = cam.Fov;
         }
 
+        /* Capa de nubes del globo: encima del suelo y de las líneas que quedan por debajo,
+           sin escribir profundidad para que la atmósfera y las órbitas sigan viéndose. */
+        void DrawGlobeClouds(double[] eye, double[] lightDir)
+        {
+            if (!GlobeClouds || CloudTex == null || CloudAmount <= 0) return;
+            double alt = CloudAlt / Body.Radius;
+            double scale = 1 + alt * Math.Max(HeightTex != null ? Relief : 0, 1);
+            cloudProg.Use();
+            cloudProg.Mat("uProj", proj);
+            cloudProg.Mat("uView", view);
+            cloudProg.Float("uScale", scale);
+            cloudProg.Float("uRelief", 0);
+            cloudProg.Float("uCloudR", 1 + alt);
+            cloudProg.Float("uCloudOff", CloudOff / 360);
+            cloudProg.Float("uCloudAmt", CloudAmount);
+            cloudProg.Vec3("uCamPos", eye[0], eye[1], eye[2]);
+            cloudProg.Vec3("uLightDir", lightDir[0], lightDir[1], lightDir[2]);
+            cloudProg.Int("uLit", Light ? 1 : 0);
+            AtmosUniforms(cloudProg, 8);
+            BindTex(0, CloudTex); cloudProg.Int("uCloudTex", 0);
+            GL.BindVertexArray(vao);
+            GL.Enable(GL.BLEND);
+            GL.BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
+            GL.CullFace(Len(eye) > scale ? GL.BACK : GL.FRONT);  // por debajo de la capa se ve su cara interior
+            GL.DepthMask(false);
+            GL.DrawElements(GL.TRIANGLES, count, GL.UNSIGNED_INT, 0);
+            GL.DepthMask(true);
+            GL.CullFace(GL.BACK);
+            GL.Disable(GL.BLEND);
+        }
+
         public void Render(Batch2D batch, TextCache tc)
         {
             Init();
@@ -915,6 +982,7 @@ void main() {
 
             DrawTrack(eye, false);
             DrawOrbits(eye, false);
+            DrawGlobeClouds(eye, lightDir);
 
             if (Atmosphere && Body.Current.HasAir)
             {
@@ -1127,7 +1195,7 @@ void main() {
 
         public void Dispose()
         {
-            prog?.Dispose(); atmProg?.Dispose(); lineProg?.Dispose();
+            prog?.Dispose(); atmProg?.Dispose(); lineProg?.Dispose(); cloudProg?.Dispose();
             modelRenderer?.Dispose();
             DisposeSky();
             DisposeScatters();

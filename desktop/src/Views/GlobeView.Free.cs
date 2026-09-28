@@ -31,6 +31,7 @@ namespace KerbinMaps.Views
            altura. Sin el mod instalado no hay textura y no se pintan. */
         public Texture CloudTex;
         public bool Clouds = true;
+        public bool GlobeClouds = true;           // la capa de nubes también en la vista 3D
         public double CloudAlt = 5200;            // m sobre el nivel del mar
         public double CloudAmount = 1.0;
         public double CloudOff;                   // giro en longitud del mapa de nubes

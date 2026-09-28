@@ -19,6 +19,10 @@ namespace KerbinMaps.Ksp
         public float[] SubsurfaceColor = { 0, 0, 0 };
         public float SubsurfaceIntensity, SubsurfacePower = 1;
         public int CullMode = 2;
+        /* Viento: un mapa que se desplaza con el tiempo y empuja los vértices según su altura
+           en el modelo (ver GlobeView.Scatters). */
+        public string WindMap;
+        public float WindScale = 0.05f, WindHeightStart = 0.05f, WindHeightFactor = 0.05f, WindSpeed = 0.05f, WindIntensity = 0.05f;
         public HashSet<string> Keywords = new(StringComparer.OrdinalIgnoreCase);
 
         public bool AlphaCutoff => Keywords.Contains("ALPHA_CUTOFF");
@@ -26,6 +30,7 @@ namespace KerbinMaps.Ksp
         public bool Billboard => Keywords.Contains("BILLBOARD") || Keywords.Contains("BILLBOARD_USE_MESH_NORMALS");
         public bool BillboardMeshNormals => Keywords.Contains("BILLBOARD_USE_MESH_NORMALS");
         public bool Subsurface => Keywords.Contains("SUBSURFACE_SCATTERING") || Keywords.Contains("SUBSURFACE_USE_THICKNESS_TEXTURE");
+        public bool Wind => Keywords.Contains("WIND") && WindMap != null;
         public bool Biplanar => Shader.Contains("Biplanar", StringComparison.OrdinalIgnoreCase);
         // las burbujas de Eve refractan lo que tienen detrás: eso no se reproduce
         public bool Unsupported => Shader.Contains("Bubble", StringComparison.OrdinalIgnoreCase);
@@ -46,6 +51,12 @@ namespace KerbinMaps.Ksp
             if (n == null) return;
             if (n.Get("shader") is string sh) Shader = sh;
             if (n.Get("_MainTex") is string t) MainTex = t;
+            if (n.Get("_WindMap") is string wm) WindMap = wm;
+            WindScale = F(n, "_WindScale", WindScale);
+            WindHeightStart = F(n, "_WindHeightStart", WindHeightStart);
+            WindHeightFactor = F(n, "_WindHeightFactor", WindHeightFactor);
+            WindSpeed = F(n, "_WindSpeed", WindSpeed);
+            WindIntensity = F(n, "_WindIntensity", WindIntensity);
             if (Vec(n.Get("_Color")) is float[] c) Color = c;
             if (Vec(n.Get("_SubsurfaceColor")) is float[] sc) SubsurfaceColor = sc;
             Cutoff = F(n, "_Cutoff", Cutoff);
@@ -168,9 +179,8 @@ namespace KerbinMaps.Ksp
                 var n = ub.Nodos.FirstOrDefault(x => x.Path.Equals(nombre, StringComparison.OrdinalIgnoreCase));
                 return n.Path == null ? null : (n.Offset, n.Size);
             }
-            foreach (var lv in defs.SelectMany(d => d.Levels))
+            foreach (var t in defs.SelectMany(d => d.Levels).SelectMany(lv => new[] { lv.Material?.MainTex, lv.Material?.WindMap }))
             {
-                string t = lv.Material?.MainTex;
                 if (t == null || a.Textures.ContainsKey(t)) continue;
                 var id = sf.Buscar(t);
                 try { a.Textures[t] = id == null ? null : ParallaxTerrain.Convertir(sf.LeerTextura(id.Value, Recurso), maxAncho); }
