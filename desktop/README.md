@@ -444,8 +444,11 @@ Kerbin, el de SCANsat de 2048: 1,8 km por texel). Parallax trae el de Kerbin a 8
 todos sus niveles de mipmap, 42 MB) y de ella se recorta una **tesela** de 1024×1024
 alrededor de la cámara, del nivel que toque por altura: por debajo de 60 km el completo
 (±235 km, más que el horizonte a esa altura), por debajo de 200 km el de la mitad, y más
-arriba ninguno. Solo se usa un nivel si es más fino que el mapa base. Se rehace en segundo
-plano al alejarse de su centro, y se funde con el mapa base en el borde.
+arriba ninguno. Solo se usa un nivel si es al menos tan fino como el mapa base: a la misma
+resolución, la tesela sigue ganando a un PNG volcado del juego, cuyo gris tiene el tope en
+145 (56 m por escalón en Kerbin: la tierra baja de la costa se hundía bajo el mar o salía
+como arena). Se rehace en segundo plano al alejarse de su centro, y se funde con el mapa
+base en el borde.
 
 Tres detalles que se notaban:
 

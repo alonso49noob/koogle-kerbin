@@ -12,8 +12,11 @@ namespace KerbinMaps.UI
 
        Nivel por altura sobre el terreno: por debajo de 60 km el nivel 0 (en Kerbin, 460 m
        por texel; la ventana de 1024 abarca ±235 km, más que el horizonte a esa altura),
-       por debajo de 200 km el nivel 1, y más arriba nada: el mapa base basta. Un nivel solo
-       se usa si es más fino que el mapa base que ya hay. */
+       por debajo de 200 km el nivel 1, y más arriba nada: el mapa base basta. Un nivel se
+       usa si es al menos tan fino como el mapa base que ya hay: a la misma resolución la
+       tesela sigue siendo mejor que un PNG volcado del juego, que tiene el gris con tope en
+       145 (56 m por escalón en Kerbin, así que la tierra baja de la costa se hundía bajo el
+       mar o salía como arena) y sin suavizar en lo llano. */
     public sealed partial class MainForm
     {
         FuenteAltura fuenteAlt;
@@ -43,7 +46,7 @@ namespace KerbinMaps.UI
             var fuente = FuenteAlturas();
             if (fuente == null) { QuitarTesela(); return; }
             int anchoBase = MapImg("height")?.Width ?? 0;
-            if (fuente.AnchoNivel(nivel) <= anchoBase) { QuitarTesela(); return; }
+            if (fuente.AnchoNivel(nivel) < anchoBase) { QuitarTesela(); return; }
             if (tesela != null && tesela.Fuente == fuente && tesela.Nivel == nivel && tesela.Cubre(lat, lon)) return;
             if (haciendoTesela) return;
             haciendoTesela = true;
