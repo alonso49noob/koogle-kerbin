@@ -24,6 +24,27 @@ Happy to take your suggestions! Leave them on a PR or open an Issue! You can als
 with OpenGL 3.3. No NuGet packages, no engine, no telemetry: it builds offline and
 reads your game files where they already are.
 
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/globe.jpg" alt="The 3D globe with the cloud layer from your cloud mod."><br><sub>The 3D globe with the cloud layer from your cloud mod.</sub></td>
+    <td width="50%"><img src="docs/screenshots/descent.jpg" alt="Zooming down from orbit: at 3 km the camera tilts and the KSC, trees and buildings load."><br><sub>Zooming down from orbit: at 3 km the camera tilts and the KSC, trees and buildings load.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/ksc.jpg" alt="The stock KSC, read straight from the game's data files."><br><sub>The stock KSC, read straight from the game's data files.</sub></td>
+    <td width="50%"><img src="docs/screenshots/crawlerway.jpg" alt="At ground level on the crawlerway, looking at the VAB and the SPH."><br><sub>At ground level on the crawlerway, looking at the VAB and the SPH.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/kerbal-konstructs.jpg" alt="Tundra Space Center (Kerbal Konstructs) with Parallax trees and grass."><br><sub>Tundra Space Center (Kerbal Konstructs) with Parallax trees and grass.</sub></td>
+    <td width="50%"><img src="docs/screenshots/scatters.jpg" alt="Parallax scatters up close: grass, daisies and flowers, swaying in the wind."><br><sub>Parallax scatters up close: grass, daisies and flowers, swaying in the wind.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/relief.jpg" alt="Detailed relief: a full-resolution Parallax height tile streamed around the camera."><br><sub>Detailed relief: a full-resolution Parallax height tile streamed around the camera.</sub></td>
+    <td width="50%"><img src="docs/screenshots/coast.jpg" alt="Shores: shallows, foam and wet sand where land meets the sea."><br><sub>Shores: shallows, foam and wet sand where land meets the sea.</sub></td>
+  </tr>
+</table>
+
+*Screenshots rendered by the app itself, with KSP and the Parallax, Kerbal Konstructs, KSC Extended, Tundra Space Center and Stock Volumetric Clouds mods installed.*
+
 What it does:
 
 - **Four views of the same place.** A sliding flat map, a 3D globe, a sky view from a

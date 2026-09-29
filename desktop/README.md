@@ -18,6 +18,27 @@ externo: compila sin conexión.
 *This document is in Spanish. English overview of the project:
 [../README.md](../README.md).*
 
+<table>
+  <tr>
+    <td width="50%"><img src="../docs/screenshots/globe.jpg" alt="El globo 3D con la capa de nubes de tu mod de nubes."><br><sub>El globo 3D con la capa de nubes de tu mod de nubes.</sub></td>
+    <td width="50%"><img src="../docs/screenshots/descent.jpg" alt="Bajando desde la órbita: a 3 km la cámara se inclina y se cargan el KSC, los árboles y los edificios."><br><sub>Bajando desde la órbita: a 3 km la cámara se inclina y se cargan el KSC, los árboles y los edificios.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="../docs/screenshots/ksc.jpg" alt="El KSC de serie, leído de los datos del propio juego."><br><sub>El KSC de serie, leído de los datos del propio juego.</sub></td>
+    <td width="50%"><img src="../docs/screenshots/crawlerway.jpg" alt="A ras de suelo en el camino de orugas, mirando al VAB y al SPH."><br><sub>A ras de suelo en el camino de orugas, mirando al VAB y al SPH.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="../docs/screenshots/kerbal-konstructs.jpg" alt="Tundra Space Center (Kerbal Konstructs) con los árboles y la hierba de Parallax."><br><sub>Tundra Space Center (Kerbal Konstructs) con los árboles y la hierba de Parallax.</sub></td>
+    <td width="50%"><img src="../docs/screenshots/scatters.jpg" alt="Los scatters de Parallax de cerca: hierba, margaritas y flores, movidas por el viento."><br><sub>Los scatters de Parallax de cerca: hierba, margaritas y flores, movidas por el viento.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="../docs/screenshots/relief.jpg" alt="Relieve de detalle: una tesela del mapa de alturas de Parallax a resolución completa alrededor de la cámara."><br><sub>Relieve de detalle: una tesela del mapa de alturas de Parallax a resolución completa alrededor de la cámara.</sub></td>
+    <td width="50%"><img src="../docs/screenshots/coast.jpg" alt="Las costas: aguas someras, espuma y arena mojada donde la tierra toca el mar."><br><sub>Las costas: aguas someras, espuma y arena mojada donde la tierra toca el mar.</sub></td>
+  </tr>
+</table>
+
+*Capturas hechas por la propia aplicación, con KSP y los mods Parallax, Kerbal Konstructs, KSC Extended, Tundra Space Center y Stock Volumetric Clouds instalados.*
+
 ## Instalarla
 
 Descarga `KoogleKerbin-Setup-<versión>.exe` de las *releases* del repositorio y
