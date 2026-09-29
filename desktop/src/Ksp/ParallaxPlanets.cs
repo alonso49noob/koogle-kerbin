@@ -86,6 +86,26 @@ namespace KerbinMaps.Ksp
             return (Leer("Color"), Leer("Height"));
         }
 
+        /* El mapa de alturas tal cual viene en el paquete: R8 con todos sus niveles de
+           mipmap seguidos, la primera fila abajo. Para las teselas de detalle, que leen a
+           resolución completa solo la zona bajo la cámara. Null si no es R8. */
+        public static (byte[] Datos, int Ancho, int Alto, int Mips)? CargarAlturasCrudas(string bundle, string body)
+        {
+            using var ub = new UnityBundle(bundle);
+            var sf = Abrir(ub);
+            (long, long)? Recurso(string p)
+            {
+                string nombre = p.Substring(p.LastIndexOf('/') + 1);
+                var n = ub.Nodos.FirstOrDefault(x => x.Path.Equals(nombre, StringComparison.OrdinalIgnoreCase));
+                return n.Path == null ? null : (n.Offset, n.Size);
+            }
+            var id = sf.Buscar($"{body}/PluginData/{body}_Height.dds");
+            if (id == null) return null;
+            var t = sf.LeerTextura(id.Value, Recurso);
+            if (t.Formato != 63 && t.Formato != 1) return null;
+            return (t.Datos, t.Ancho, t.Alto, t.Mips);
+        }
+
         static UnitySerialized Abrir(UnityBundle ub)
         {
             var cab = ub.Nodos.First(n => !n.Path.EndsWith(".resS", StringComparison.OrdinalIgnoreCase)

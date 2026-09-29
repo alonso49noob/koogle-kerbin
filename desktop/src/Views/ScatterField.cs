@@ -67,7 +67,7 @@ namespace KerbinMaps.Views
         public Action Changed;                                   // hay celdas nuevas: pintar otra vez
 
         volatile bool vivo = true;
-        double objLat, objLon;
+        double objLat, objLon, objAgl;
         int trabajando;                                          // 1 mientras hay un hilo generando
 
         public ScatterField(double radius, IEnumerable<ScatterDef> defs)
@@ -88,10 +88,12 @@ namespace KerbinMaps.Views
 
         public void Stop() => vivo = false;
 
-        /* La cámara está aquí: si faltan celdas, se ponen a generar en otro hilo. */
-        public void Request(double lat, double lon)
+        /* La cámara está aquí (`agl`: metros sobre el suelo): si faltan celdas, se ponen a
+           generar en otro hilo. Las distancias se miden desde el ojo, así que desde arriba
+           se piden menos y más ralas, y por encima del alcance de una capa, ninguna. */
+        public void Request(double lat, double lon, double agl = 0)
         {
-            objLat = lat; objLon = lon;
+            objLat = lat; objLon = lon; objAgl = agl;
             if (Interlocked.CompareExchange(ref trabajando, 1, 0) != 0) return;
             Task.Run(() =>
             {
@@ -106,7 +108,7 @@ namespace KerbinMaps.Views
         bool Generar()
         {
             double lat = objLat, lon = objLon;
-            var eye = Pos(lat, lon, Altura(lat, lon));
+            var eye = Pos(lat, lon, Altura(lat, lon) + objAgl);
             var faltan = new List<(Layer l, int j, int i, double d, double f)>();
             foreach (var l in Layers)
             {

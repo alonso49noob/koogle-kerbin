@@ -95,6 +95,24 @@ namespace KerbinMaps.Gfx
             return new Texture { Id = id, Width = w, Height = h };
         }
 
+        /* Un canal en coma flotante (alturas en metros), sin filtrar y sin repetir: se lee
+           texel a texel con texelFetch. */
+        public static Texture FromR32F(float[] data, int w, int h)
+        {
+            var bytes = new byte[data.Length * 4];
+            Buffer.BlockCopy(data, 0, bytes, 0, bytes.Length);
+            uint id = GL.GenTexture();
+            GL.BindTexture(GL.TEXTURE_2D, id);
+            GL.PixelStore(GL.UNPACK_ALIGNMENT, 4);
+            GL.TexImage2D(GL.TEXTURE_2D, 0, (int)GL.R32F, w, h, GL.RED, GL.FLOAT, bytes);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+            GL.BindTexture(GL.TEXTURE_2D, 0);
+            return new Texture { Id = id, Width = w, Height = h };
+        }
+
         /* Textura que ya viene comprimida en DXT con sus mipmaps, como las del juego. Se
            sube tal cual (la GPU descomprime al leer) y se repite, que es lo que hace falta
            para las texturas de detalle del terreno. */

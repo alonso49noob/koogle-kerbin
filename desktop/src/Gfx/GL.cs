@@ -27,6 +27,7 @@ namespace KerbinMaps.Gfx
         public const uint FRONT = 0x0404, BACK = 0x0405;
         public const uint TEXTURE_2D = 0x0DE1, TEXTURE0 = 0x84C0;
         public const uint RGBA = 0x1908, RGBA8 = 0x8058, UNSIGNED_BYTE = 0x1401, UNSIGNED_INT = 0x1405, FLOAT = 0x1406;
+        public const uint RED = 0x1903, R32F = 0x822E;
         public const uint TEXTURE_MAG_FILTER = 0x2800, TEXTURE_MIN_FILTER = 0x2801, TEXTURE_WRAP_S = 0x2802, TEXTURE_WRAP_T = 0x2803;
         public const int NEAREST = 0x2600, LINEAR = 0x2601, LINEAR_MIPMAP_LINEAR = 0x2703, REPEAT = 0x2901, CLAMP_TO_EDGE = 0x812F;
         public const uint UNPACK_ALIGNMENT = 0x0CF5, PACK_ALIGNMENT = 0x0D05, TEXTURE_MAX_ANISOTROPY = 0x84FE, MAX_TEXTURE_MAX_ANISOTROPY = 0x84FF;

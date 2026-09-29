@@ -116,7 +116,7 @@ namespace KerbinMaps.Views
         readonly Dictionary<(ScatterDef, int), Lote> lotes = new();
 
         bool ScattersActive => Scatters && ScatterField != null && ScatterGpu != null && HeightTex != null && FreeRelief
-                               && (Mode == CamMode.Free || Mode == CamMode.Sky);
+                               && (Mode == CamMode.Free || Mode == CamMode.Sky || PlanetaCerca);
 
         const string ScatterVS = Header + AtmosphereGlsl + @"
 layout(location = 0) in vec3 aPos;
@@ -256,7 +256,7 @@ void main() {
         {
             var field = ScatterField;
             var gpu = ScatterGpu;
-            field.Request(lat, lon);
+            field.Request(lat, lon, Math.Max(0, EyeGround().Agl));
             scatterProg ??= new ShaderProgram(ScatterVS, ScatterFS);
 
             double R = Body.Radius;

@@ -301,6 +301,8 @@ namespace KerbinMaps.UI
             ActualizarSol();
             if (map.Animating) { map.Animate(dt); saveViewTimer.Stop(); saveViewTimer.Start(); }
             PasoDeVuelo(now);
+            globe.GroundAt ??= AlturaDelSuelo;
+            ActualizarTesela();
 
             int w = Math.Max(1, surface.ClientSize.Width), h = Math.Max(1, surface.ClientSize.Height);
             if (GlobeVisible)
@@ -529,7 +531,21 @@ namespace KerbinMaps.UI
                 RequestRender();
                 return;
             }
-            if (is3D) return;
+            if (is3D)
+            {
+                // en la vista 3D: el rumbo con las flechas (se nota al bajar, con la cámara inclinada)
+                switch (e.KeyCode)
+                {
+                    case Keys.Left: globe.GirarRumbo(-10); break;
+                    case Keys.Right: globe.GirarRumbo(10); break;
+                    case Keys.Add: case Keys.Oemplus: globe.Wheel(1); break;
+                    case Keys.Subtract: case Keys.OemMinus: globe.Wheel(-1); break;
+                    default: return;
+                }
+                e.Handled = true;
+                RequestRender();
+                return;
+            }
             double px = 80 * Theme.Scale;
             switch (e.KeyCode)
             {

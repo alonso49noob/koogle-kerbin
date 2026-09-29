@@ -30,7 +30,7 @@ namespace KerbinMaps.Views
         ModelGpu staticGpu;
 
         bool StaticsActive => StaticsOn && Statics != null && StaticModel != null
-                              && (Mode == CamMode.Free || Mode == CamMode.Sky);
+                              && (Mode == CamMode.Free || Mode == CamMode.Sky || PlanetaCerca);
 
         const string StaticVS = Header + AtmosphereGlsl + @"
 layout(location = 0) in vec3 aPos;

@@ -37,6 +37,7 @@ namespace KerbinMaps.Views
 
         // cámara alrededor del planeta
         public double CamLat = 0, CamLon = -74.5, CamDist = 3.2;
+        public double CamHeading;                 // rumbo al que se mira al bajar (inclinado), grados
         // cámara alrededor de una nave: rumbo y elevación desde los que se la mira
         public double[] FocusTarget = { 0, 0, 1.1 };
         public double FocusAz, FocusEl = 25, FocusDist = 0.25;
@@ -70,7 +71,11 @@ namespace KerbinMaps.Views
         public Texture ScanTex;                   // cobertura de SCANsat (360x180, sin filtrar)
         public double ScanAmt;
         public double AltMin, AltMax, AltAmt;     // filtro de altimetría
-        public double MinDist = 1.02, MaxDist = 12, SceneR = 1.2;
+        public double MinDist = 1.0, MaxDist = 12, SceneR = 1.2;
+        /* Por debajo de este radio la vista del planeta se pinta como el vuelo: el suelo
+           trazado por rayos, con sus texturas de cerca, los scatters y los edificios. */
+        public const double RadioCerca = 1.1;
+        const double RangoMinimoM = 150;          // lo más cerca del suelo que baja la rueda
         public int W = 1, H = 1;
         public float S = 1;
         public readonly List<GlobePin> Pins = new();
@@ -540,8 +545,21 @@ void main() {
         }
 
         /* Latitud y longitud bajo la cámara, sea cual sea el modo. */
+        /* Dónde está el ojo, sea cual sea el modo: latitud, longitud y altura sobre el
+           terreno en metros. */
+        public (double Lat, double Lon, double Agl) EyeGround()
+        {
+            var e = CurrentCam().Eye;
+            double l = Len(e);
+            double lat = Math.Asin(Math.Clamp(e[1] / l, -1, 1)) * R2D, lon = Geo.WrapLon(Math.Atan2(e[0], e[2]) * R2D);
+            double suelo = GroundAt?.Invoke(lat, lon) ?? 0;
+            return (lat, lon, (l - 1) * Body.Radius - Math.Max(0, suelo));
+        }
+
         public LatLon Center()
         {
+            // la vista del planeta mira a (CamLat, CamLon); inclinada, el ojo no está encima
+            if (Mode == CamMode.Planet && !transActive) return new LatLon(CamLat, Geo.WrapLon(CamLon));
             var e = CurrentCam().Eye;
             double l = Len(e);
             return new LatLon(Math.Asin(Math.Clamp(e[1] / l, -1, 1)) * R2D, Geo.WrapLon(Math.Atan2(e[0], e[2]) * R2D));
@@ -587,9 +605,47 @@ void main() {
                     return new Cam { Eye = eye, Target = Add(eye, f), Up = up, Fov = SkyFov };
                 }
                 default:
-                    return new Cam { Eye = Sph(CamLat, CamLon, CamDist), Target = new double[] { 0, 0, 0 }, Up = new double[] { 0, 1, 0 }, Fov = 45 };
+                {
+                    /* Se mira al punto (CamLat, CamLon) del terreno desde CamDist. Desde lejos,
+                       en vertical, como siempre; al bajar la cámara se va inclinando hacia el
+                       horizonte, en el rumbo elegido, como en un globo terráqueo digital. */
+                    double suelo = SueloR(CamLat, CamLon);
+                    var up = Sph(CamLat, CamLon, 1);
+                    double rango = Math.Max(CamDist - 1 - suelo, 1e-7);
+                    double tau = Inclinacion(rango * Body.Radius) * D2R;
+                    LocalBasis(up, out var u, out var east, out var north);
+                    double hd = CamHeading * D2R;
+                    var hdir = Add(Scale(north, Math.Cos(hd)), east, Math.Sin(hd));
+                    var p = Scale(up, 1 + suelo);
+                    var eye = Add(p, Add(Scale(u, Math.Cos(tau)), hdir, -Math.Sin(tau)), rango);
+                    return new Cam { Eye = eye, Target = p, Up = hdir, Fov = 45 };
+                }
             }
         }
+
+        static double SuaveEntre(double x, double a, double b)
+        {
+            double t = Math.Clamp((x - a) / (b - a), 0, 1);
+            return t * t * (3 - 2 * t);
+        }
+
+        /* Altura del terreno en radios (0 en el mar). */
+        double SueloR(double lat, double lon) => Math.Max(0, GroundAt?.Invoke(lat, lon) ?? 0) / Body.Radius;
+
+        /* Inclinación de la cámara del planeta según la distancia al suelo: vertical por
+           encima de 120 km, 70° a menos de 1,5 km, y en medio suave, en escala logarítmica. */
+        static double Inclinacion(double rangoM)
+        {
+            double k = Math.Clamp((Math.Log(Math.Max(rangoM, 1)) - Math.Log(1500)) / (Math.Log(120000) - Math.Log(1500)), 0, 1);
+            k = k * k * (3 - 2 * k);
+            return 70 * (1 - k);
+        }
+
+        /* La vista del planeta está tan cerca que se pinta con el suelo del vuelo. */
+        public bool PlanetaCerca => Mode == CamMode.Planet && Len(CurrentCam().Eye) < RadioCerca;
+
+        /* Girar el rumbo de la vista del planeta (solo se nota con la cámara inclinada). */
+        public void GirarRumbo(double grados) => CamHeading = ((CamHeading + grados) % 360 + 360) % 360;
 
         /* La cámara de este instante: la del modo, o una mezcla si hay transición. El
            ojo se interpola por la esfera (dirección y radio por separado) para que no
@@ -745,11 +801,15 @@ void main() {
                     break;
                 }
                 default:
-                    /* El este cae a la derecha, así que arrastrar a la derecha baja la
-                       longitud de la cámara: el terreno agarrado acompaña al cursor. */
-                    CamLon = dragB - Arc(dx);
-                    CamLat = Math.Clamp(dragA + Arc(dy), -89.9, 89.9);
+                {
+                    /* El terreno agarrado acompaña al cursor. Con rumbo 0 el este cae a la
+                       derecha, así que arrastrar a la derecha baja la longitud; con otro
+                       rumbo, lo mismo girado. */
+                    double ax = Arc(dx), ay = Arc(dy), h = CamHeading * D2R;
+                    CamLat = Math.Clamp(dragA + ay * Math.Cos(h) + ax * Math.Sin(h), -89.9, 89.9);
+                    CamLon = dragB + ay * Math.Sin(h) - ax * Math.Cos(h);
                     break;
+                }
             }
             return first;
         }
@@ -778,8 +838,15 @@ void main() {
                     FreeSpeedStep((int)Math.Round(notches));
                     break;
                 default:
-                    CamDist = Math.Clamp(CamDist * Math.Exp(-notches * 100 * 0.0012), MinDist, MaxDist);
+                {
+                    /* Lo que se acerca es la distancia al suelo, no al centro: así se baja
+                       de la órbita al terreno con el mismo gesto, cada muesca un 22 %. */
+                    double suelo = SueloR(CamLat, CamLon);
+                    double rango = Math.Max(CamDist - 1 - suelo, RangoMinimoM / Body.Radius);
+                    rango = Math.Max(rango * Math.Exp(-notches * 0.25), RangoMinimoM / Body.Radius);
+                    CamDist = Math.Clamp(1 + suelo + rango, MinDist, MaxDist);
                     break;
+                }
             }
         }
 
@@ -918,7 +985,7 @@ void main() {
             /* Cerca de la superficie el búfer de profundidad no da para distinguir el
                suelo a metros de una órbita a cientos de kilómetros: ahí se usa el
                trazado de rayos de la vista del cielo, también a mitad de transición. */
-            if (Mode == CamMode.Sky || Mode == CamMode.Free || (transActive && Len(cam.Eye) < 1.1))
+            if (Mode == CamMode.Sky || Mode == CamMode.Free || ((Mode == CamMode.Planet || transActive) && Len(cam.Eye) < RadioCerca))
             {
                 RenderSky(batch, tc, cam);
                 return;

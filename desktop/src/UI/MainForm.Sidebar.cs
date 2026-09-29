@@ -11,7 +11,7 @@ namespace KerbinMaps.UI
     {
         Section globeSection;
         Section secCuerpo, secScan, secAltim, secTransfer, secAterrizaje, secNaves, secMarcadores, secVuelo;
-        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax, chkVariacion, chkScatters, chkViento;
+        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax, chkVariacion, chkScatters, chkViento, chkTeselas;
         DarkSlider densidadSlider;
         FieldHeader densidadHeader;
         DarkSlider velSlider, nubeAltSlider;
@@ -373,7 +373,9 @@ namespace KerbinMaps.UI
             };
             chkViento = new DarkCheck("Viento en la vegetación", state.Wind);
             chkViento.CheckedChanged += (s, e) => { state.Wind = chkViento.Checked; globe.Wind = chkViento.Checked; SaveSettings(); RequestRender(); };
-            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkVariacion, chkScatters, chkViento, chkNubes));
+            chkTeselas = new DarkCheck("Relieve de detalle bajo la cámara (Parallax)", state.DetailTiles);
+            chkTeselas.CheckedChanged += (s, e) => { state.DetailTiles = chkTeselas.Checked; SaveSettings(); if (!chkTeselas.Checked) QuitarTesela(); RequestRender(); };
+            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkVariacion, chkTeselas, chkScatters, chkViento, chkNubes));
             densidadSlider = new DarkSlider(10, 100, (int)Math.Round(state.ScatterDensity * 100));
             densidadSlider.ValueChanged += (s, e) =>
             {
@@ -440,7 +442,10 @@ namespace KerbinMaps.UI
             globeSection.Add(reliefWrap);
             reliefHint = globeSection.Add(Hint("El relieve necesita un mapa de alturas cargado. Exagera la altura para que " +
                                                "se note: a escala real, el pico más alto de Kerbin es un 1% del radio y no se vería nada."));
-            globeSection.Add(Hint("Arrastra para girar, rueda para acercarte. Los marcadores se ocultan solos al pasar tras el horizonte."));
+            globeSection.Add(Hint("Arrastra para girar, rueda para acercarte: se puede bajar hasta el suelo. Al acercarse la cámara se inclina " +
+                                  "hacia el horizonte (las flechas cambian el rumbo) y, cerca del suelo, se cargan el relieve de detalle, las " +
+                                  "texturas de cerca, la vegetación y los edificios, con más detalle cuanto más cerca. Los marcadores se ocultan " +
+                                  "solos al pasar tras el horizonte."));
             Vis.Set(globeSection, false);
 
             /* ------------------------------------------------------- Vista del cielo */

@@ -44,7 +44,11 @@ namespace KerbinMaps.UI
         (double Min, double Max) RangoAltura()
         {
             if (OnMapBody) return (state.HMin, state.HMax);
-            if (parallaxRanges.TryGetValue(Body.Name, out var pr)) return BodyMaps.Calibracion(pr.Min, pr.Max);
+            /* Leídos del paquete de Parallax, el gris usa toda la escala: 0 y 255 son el
+               mínimo y el máximo del terreno (en Kerbin, así el KSC queda a 79 m y la
+               plataforma a 74). El tope de 145 es de los volcados a PNG de la carpeta. */
+            if (parallaxRanges.TryGetValue(Body.Name, out var pr))
+                return bodyMapsSource == "Parallax" ? (pr.Min, pr.Max) : BodyMaps.Calibracion(pr.Min, pr.Max);
             var cobertura = extras?.Cobertura(Body.Name);
             if (cobertura != null && !double.IsNaN(cobertura.MinHeight) && cobertura.MaxHeight > cobertura.MinHeight)
                 return (cobertura.MinHeight, cobertura.MaxHeight);

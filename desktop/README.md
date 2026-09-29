@@ -388,6 +388,56 @@ Dos detalles que costó afinar:
   lenguaje deja sin definir: el mipmap se iba al nivel más basto y el suelo salía de un
   gris plano. El nivel se calcula del tamaño que tiene el píxel sobre el suelo.
 
+### Del globo al suelo, con la rueda
+
+En la vista 3D la rueda ya no se para a 12 km: acerca la distancia al terreno (cada
+muesca un 22 %) hasta 150 m del suelo. Por encima de 120 km se mira en vertical, como
+siempre; al bajar la cámara se va inclinando hacia el horizonte, en escala logarítmica,
+hasta unos 70° cerca del suelo, mirando al punto que se estaba viendo. Las flechas
+izquierda y derecha giran el rumbo y arrastrar mueve el terreno en ese rumbo.
+
+Por debajo de 1,1 radios (en Kerbin, 60 km) el planeta se pinta como en el vuelo, con el
+suelo trazado por rayos, y lo que viste el terreno de cerca se carga la primera vez que se
+baja, sin entrar en el vuelo: texturas de suelo, nubes, scatters y edificios. La
+exposición se funde entre la del globo y la de paisaje entre 40 y 3 km, para que el
+cambio no dé un salto. El nivel de detalle va con la distancia a todo: el relieve de
+detalle con la altura (ver abajo), las texturas de suelo con la distancia de cada píxel,
+los edificios hasta 25 km, y los scatters midiendo desde el ojo y no desde el suelo que
+tiene debajo, así que desde arriba se generan menos y más ralos, y por encima del alcance
+de cada tipo, ninguno.
+
+### Relieve de detalle: teselas
+
+El mapa de alturas del cuerpo se sube entero a una resolución que cabe en memoria (en
+Kerbin, el de SCANsat de 2048: 1,8 km por texel). Parallax trae el de Kerbin a 8192
+(460 m por texel), pero entero serían 128 MB. Así que se guarda su versión cruda (R8, con
+todos sus niveles de mipmap, 42 MB) y de ella se recorta una **tesela** de 1024×1024
+alrededor de la cámara, del nivel que toque por altura: por debajo de 60 km el completo
+(±235 km, más que el horizonte a esa altura), por debajo de 200 km el de la mitad, y más
+arriba ninguno. Solo se usa un nivel si es más fino que el mapa base. Se rehace en segundo
+plano al alejarse de su centro, y se funde con el mapa base en el borde.
+
+Tres detalles que se notaban:
+
+- El gris es de 8 bits (32 m por escalón en Kerbin): en las zonas llanas se suaviza con
+  una gaussiana de 2 texeles, solo donde apenas hay dos o tres grises distintos, para que
+  los escalones no salgan como terrazas; donde hay relieve de verdad no se toca.
+- Se interpola con Catmull-Rom entre 4×4 texeles, en la GPU y en la CPU con la misma
+  cuenta (lo que se coloca en el suelo tiene que coincidir con lo que se pinta). La curva
+  quíntica del mapa base se queda plana en cada texel, y a 460 m eso se ve como bandas en
+  la luz de las laderas.
+- La marcha del rayo avanza según la holgura sobre el terreno, con un mínimo que crece
+  con la distancia, en lugar de 128 pasos fijos: con pasos fijos, las crestas finas de
+  lejos se saltaban y las siluetas salían a escalones.
+
+Cuesta poco: en una RTX 5060 a 1280×720, 1,7 ms por fotograma con la tesela frente a 1,5
+sin ella, y 6,5 ms bajando al KSC con edificios, scatters y nubes.
+
+Al leer estos mapas del paquete de Parallax salió otra cosa: ahí el gris usa toda la
+escala (0 y 255 son el mínimo y el máximo del terreno; el KSC queda a 79 m), mientras que
+el tope en el gris 145 es de los volcados a PNG. Los mapas de los demás cuerpos leídos del
+paquete salían 1,76 veces más altos; ahora cada fuente usa su calibración.
+
 ### Texturas de suelo y nubes, del juego
 
 De cerca, el mapa del cuerpo no da más de sí: un texel son cientos de metros. Encima se
@@ -617,7 +667,7 @@ proyecto.
 
 | Carpeta | Qué hay |
 |---|---|
-| `src\Core` | Lo que no depende de la pantalla: geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`, más lo que la web no tiene: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
+| `src\Core` | Lo que no depende de la pantalla (también las teselas de relieve, `TeselaAltura.cs`, y las explanadas, `Aplanado.cs`): geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`, más lo que la web no tiene: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
 | `src\Gfx` | Enlaces a OpenGL, el control con el contexto (con antialias multimuestra), shaders, texturas, dibujo 2D por lotes y rótulos. |
 | `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`), el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble), los scatters de Parallax (`ScatterField.cs` los reparte en segundo plano; `GlobeView.Scatters.cs` los pinta) y los edificios de Kerbal Konstructs (`GlobeView.Statics.cs`, con la elección por clic); `ModelGpu.cs` sube mallas y texturas para los dos. |
 | `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques, y también los `.assets` sueltos del juego; `DxtDecoder.cs`; `ParallaxPlanets.cs`, `ParallaxTerrain.cs` y `ParallaxScatters.cs`), las texturas de serie (`StockAssets.cs`) y Kerbal Konstructs (`Konstructs.cs` lee y coloca; `KonstructsWriter.cs` guarda) y los edificios del KSC sacados de los datos de Unity (`StockPrefabs.cs`). |

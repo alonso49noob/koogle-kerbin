@@ -102,7 +102,8 @@ namespace KerbinMaps.UI
 
         double PasoKK => double.TryParse(kkPaso?.SelectedId, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : 1;
         double GiroKK => double.TryParse(kkGiro?.SelectedId, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : 15;
-        double AzCamara => isFree ? globe.FreeAz : isSky ? globe.SkyAz : 0;
+        double AzCamara => isFree ? globe.FreeAz : isSky ? globe.SkyAz : is3D ? globe.CamHeading : 0;
+        bool VistaDeSuelo => isFree || isSky || (is3D && globe.PlanetaCerca);
 
         bool PuedeEditar(KkInstance i, bool duplicar = false)
         {
@@ -221,7 +222,7 @@ namespace KerbinMaps.UI
 
         bool KKKeyDown(KeyEventArgs e)
         {
-            if (!kkEditando || kkSel == null || !(isFree || isSky) || FocusInText()) return false;
+            if (!kkEditando || kkSel == null || !VistaDeSuelo || FocusInText()) return false;
             switch (e.KeyCode)
             {
                 case Keys.I: MoverKK(1, 0, 0); break;
@@ -243,7 +244,7 @@ namespace KerbinMaps.UI
         /* Clic en el vuelo o el cielo con el editor activo: el edificio bajo el ratón. */
         bool KKClick(int x, int y)
         {
-            if (!kkEditando || !(isFree || isSky)) return false;
+            if (!kkEditando || !VistaDeSuelo) return false;
             var i = globe.PickStatic(x, y);
             if (i == null) return false;
             SeleccionarKK(i);

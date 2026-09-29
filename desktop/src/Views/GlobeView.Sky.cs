@@ -94,17 +94,58 @@ float grisSuave(vec2 uv) {
   return mix(a, b, f.y);
 }
 
-/* Altura del terreno en esa direccion, en metros sobre el nivel del mar. */
 /* Zonas allanadas (la explanada del KSC): dirección y altura, y radios plano y de fundido. */
 uniform int uFlatCount;
 uniform vec4 uFlat[4];
 uniform vec2 uFlatR[4];
 
+/* Tesela de alturas de detalle bajo la cámara (ver TeselaAltura): una ventana del mapa a
+   resolución completa. Rect: primer texel y tamaño de la ventana; Nivel: tamaño del nivel
+   entero y desfase de longitud; Rango: metros del gris 0 y del 255; y el ancho del fundido. */
+uniform int uTesela;
+uniform sampler2D uTeselaTex;
+uniform vec4 uTeselaRect;
+uniform vec3 uTeselaNivel;
+uniform vec3 uTeselaRango;
+
+/* Pesos de Catmull-Rom (ver TeselaAltura.Altura, que hace lo mismo en la CPU). */
+vec4 pesosCatmullRom(float f) {
+  float f2 = f * f, f3 = f2 * f;
+  return vec4(-f + 2.0 * f2 - f3, 2.0 - 5.0 * f2 + 3.0 * f3, f + 4.0 * f2 - 3.0 * f3, -f2 + f3) * 0.5;
+}
+
+/* Altura de la tesela en metros y su peso (0 fuera, 1 dentro, fundido cerca del borde). */
+vec2 alturaTesela(float lat, float lon) {
+  float u = fract(lon / (2.0 * PI) + 0.5 + uTeselaNivel.z), v = 0.5 - lat / PI;
+  vec2 t = vec2(u * uTeselaNivel.x, v * uTeselaNivel.y) - 0.5 - uTeselaRect.xy;
+  if (t.x < -uTeselaNivel.x * 0.5) t.x += uTeselaNivel.x;
+  if (t.x > uTeselaNivel.x * 0.5) t.x -= uTeselaNivel.x;
+  vec2 lim = uTeselaRect.zw - 3.0;
+  if (t.x < 1.0 || t.y < 1.0 || t.x > lim.x || t.y > lim.y) return vec2(0.0);
+  ivec2 i = ivec2(floor(t));
+  vec2 f = t - vec2(i);
+  vec4 wx = pesosCatmullRom(f.x), wy = pesosCatmullRom(f.y);
+  float h = 0.0;
+  for (int j = 0; j < 4; j++) {
+    int y = i.y - 1 + j;
+    vec4 fila = vec4(texelFetch(uTeselaTex, ivec2(i.x - 1, y), 0).r, texelFetch(uTeselaTex, ivec2(i.x, y), 0).r,
+                     texelFetch(uTeselaTex, ivec2(i.x + 1, y), 0).r, texelFetch(uTeselaTex, ivec2(i.x + 2, y), 0).r);
+    h += wy[j] * dot(wx, fila);
+  }
+  float borde = min(min(t.x - 1.0, lim.x - t.x), min(t.y - 1.0, lim.y - t.y));
+  return vec2(h, smoothstep(0.0, 1.0, clamp(borde / uTeselaRango.z, 0.0, 1.0)));
+}
+
+/* Altura del terreno en esa direccion, en metros sobre el nivel del mar. */
 float terrainH(vec3 n) {
   float lat = asin(clamp(n.y, -1.0, 1.0));
   float lon = atan(n.x, n.z);
   vec2 uv = vec2(fract(lon / (2.0 * PI) + 0.5 + uHeightOff), 0.5 - lat / PI);
-  float h = uHMin + grisSuave(uv) * (uHMax - uHMin);
+  float h;
+  vec2 ht = uTesela != 0 ? alturaTesela(lat, lon) : vec2(0.0);
+  // dentro de la tesela el mapa base ni se lee
+  if (ht.y >= 1.0) h = ht.x;
+  else h = mix(uHMin + grisSuave(uv) * (uHMax - uHMin), ht.x, ht.y);
   for (int i = 0; i < uFlatCount; i++) {
     float d = length(n - uFlat[i].xyz) * uRadiusM;
     if (d < uFlatR[i].y) h = mix(h, uFlat[i].w, 1.0 - smoothstep(uFlatR[i].x, uFlatR[i].y, d));
@@ -144,13 +185,17 @@ float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
   float t1 = tSea.x > 0.0 ? tSea.x : tTop.y;
   if (t1 <= t0) return -1.0;
 
-  float prevT = t0;
-  const int N = 128;
-  for (int i = 1; i <= N; i++) {
-    float f01 = float(i) / float(N);
-    float tt = mix(t0, t1, f01 * f01);
+  /* Pasos según la holgura sobre el terreno: con pendientes de hasta unos 60° no se
+     salta nada avanzando la mitad de la altura que queda por encima. Un mínimo que
+     crece con la distancia (lo que abarca un píxel) y otro que asegura llegar al final
+     en 256 pasos. Con pasos fijos, las crestas finas de lejos se saltaban (escalones en
+     las siluetas), sobre todo con la tesela de detalle. */
+  float prevT = t0, tt = t0;
+  float pasoMin = (t1 - t0) / 256.0;
+  for (int i = 0; i < 256; i++) {
     vec3 p = o + d * tt;
-    if (length(p) < terrainR(p)) {
+    float encima = length(p) - terrainR(p);
+    if (encima < 0.0) {
       float a = prevT, b = tt;
       for (int k = 0; k < 14; k++) {
         float m = 0.5 * (a + b);
@@ -161,7 +206,9 @@ float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
       nOut = terrainNormal(o + d * th);
       return th;
     }
+    if (tt >= t1) break;
     prevT = tt;
+    tt = min(t1, tt + max(max(encima * 0.5, tt * 0.0015 + 1.0 / uRadiusM), pasoMin));
   }
   if (tSea.x > 0.0) { wasSea = 1.0; nOut = normalize(o + d * tSea.x); return tSea.x; }
   return -1.0;
@@ -592,8 +639,9 @@ void main() {
             skyProg.Vec3("uSun", sun[0], sun[1], sun[2]);
             skyProg.Float("uSunRad", Math.Max(SunAngularRadius, 0.0015));
             AtmosUniforms(skyProg, 24, sunOn: !SkyForceNight);
-            // a ras de suelo, el ajuste de exposición para paisaje (ver shadeGround)
-            skyProg.Float("uCerca", 1);
+            // a ras de suelo, el ajuste de exposición para paisaje (ver shadeGround); bajando
+            // desde el globo se funde con el de fuera para que no dé un salto
+            skyProg.Float("uCerca", Mode == CamMode.Planet ? 1 - SuaveEntre((Len(eye) - 1) * Body.Radius, 3000, 40000) : 1);
             skyProg.Float("uColorOff", ColorOff / 360);
             skyProg.Float("uBiomeOff", BiomeOff / 360);
             skyProg.Float("uBiomeAmt", BiomeTex != null ? BiomeAmt : 0);
@@ -606,6 +654,16 @@ void main() {
             skyProg.Int("uRelief", relieve ? 1 : 0);
             skyProg.Float("uHeightOff", HeightOff / 360);
             skyProg.Float("uHMin", HMin);
+            var tesela = Tesela;
+            bool conTesela = tesela != null && TeselaTex != null;
+            skyProg.Int("uTesela", conTesela ? 1 : 0);
+            if (conTesela)
+            {
+                BindTex(15, TeselaTex); skyProg.Int("uTeselaTex", 15);
+                skyProg.Vec4("uTeselaRect", tesela.X0, tesela.Y0, tesela.Tw, tesela.Th);
+                skyProg.Vec3("uTeselaNivel", tesela.W, tesela.H, tesela.Offset / 360);
+                skyProg.Vec3("uTeselaRango", tesela.Min, tesela.Max, tesela.Margen);
+            }
             int nFlat = Math.Min(4, Aplanados?.Count ?? 0);
             skyProg.Int("uFlatCount", nFlat);
             for (int i = 0; i < nFlat; i++)
@@ -642,6 +700,7 @@ void main() {
             skyProg.Vec3("uPxSteep", PxSteep.power, PxSteep.contrast, PxSteep.mid);
             skyProg.Float("uDetAmt", det ? DetailAmount : 0);
             double lat0 = Mode == CamMode.Free ? FreeLat : ObsLat, lon0 = Mode == CamMode.Free ? FreeLon : ObsLon;
+            if (Mode == CamMode.Planet) { var g = EyeGround(); lat0 = g.Lat; lon0 = g.Lon; }
             /* El módulo es un múltiplo de todos los periodos de las texturas (4096 repeticiones:
                la escala más grande que se usa es de 1024) y de su ruido de variación. */
             double periodo = DetailTile * 4096;
@@ -706,7 +765,7 @@ void main() {
             DrawTrack(eye, occlude: true, ground: false);
 
             batch.Begin(W, H);
-            PlacePins(batch, tc, eye, vesselsOnly: true);
+            PlacePins(batch, tc, eye, vesselsOnly: Mode != CamMode.Planet);
             if (SkyGrid && Mode == CamMode.Sky) DrawCompass(batch, tc, eye, up, east, north);
             batch.End();
         }

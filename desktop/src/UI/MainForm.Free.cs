@@ -58,7 +58,7 @@ namespace KerbinMaps.UI
             var img = MapImg("height");
             var (hmin, hmax) = RangoAltura();
             double h = img == null ? 0 : img.HeightSmooth(lat, Geo.WrapLon(lon), hmin, hmax, (int)HeightOffNow);
-            return Aplanado.Aplicar(aplanados, lat, lon, h, Body.Radius);
+            return Aplanado.Aplicar(aplanados, lat, lon, ConTesela(lat, lon, h), Body.Radius);
         }
 
         /* Un paso de vuelo con las teclas que estén pulsadas. Lo llama el bucle de
@@ -139,6 +139,9 @@ namespace KerbinMaps.UI
             globe.Scatters = state.Scatters;
             globe.ScatterDensity = state.ScatterDensity;
             globe.Wind = state.Wind;
+            // también al bajar hasta el suelo desde la vista 3D, que no pasa por EntrarVuelo
+            globe.FreeRelief = state.FreeRelief;
+            globe.Detail = state.FreeDetail;
             _ = CargarTexturasDeTerreno();
             _ = CargarNubes();
             _ = CargarScatters();
