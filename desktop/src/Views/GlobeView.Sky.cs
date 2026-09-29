@@ -95,11 +95,21 @@ float grisSuave(vec2 uv) {
 }
 
 /* Altura del terreno en esa direccion, en metros sobre el nivel del mar. */
+/* Zonas allanadas (la explanada del KSC): dirección y altura, y radios plano y de fundido. */
+uniform int uFlatCount;
+uniform vec4 uFlat[4];
+uniform vec2 uFlatR[4];
+
 float terrainH(vec3 n) {
   float lat = asin(clamp(n.y, -1.0, 1.0));
   float lon = atan(n.x, n.z);
   vec2 uv = vec2(fract(lon / (2.0 * PI) + 0.5 + uHeightOff), 0.5 - lat / PI);
-  return uHMin + grisSuave(uv) * (uHMax - uHMin);
+  float h = uHMin + grisSuave(uv) * (uHMax - uHMin);
+  for (int i = 0; i < uFlatCount; i++) {
+    float d = length(n - uFlat[i].xyz) * uRadiusM;
+    if (d < uFlatR[i].y) h = mix(h, uFlat[i].w, 1.0 - smoothstep(uFlatR[i].x, uFlatR[i].y, d));
+  }
+  return h;
 }
 
 /* Radio de la superficie en ese punto. Bajo el nivel del mar manda el mar: el agua
@@ -596,6 +606,14 @@ void main() {
             skyProg.Int("uRelief", relieve ? 1 : 0);
             skyProg.Float("uHeightOff", HeightOff / 360);
             skyProg.Float("uHMin", HMin);
+            int nFlat = Math.Min(4, Aplanados?.Count ?? 0);
+            skyProg.Int("uFlatCount", nFlat);
+            for (int i = 0; i < nFlat; i++)
+            {
+                var a = Aplanados[i];
+                skyProg.Vec4("uFlat[" + i + "]", a.N[0], a.N[1], a.N[2], a.H);
+                skyProg.Vec2("uFlatR[" + i + "]", a.R0, a.R1);
+            }
             skyProg.Float("uHMax", HMax);
             skyProg.Float("uRadiusM", Body.Radius);
             // cascara por encima de la cima mas alta, que es donde empieza a buscarse el suelo

@@ -41,10 +41,11 @@ uniform vec4 uUvXform;
 uniform vec3 uF, uR, uU, uEyeR, uSun;
 uniform float uTan, uAspect, uNear, uFar, uRadiusM;
 out vec2 vUv;
-out vec3 vN, vRel, vIns, vTr;
+out vec3 vN, vRel, vIns, vTr, vLocal;
 out float vZ;
 void main() {
   vec3 w = (uModel * vec4(aPos, 1.0)).xyz;
+  vLocal = aPos;
   vRel = w;
   vN = mat3(uNrm) * aNrm;
   vUv = aUv * uUvXform.xy + uUvXform.zw;
@@ -69,12 +70,25 @@ uniform sampler2D uTex;
 uniform int uHasTex, uCutout, uBlend;
 uniform vec4 uColor;
 uniform vec3 uTint;                     // resaltado de la instancia elegida
+/* Suelo del KSC («Diffuse Ground KSC»): hierba repetida por la posición en la malla y
+   teñida, asfalto por las UV, y una máscara con las UV que dice dónde va cada uno. */
+uniform int uGround, uHasGrass, uHasTarmac, uHasMask;
+uniform sampler2D uGrass, uTarmac, uMask;
+uniform float uGrassTiling;
+uniform vec3 uGrassColor, uTarmacColor;
+uniform vec2 uTarmacScale;
 in vec2 vUv;
-in vec3 vN, vRel, vIns, vTr;
+in vec3 vN, vRel, vIns, vTr, vLocal;
 in float vZ;
 out vec4 frag;
 void main() {
   vec4 c = (uHasTex != 0 ? texture(uTex, vUv) : vec4(0.7, 0.7, 0.7, 1.0)) * uColor;
+  if (uGround != 0) {
+    vec3 g = (uHasGrass != 0 ? texture(uGrass, vLocal.xz * uGrassTiling).rgb : vec3(0.5)) * uGrassColor;
+    vec3 t = (uHasTarmac != 0 ? texture(uTarmac, vUv * uTarmacScale).rgb : vec3(0.55)) * uTarmacColor;
+    float m = uHasMask != 0 ? texture(uMask, vUv).r : 0.0;
+    c = vec4(mix(g, t, m), 1.0);
+  }
   if (uCutout != 0 && c.a < 0.5) discard;
   /* Las caras de KSP son de una sola cara y el cambio de marco (mano izquierda a
      derecha) invierte su sentido: la normal se vuelve hacia quien mira. */
@@ -148,6 +162,7 @@ void main() {
             AtmosUniforms(p, 4, sunOn: !SkyForceNight);
             p.Float("uCerca", 1);
             p.Int("uTex", 0);
+            p.Int("uGrass", 1); p.Int("uTarmac", 2); p.Int("uMask", 3);
             GL.ActiveTexture(GL.TEXTURE0);
 
             for (int pass = 0; pass < 2; pass++)
@@ -168,6 +183,21 @@ void main() {
                         p.Mat("uNrm", VesselModelRenderer.NormalMatrix(mm));
                         p.Vec4("uUvXform", it.TexScale[0], it.TexScale[1], it.TexOffset[0], it.TexOffset[1]);
                         p.Vec4("uColor", it.Color[0], it.Color[1], it.Color[2], it.Color[3]);
+                        var gr = it.Ground;
+                        p.Int("uGround", gr != null ? 1 : 0);
+                        if (gr != null)
+                        {
+                            uint tg = staticGpu.Tex(a, gr.Grass), tt = staticGpu.Tex(a, gr.Tarmac), tm = staticGpu.Tex(a, gr.Mask);
+                            GL.ActiveTexture(GL.TEXTURE0 + 1); GL.BindTexture(GL.TEXTURE_2D, tg);
+                            GL.ActiveTexture(GL.TEXTURE0 + 2); GL.BindTexture(GL.TEXTURE_2D, tt);
+                            GL.ActiveTexture(GL.TEXTURE0 + 3); GL.BindTexture(GL.TEXTURE_2D, tm);
+                            GL.ActiveTexture(GL.TEXTURE0);
+                            p.Int("uHasGrass", tg != 0 ? 1 : 0); p.Int("uHasTarmac", tt != 0 ? 1 : 0); p.Int("uHasMask", tm != 0 ? 1 : 0);
+                            p.Float("uGrassTiling", gr.GrassTiling);
+                            p.Vec3("uGrassColor", gr.GrassColor[0], gr.GrassColor[1], gr.GrassColor[2]);
+                            p.Vec3("uTarmacColor", gr.TarmacColor[0], gr.TarmacColor[1], gr.TarmacColor[2]);
+                            p.Vec2("uTarmacScale", gr.TarmacScale[0], gr.TarmacScale[1]);
+                        }
                         uint tex = staticGpu.Tex(a, it.TexturePath);
                         GL.BindTexture(GL.TEXTURE_2D, tex);
                         p.Int("uHasTex", tex != 0 ? 1 : 0);

@@ -56,9 +56,9 @@ namespace KerbinMaps.UI
         double AlturaCruda(double lat, double lon)
         {
             var img = MapImg("height");
-            if (img == null) return 0;
             var (hmin, hmax) = RangoAltura();
-            return img.HeightSmooth(lat, Geo.WrapLon(lon), hmin, hmax, (int)HeightOffNow);
+            double h = img == null ? 0 : img.HeightSmooth(lat, Geo.WrapLon(lon), hmin, hmax, (int)HeightOffNow);
+            return Aplanado.Aplicar(aplanados, lat, lon, h, Body.Radius);
         }
 
         /* Un paso de vuelo con las teclas que estén pulsadas. Lo llama el bucle de

@@ -30,6 +30,7 @@ namespace KerbinMaps.Views
         /* Nubes: el mapa del juego (EVE / Stock Volumetric Clouds) sobre una capa a su
            altura. Sin el mod instalado no hay textura y no se pintan. */
         public Texture CloudTex;
+        public System.Collections.Generic.IReadOnlyList<Aplanado> Aplanados = Array.Empty<Aplanado>();   // explanadas (el KSC)
         public bool Clouds = true;
         public bool GlobeClouds = true;           // la capa de nubes también en la vista 3D
         public double CloudAlt = 5200;            // m sobre el nivel del mar

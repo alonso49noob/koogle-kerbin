@@ -46,6 +46,8 @@ namespace KerbinMaps.Core
         public readonly Dictionary<string, ScanCoverage> Scan = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, ProgressBody> Progress = new(StringComparer.OrdinalIgnoreCase);
         public readonly List<Waypoint> Waypoints = new();
+        /* Nivel de cada instalación del KSC («SpaceCenter/LaunchPad» → 0, 0,5 o 1). */
+        public readonly Dictionary<string, double> NivelesKsc = new(StringComparer.OrdinalIgnoreCase);
 
         public bool HasScan => Scan.Count > 0;
         public bool Sandbox => string.IsNullOrEmpty(Mode) || Mode.Equals("SANDBOX", StringComparison.OrdinalIgnoreCase);
@@ -54,7 +56,7 @@ namespace KerbinMaps.Core
         public ProgressBody Hitos(string body) => body != null && Progress.TryGetValue(body, out var p) ? p : null;
 
         static readonly HashSet<string> Interesa = new(StringComparer.Ordinal)
-        { "SCANcontroller", "ProgressTracking", "ScenarioCustomWaypoints" };
+        { "SCANcontroller", "ProgressTracking", "ScenarioCustomWaypoints", "ScenarioUpgradeableFacilities" };
 
         public static SaveExtras Parse(string text) => Parse(text.Split('\n'));
 
@@ -142,6 +144,11 @@ namespace KerbinMaps.Core
                                 }
                             extras.Progress[b.Name] = p;
                         }
+                    break;
+
+                case "ScenarioUpgradeableFacilities":
+                    foreach (var f in node.Nodes)
+                        if (Num(f.Get("lvl")) is double lvl) extras.NivelesKsc[f.Name] = lvl;
                     break;
 
                 case "ScenarioCustomWaypoints":

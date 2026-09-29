@@ -30,6 +30,8 @@ namespace KerbinMaps.Ksp
 
         StockAssets(string dir) { this.dir = dir; }
 
+        public string Dir => dir;
+
         /* La de una instalación, a partir de su GameData (KSP_x64_Data va al lado). */
         public static StockAssets For(string gameData)
         {
@@ -61,7 +63,7 @@ namespace KerbinMaps.Ksp
                     if (g2 > 0 && resto.Substring(g2 + 1).EndsWith(".assets", StringComparison.OrdinalIgnoreCase))
                     {
                         string file = resto.Substring(g2 + 1);
-                        var s = Serializado(file);
+                        var s = SerializadoSinCerrojo(file);
                         if (s != null && s.Objetos.TryGetValue(id, out var o) && o.ClassId == 28) return Prefijo + file + ":" + id;
                         bare = resto.Substring(0, g2);
                     }
@@ -78,7 +80,7 @@ namespace KerbinMaps.Ksp
             if (p.Length != 2 || !long.TryParse(p[1], out long id)) return null;
             lock (cerrojo)
             {
-                var s = Serializado(p[0]);
+                var s = SerializadoSinCerrojo(p[0]);
                 if (s == null) return null;
                 var t = s.LeerTextura(id, (ruta, off, size) =>
                 {
@@ -94,7 +96,33 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        UnitySerialized Serializado(string file)
+        /* Bytes del fichero de recursos (.resS) de al lado, por la ruta que trae el objeto. */
+        public byte[] LeerRecurso(string ruta, long off, int size)
+        {
+            lock (cerrojo)
+            {
+                string nombre = Path.GetFileName(ruta.Replace("archive:/", ""));
+                if (!recursos.TryGetValue(nombre, out var rf))
+                {
+                    string full = Path.Combine(dir, nombre);
+                    recursos[nombre] = rf = File.Exists(full) ? new UnityFile(full) : null;
+                }
+                return rf?.Read(off, size);
+            }
+        }
+
+        /* El nombre del fichero de un serializado ya abierto. */
+        public string NombreDe(UnitySerialized x)
+        {
+            lock (cerrojo) return ficheros.FirstOrDefault(kv => kv.Value.S == x).Key;
+        }
+
+        public UnitySerialized Serializado(string file)
+        {
+            lock (cerrojo) return SerializadoSinCerrojo(file);
+        }
+
+        UnitySerialized SerializadoSinCerrojo(string file)
         {
             if (ficheros.TryGetValue(file, out var e)) return e.S;
             UnitySerialized s = null;
@@ -130,7 +158,7 @@ namespace KerbinMaps.Ksp
             catch { return; }
             foreach (var file in files)
             {
-                var s = Serializado(file);
+                var s = SerializadoSinCerrojo(file);
                 if (s == null) continue;
                 foreach (var kv in s.Objetos)
                 {

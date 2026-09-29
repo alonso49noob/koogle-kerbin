@@ -78,12 +78,25 @@ namespace KerbinMaps.UI
             if (kkDe != gd) return;                 // entretanto se eligió otra carpeta
             QuitarModelosKK();
             SeleccionarKK(null);
+            db?.NivelesKsc(NivelKsc);
             kk = db;
             kkLeidoEn = leidoEn;
             kkFirma = null;
             AplicarKonstructs();
             RenderKKModelos();
             RenderKKSel();
+        }
+
+        /* El nivel de una instalación del KSC en la partida cargada, o null (el más alto). */
+        double? NivelKsc(string instalacion) =>
+            instalacion != null && extras != null && extras.NivelesKsc.TryGetValue(instalacion, out double v) ? v : null;
+
+        /* Al cargar otra partida: el KSC con sus niveles. */
+        void NivelesKscDePartida()
+        {
+            if (kk == null || !kk.NivelesKsc(NivelKsc)) return;
+            kkFirma = null;
+            AplicarKonstructs();
         }
 
         /* Coloca los edificios del cuerpo que se ve y rehace marcadores, lista y globo. */
@@ -102,12 +115,35 @@ namespace KerbinMaps.UI
             globe.Statics = on ? kk : null;
             globe.StaticsOn = on;
             globe.StaticModel = on ? ModeloKK : null;
-            if (!on) return false;
+            if (!on) { PonerAplanados(null); return false; }
             var firma = new object[] { Body.Name, MapImg("height"), HMinNow, HMaxNow, HeightOffNow };
             if (kkFirma != null && firma.SequenceEqual(kkFirma)) return false;
+            PonerAplanados(ExplanadaKsc());
             kk.Place(Body.Name, Body.Radius, AlturaDelSuelo);
             kkFirma = firma;
             return true;
+        }
+
+        /* La explanada del KSC: plana a la altura de sus céspedes hasta 2 km del centro
+           (la pista mide 2,9) y fundida con el terreno hasta 3,5 km. Solo si se ven sus
+           edificios de serie, que es lo que la necesita. */
+        Aplanado[] aplanados;
+
+        Aplanado[] ExplanadaKsc()
+        {
+            if (kk == null || !kk.Groups.TryGetValue(Body.Name + "_KSC_Builtin", out var g) || !g.Builtin) return null;
+            if (!kk.Instances.Any(i => i.DelJuego && i.Body == Body.Name)) return null;
+            // los céspedes van a 24,8 m sobre el centro del KSC, y este a su altura sobre el mar
+            return new[] { Aplanado.En(g.Lat, g.Lon, 2000, 3500, g.RadiusOffset + 24.8 - 0.4) };
+        }
+
+        void PonerAplanados(Aplanado[] a)
+        {
+            bool igual = (a == null && aplanados == null) || (a != null && aplanados != null && a.Length == aplanados.Length
+                          && a.Zip(aplanados).All(p => p.First.H == p.Second.H && p.First.N.SequenceEqual(p.Second.N)));
+            if (igual) return;
+            aplanados = a;
+            globe.Aplanados = a ?? Array.Empty<Aplanado>();
         }
 
         void MarcadoresKK()
@@ -154,7 +190,9 @@ namespace KerbinMaps.UI
                 Lang.F("En {0}: <b>{1}</b> edificios en <b>{2}</b> grupos.", Body.Current.Label, aqui.Count(i => i.Placed), GruposVisibles().Count),
             };
             int stock = aqui.Count(i => i.ModelRef == null);
-            if (stock > 0) partes.Add(Lang.F("{0} son edificios del juego que KK copia del KSC: aún no se pintan.", stock));
+            if (stock > 0) partes.Add(Lang.F("{0} usan modelos que no encuentro (ni .mu ni edificios del juego).", stock));
+            int ksc = aqui.Count(i => i.DelJuego);
+            if (ksc > 0) partes.Add(Lang.F("El KSC de serie: {0} instalaciones, leídas de los datos del juego.", ksc));
             if (globe.StaticsVisible > 0) partes.Add(Lang.F("A la vista: {0}.", globe.StaticsVisible));
             if (kkCargando.Count > 0) partes.Add(Lang.F("Cargando {0} modelos...", kkCargando.Count));
             kkInfo.SetText(string.Join("\n", partes));

@@ -32,6 +32,7 @@ namespace KerbinMaps.UI
         void AplicarExtras(SaveExtras nuevos, bool proponerModo)
         {
             extras = nuevos;
+            NivelesKscDePartida();
             if (proponerModo && extras != null && !extras.Sandbox && !state.Progresion)
             {
                 state.Progresion = true;

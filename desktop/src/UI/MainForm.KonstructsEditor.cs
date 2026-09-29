@@ -104,9 +104,10 @@ namespace KerbinMaps.UI
         double GiroKK => double.TryParse(kkGiro?.SelectedId, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : 15;
         double AzCamara => isFree ? globe.FreeAz : isSky ? globe.SkyAz : 0;
 
-        bool PuedeEditar(KkInstance i)
+        bool PuedeEditar(KkInstance i, bool duplicar = false)
         {
             if (i == null) { Flash("Elige antes un edificio: clic sobre él en el vuelo o en el cielo."); return false; }
+            if (i.DelJuego && !duplicar) { Flash("Es un edificio del KSC de serie: no está en ningún .cfg y no se puede mover ni borrar. «Duplicar» hace una copia de Kerbal Konstructs que sí."); return false; }
             if (i.Legacy) { Flash("Este edificio usa el formato antiguo de KK, sin grupo: ábrelo una vez con KK en el juego para que lo convierta."); return false; }
             return true;
         }
@@ -146,7 +147,7 @@ namespace KerbinMaps.UI
 
         void DuplicarKK()
         {
-            if (!PuedeEditar(kkSel)) return;
+            if (!PuedeEditar(kkSel, duplicar: true)) return;
             var n = kk.Duplicate(kkSel, Body.Radius);
             SeleccionarKK(n);
             TrasCambioKK();
@@ -154,7 +155,7 @@ namespace KerbinMaps.UI
 
         void BorrarKK()
         {
-            if (kkSel == null) return;
+            if (kkSel == null || (kkSel.DelJuego && !PuedeEditar(kkSel))) return;
             kkSel.Borrado = true;
             kkSel.Placed = false;
             if (kkSel.GroupRef != null) kkSel.GroupRef.Count--;
@@ -267,6 +268,7 @@ namespace KerbinMaps.UI
                                          Geo.F(KkDatabase.Heading(i), 1), Geo.F(i.Scale, 2)) + "</m>";
                 if (i.CfgPath != null && kk?.GameData != null) h += "\n<m>" + RichLabel.Esc(Path.GetRelativePath(kk.GameData, i.CfgPath)) + "</m>";
                 else if (i.Nuevo) h += "\n" + Lang.T("Nuevo: irá a KerbalKonstructs/NewInstances al guardar.");
+                else if (i.DelJuego) h += "\n" + Lang.T("Del KSC de serie: se ve, pero no se edita.");
                 kkSelInfo.SetText(h);
             }
             if (kkCambiosInfo != null)

@@ -289,8 +289,36 @@ namespace KerbinMaps.Ksp
                 int t = r.I32();
                 Objetos[pathId] = (start, sz, t >= 0 && t < clases.Count ? clases[t] : -1);
             }
+            // los scripts y los ficheros externos: a qué fichero apunta cada fileID de un PPtr
+            try
+            {
+                int nScripts = r.I32();
+                for (int i = 0; i < nScripts; i++)
+                {
+                    r.I32();
+                    r.Pos = (r.Pos + 3) & ~3;
+                    r.I64();
+                }
+                int nExt = r.I32();
+                for (int i = 0; i < nExt; i++)
+                {
+                    r.CString();                            // vacío
+                    r.Pos += 16 + 4;                        // guid y tipo
+                    Externos.Add(r.CString());
+                }
+            }
+            catch (Exception) { }
             LeerContenedor();
         }
+
+        /* Los ficheros a los que apuntan los PPtr con fileID > 0, en orden (fileID 1 es el
+           primero). Rutas como «sharedassets0.assets» o «library/unity default resources». */
+        public readonly List<string> Externos = new();
+
+        public int Version => version;
+
+        /* Los bytes de un objeto, para leerlo según su clase. */
+        public byte[] Leer(long pathId) => Objeto(pathId);
 
         byte[] Objeto(long pathId)
         {

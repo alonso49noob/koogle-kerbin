@@ -63,6 +63,7 @@ namespace KerbinMaps.Views
         public Func<double, double, double> Altura;              // lat, lon → metros (fondo marino incluido)
         public Func<double, double, string> Bioma;               // nombre del bioma, o null
         public Func<double, double, (float, float, float)> Color;
+        public Func<double, double, bool> Excluir;               // zonas sin scatters (la explanada del KSC)
         public Action Changed;                                   // hay celdas nuevas: pintar otra vez
 
         volatile bool vivo = true;
@@ -217,6 +218,7 @@ namespace KerbinMaps.Views
 
                 double ruido = Ruido(d, dir);
                 if (ruido <= d.CutoffScale) continue;
+                if (Excluir != null && Excluir(lat, lon)) continue;
 
                 double alt = Altura(lat, lon);
                 double escalarAlt = EscalarAltitud(d, alt);

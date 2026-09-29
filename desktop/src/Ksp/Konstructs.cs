@@ -32,14 +32,17 @@ namespace KerbinMaps.Ksp
         public string Name, Title, Category, Author;
         public string Mesh;                       // ruta completa del .mu, o null
         public string CfgPath;
+        public long StockRoot;                    // edificio de serie: su prefab en los datos del juego
         // módulos AdvancedTextures: a qué objetos del modelo («Any»: todos) les cambia la textura
         public readonly List<(HashSet<string> Transforms, string MainTex)> TexSwaps = new();
-        public bool HasMesh => Mesh != null && File.Exists(Mesh);
+        public bool Stock => StockRoot != 0;
+        public bool HasMesh => Stock || (Mesh != null && File.Exists(Mesh));
 
         /* El modelo montado, con las texturas que le cambia KK. `_MainTex` es una ruta de
            GameData sin extensión o «BUILTIN:/nombre», una textura del propio juego. */
         public AssembledVessel Build(string gameData, StockAssets stock)
         {
+            if (Stock) return StockPrefabs.For(gameData)?.Build(StockRoot) ?? new AssembledVessel();
             var a = VesselAssembler.BuildModel(Mesh, stock);
             foreach (var (tr, tex) in TexSwaps)
             {
@@ -75,6 +78,9 @@ namespace KerbinMaps.Ksp
     {
         public string Model, Body, Group = "Ungrouped", Uuid, CfgPath, LaunchSite;
         public int FileIndex = -1;                // qué nodo Instances es dentro de su fichero
+        public bool DelJuego;                     // una instalación del KSC de serie: no está en ningún .cfg
+        public string Instalacion;                // la del KSC que es («SpaceCenter/LaunchPad»)
+        public string[] ModelosNivel;             // sus modelos, del nivel 1 al último
         public bool Nuevo, Cambiado, Borrado;     // estado en el editor, sin guardar
         public double[] Rel = { 0, 0, 0 }, Euler = { 0, 0, 0 };
         public double Scale = 1, Visibility = 25000;
@@ -186,9 +192,90 @@ namespace KerbinMaps.Ksp
                     db.Instances.Add(i);
                 }
             }
+            db.AddStock(homeWorld);
             foreach (var i in db.Instances)
                 i.ModelRef = db.Models.GetValueOrDefault(i.Model);
             return db;
+        }
+
+        /* Los edificios de serie: los modelos con el nombre que les da KK (para las instancias
+           que los usan y para ponerlos desde el editor) y el propio KSC, con cada instalación
+           a su nivel más alto, dentro del grupo KSC_Builtin como en el juego. */
+        void AddStock(string homeWorld)
+        {
+            var sp = StockPrefabs.For(GameData);
+            if (sp == null) return;
+            foreach (var (nombre, raiz) in sp.PorNombreKK)
+            {
+                if (Models.ContainsKey(nombre)) continue;
+                string titulo = nombre.StartsWith("KSC_") ? "KSC " + nombre.Substring(4).Replace("_level_", " lv ").Replace('_', ' ') : nombre;
+                Models[nombre] = new KkModel { Name = nombre, Title = titulo, Category = "Squad KSC", Author = "Squad", StockRoot = raiz };
+            }
+            string grupo = homeWorld + "_KSC_Builtin";
+            if (!Groups.ContainsKey(grupo)) return;
+            foreach (var f in sp.Ksc)
+            {
+                bool camino = !sp.PorNombreKK.ContainsKey("KSC_" + f.Name + "_level_1");   // los de Grounds
+                string prefijo = camino ? "KSC_Grounds_" + f.Name : "KSC_" + f.Name;
+                var modelos = new string[f.Niveles.Length];
+                for (int n = 0; n < modelos.Length; n++)
+                {
+                    modelos[n] = prefijo + "_level_" + (n + 1);
+                    if (!Models.ContainsKey(modelos[n]))
+                        Models[modelos[n]] = new KkModel { Name = modelos[n], Title = "KSC " + f.Name + " lv " + (n + 1), Category = "Squad KSC", Author = "Squad", StockRoot = f.Niveles[n] };
+                }
+                Instances.Add(new KkInstance
+                {
+                    Model = modelos[^1], Body = homeWorld, Group = "KSC_Builtin", DelJuego = true,
+                    Instalacion = (camino ? "SpaceCenter/Grounds/" : "SpaceCenter/") + f.Name, ModelosNivel = modelos,
+                    Rel = new[] { f.M[12], f.M[13], f.M[14] }, Euler = EulerDe(f.M),
+                    LaunchSite = f.Name == "Runway" || f.Name == "LaunchPad" ? f.Name : null,
+                });
+            }
+        }
+
+        /* El nivel de cada instalación del KSC según la partida (0 a 1, como lo guarda el
+           juego: con tres niveles, 0, 0,5 y 1). Sin dato, el más alto, como en sandbox. Dice
+           si ha cambiado algo. */
+        public bool NivelesKsc(Func<string, double?> nivel)
+        {
+            bool cambio = false;
+            foreach (var i in Instances)
+            {
+                if (!i.DelJuego || i.ModelosNivel == null) continue;
+                int n = i.ModelosNivel.Length;
+                int k = nivel(i.Instalacion) is double v ? (int)Math.Round(Math.Clamp(v, 0, 1) * (n - 1)) : n - 1;
+                string m = i.ModelosNivel[k];
+                if (m == i.Model) continue;
+                i.Model = m;
+                i.ModelRef = Models.GetValueOrDefault(m);
+                cambio = true;
+            }
+            return cambio;
+        }
+
+        /* Los ángulos de Euler de Unity (Z, luego X, luego Y) de una matriz de giro. */
+        public static double[] EulerDe(double[] m)
+        {
+            double sx = Math.Sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
+            double sy = Math.Sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]);
+            double sz = Math.Sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]);
+            double r12 = m[9] / sz, r02 = m[8] / sz, r22 = m[10] / sz, r10 = m[1] / sx, r11 = m[5] / sy;
+            double x = Math.Asin(Math.Clamp(-r12, -1, 1));
+            double y, z;
+            if (Math.Abs(r12) < 0.999999)
+            {
+                y = Math.Atan2(r02, r22);
+                z = Math.Atan2(r10, r11);
+            }
+            else
+            {
+                // bloqueo: con X a ±90° solo cuenta la suma de Y y Z
+                y = Math.Atan2(-m[2] / sx, m[0] / sx);
+                z = 0;
+            }
+            double D(double v) => ((v * 180 / Math.PI) % 360 + 360) % 360;
+            return new[] { D(x), D(y), D(z) };
         }
 
         void AddModel(ConfigNode n, string path)
@@ -438,6 +525,7 @@ namespace KerbinMaps.Ksp
         /* Copia de una instancia unos metros al este, para moverla después. */
         public KkInstance Duplicate(KkInstance src, double radius)
         {
+            // una copia de un edificio de serie es una instancia normal de KK con ese modelo
             var i = new KkInstance
             {
                 Model = src.Model, ModelRef = src.ModelRef, Body = src.Body, Group = src.Group, GroupRef = src.GroupRef,

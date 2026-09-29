@@ -57,10 +57,13 @@ namespace KerbinMaps.UI
             double hOff = (int)HeightOffNow, cOff = (int)ColorOffNow, bOff = (int)BiomeOffNow;
             string cuerpo = Body.Name;
             var nombres = new Dictionary<string, string>(biomeNames, StringComparer.OrdinalIgnoreCase);
+            var llanos = aplanados;
+            double radio = Body.Radius;
 
             var campo = new ScatterField(Body.Radius, globe.ScatterGpu.Defs)
             {
-                Altura = (la, lo) => alt == null ? 0 : alt.HeightSmooth(la, Geo.WrapLon(lo), hmin, hmax, hOff),
+                Altura = (la, lo) => Aplanado.Aplicar(llanos, la, lo, alt == null ? 0 : alt.HeightSmooth(la, Geo.WrapLon(lo), hmin, hmax, hOff), radio),
+                Excluir = (la, lo) => Aplanado.Dentro(llanos, la, lo, radio),
                 Color = (la, lo) => col == null ? (1f, 1f, 1f) : col.SampleBilinear(la, Geo.WrapLon(lo), cOff),
                 /* Con los nombres del juego («Grasslands», «Deserts»...), que son los que usan
                    las listas de Parallax; si no se conocen, los que les haya puesto el usuario. */
@@ -88,7 +91,7 @@ namespace KerbinMaps.UI
 
         object[] FirmaCampo() => new object[]
         {
-            Body.Name, MapImg("height"), MapImg("color"), MapImg("biome"), HMinNow, HMaxNow, HeightOffNow, ColorOffNow, BiomeOffNow,
+            Body.Name, MapImg("height"), MapImg("color"), MapImg("biome"), HMinNow, HMaxNow, HeightOffNow, ColorOffNow, BiomeOffNow, aplanados,
         };
 
         /* Se llama al cambiar los mapas: si el reparto se hizo con otros, se rehace. */

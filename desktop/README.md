@@ -525,10 +525,39 @@ fichero se copia a `%LOCALAPPDATA%\KoogleKerbin\kk-copias\<fecha>\` con su ruta 
 GameData, y si ha cambiado en disco desde que se leyó (KSP abierto guardando, por ejemplo)
 no se toca. Mejor editar con KSP cerrado. Al salir con cambios sin guardar, se pregunta.
 
-Lo que aún no: los edificios de serie que KK copia del KSC (`KSC_Runway_level_2`...) no se
-pintan, porque sus modelos están dentro de los datos de Unity del juego; el césped de las
-bases sale con su textura, sin el tinte (`GrassColor`) ni la máscara de asfalto de KK; y los
-edificios del formato antiguo se ven pero no se editan.
+### El KSC de serie
+
+Los edificios del propio juego no tienen `.mu`: son prefabs de Unity dentro de
+`KSP_x64_Data/sharedassets9.assets`, uno por nivel de cada instalación, y ese fichero no
+lleva la descripción de sus tipos. Se leen con la disposición de Unity 2019.4 escrita a
+mano (`StockPrefabs.cs`): GameObject y Transform para la jerarquía, MeshFilter y
+MeshRenderer, Material con sus texturas, y Mesh con sus canales de vértices, índices de 16
+o 32 bits y datos en el `.resS` si hace falta, siguiendo las referencias a otros ficheros
+del juego (`sharedassets0.assets`...). Qué instalaciones hay, dónde está cada una dentro del
+centro y qué prefab es cada nivel lo dice el prefab `KSC`: un hijo por instalación con su
+script `UpgradeableFacility`. Leer los 36 modelos cuesta unos milisegundos cada uno.
+
+Con eso se ven dos cosas. **El KSC**, cada instalación en su sitio dentro del grupo
+`KSC_Builtin` (la plataforma de lanzamiento cae a 3 m de sus coordenadas conocidas y la
+pista queda este-oeste, como en el juego), al nivel que diga la partida cargada
+(`ScenarioUpgradeableFacilities`) o al más alto si no dice nada. Y **las copias de KK**
+(`KSC_Runway_level_2`, `KSC_FuelTanks`, `KSC_WaterTower`...), que usan esos mismos modelos con
+el nombre que les da KK; también salen en la lista del editor para ponerlas. Los
+edificios del KSC de serie no se mueven ni se borran (no están en ningún `.cfg`), pero
+«Duplicar» hace de uno una instancia normal de KK.
+
+El césped del KSC usa el shader «Diffuse Ground KSC» del juego: hierba repetida y teñida con
+`_GrassColor`, y asfalto donde lo diga una máscara. Aquí se reproduce, pero las máscaras
+vienen comprimidas en Crunch, que aún no se lee, así que por ahora todo el suelo sale de
+hierba. Como el mapa de alturas (1,8 km por píxel) no recoge la explanada sobre la que
+está el KSC, el terreno se allana a la altura de sus céspedes hasta 2 km del centro y se
+funde con el de alrededor hasta 3,5 km, en el suelo que se pinta y en las cuentas de la
+cámara, la colocación y los scatters, que dentro no salen, como en el juego.
+
+Lo que aún no: las máscaras en Crunch (el asfalto del suelo del KSC); el césped de las bases
+de KK sale con su textura, sin el tinte (`GrassColor`) ni su máscara; los edificios del
+formato antiguo se ven pero no se editan; y del juego no se pintan las mallas con
+esqueleto (dos piezas de la plataforma de nivel 3).
 
 ## Controles
 
@@ -591,7 +620,7 @@ proyecto.
 | `src\Core` | Lo que no depende de la pantalla: geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`, más lo que la web no tiene: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
 | `src\Gfx` | Enlaces a OpenGL, el control con el contexto (con antialias multimuestra), shaders, texturas, dibujo 2D por lotes y rótulos. |
 | `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`), el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble), los scatters de Parallax (`ScatterField.cs` los reparte en segundo plano; `GlobeView.Scatters.cs` los pinta) y los edificios de Kerbal Konstructs (`GlobeView.Statics.cs`, con la elección por clic); `ModelGpu.cs` sube mallas y texturas para los dos. |
-| `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques, y también los `.assets` sueltos del juego; `DxtDecoder.cs`; `ParallaxPlanets.cs`, `ParallaxTerrain.cs` y `ParallaxScatters.cs`), las texturas de serie (`StockAssets.cs`) y Kerbal Konstructs (`Konstructs.cs` lee y coloca; `KonstructsWriter.cs` guarda). |
+| `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques, y también los `.assets` sueltos del juego; `DxtDecoder.cs`; `ParallaxPlanets.cs`, `ParallaxTerrain.cs` y `ParallaxScatters.cs`), las texturas de serie (`StockAssets.cs`) y Kerbal Konstructs (`Konstructs.cs` lee y coloca; `KonstructsWriter.cs` guarda) y los edificios del KSC sacados de los datos de Unity (`StockPrefabs.cs`). |
 | `src\UI` | La ventana, el panel lateral y los controles de tema oscuro. `MainForm` está repartida como `app.js`: mapas, naves, herramientas y cielo. |
 
 Decisiones que no son evidentes:

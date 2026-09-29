@@ -48,6 +48,11 @@ What it does:
   game's `sharedassets` files). An editor moves, rotates, scales, duplicates, deletes and
   adds buildings, and saves back to the `.cfg` files by changing only the lines involved,
   after backing each file up.
+- **The stock KSC, straight from the game's data.** The space center's buildings have no
+  `.mu` files: they are Unity prefabs inside `sharedassets9.assets`, read here without
+  type trees (meshes, materials, hierarchy, cross-file references). Each facility shows at
+  the level your save has reached, on a flattened plateau like the game's terrain decal,
+  and KK's copies of stock buildings use the same models.
 - **Optional extra textures in the installer.** If you don't have Parallax, the
   installer can fetch its planet maps (234 MB), surface textures (1.9 GB) and scatters
   (1.1 GB) from the

@@ -17,6 +17,16 @@ namespace KerbinMaps.Ksp
         public string TexturePath;
         public float[] Color, TexScale, TexOffset;
         public bool Cutout, Transparent;
+        public GroundMat Ground;                  // suelo del KSC: hierba y asfalto mezclados por una máscara
+    }
+
+    /* El shader «Diffuse Ground KSC» del juego: hierba repetida por la posición, teñida, y
+       asfalto por las UV, mezclados con una máscara que sigue las UV de la malla. */
+    public sealed class GroundMat
+    {
+        public string Grass, Tarmac, Mask;
+        public float GrassTiling = 0.3f;
+        public float[] GrassColor = { 0.58f, 0.61f, 0.39f, 1 }, TarmacColor = { 1, 1, 1, 1 }, TarmacScale = { 1, 1 };
     }
 
     public sealed class AssembledVessel
@@ -37,16 +47,16 @@ namespace KerbinMaps.Ksp
         public void LoadTextures()
         {
             var t = new Dictionary<string, TextureFile>(StringComparer.OrdinalIgnoreCase);
-            foreach (var it in Items)
+            foreach (var path in Items.SelectMany(it => new[] { it.TexturePath, it.Ground?.Grass, it.Ground?.Tarmac, it.Ground?.Mask }))
             {
-                if (it.TexturePath == null || t.ContainsKey(it.TexturePath)) continue;
+                if (path == null || t.ContainsKey(path)) continue;
                 try
                 {
-                    t[it.TexturePath] = it.TexturePath.StartsWith(StockAssets.Prefijo, StringComparison.Ordinal)
-                        ? Stock?.Load(it.TexturePath)
-                        : TextureFile.Load(it.TexturePath);
+                    t[path] = path.StartsWith(StockAssets.Prefijo, StringComparison.Ordinal)
+                        ? Stock?.Load(path)
+                        : TextureFile.Load(path);
                 }
-                catch { t[it.TexturePath] = null; }
+                catch { t[path] = null; }       // p. ej. las máscaras en Crunch, que aún no se leen
             }
             Textures = t;
         }
