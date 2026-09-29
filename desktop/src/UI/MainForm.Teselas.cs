@@ -26,7 +26,26 @@ namespace KerbinMaps.UI
 
         const int LadoTesela = 1024;
 
-        string sueloEn3D;                           // el cuerpo cuyo suelo ya se cargó al bajar en 3D
+        string sueloEn3D;                           // el cuerpo cuyo suelo ya se cargó al bajar en 3D o en el 2D
+
+        /* El mapa 2D, de cerca, se pinta con el suelo del vuelo visto desde arriba (ver
+           GlobeView.RenderCenital): a partir de este zoom, unos 7 m por píxel. */
+        const double ZoomCenital = 10;
+
+        bool Cenital2D => !GlobeVisible && glOk && map.Zoom >= ZoomCenital - 0.01;
+
+        bool FondoCenital()
+        {
+            if (!Cenital2D) return false;
+            globe.W = map.W; globe.H = map.H; globe.S = map.S;
+            globe.GroundAt ??= AlturaDelSuelo;
+            globe.RenderCenital(batch, text, map.CenterLat, map.CenterLon, map.Ppd, map.DayNight);
+            return true;
+        }
+
+        /* Lo que abarca en vertical el mapa 2D, en metros: hace de altura sobre el suelo
+           para elegir el nivel de la tesela. */
+        double AltoDelMapaM => map.H / map.Ppd * Body.Radius * Math.PI / 180;
 
         /* Cada fotograma: si la cámara pide otra tesela, se pone a hacer. Y al bajar en la
            vista 3D hasta el suelo, se carga lo que viste el terreno de cerca (texturas,
@@ -34,13 +53,13 @@ namespace KerbinMaps.UI
         void ActualizarTesela()
         {
             if (!glOk) return;
-            if (is3D && globe.PlanetaCerca && sueloEn3D != Body.Name)
+            if ((is3D && globe.PlanetaCerca || Cenital2D) && sueloEn3D != Body.Name)
             {
                 sueloEn3D = Body.Name;
                 CargarSuelo();
             }
-            if (!state.DetailTiles || !GlobeVisible) { QuitarTesela(); return; }
-            var (lat, lon, agl) = globe.EyeGround();
+            if (!state.DetailTiles || !(GlobeVisible || Cenital2D)) { QuitarTesela(); return; }
+            var (lat, lon, agl) = GlobeVisible ? globe.EyeGround() : (map.CenterLat, Geo.WrapLon(map.CenterLon), AltoDelMapaM);
             int nivel = agl < 60000 ? 0 : agl < 200000 ? 1 : -1;
             if (nivel < 0) { QuitarTesela(); return; }         // desde lejos ni se carga la fuente
             var fuente = FuenteAlturas();

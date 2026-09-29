@@ -24,22 +24,25 @@ namespace KerbinMaps.Views
         {
             if (meshes.TryGetValue(m, out var g)) return g;
             int n = m.VertCount;
-            var data = new float[n * 8];
+            var data = new float[n * 10];
+            var uv2 = m.Uvs2 ?? m.Uvs;
             for (int i = 0; i < n; i++)
             {
-                int o = i * 8;
+                int o = i * 10;
                 data[o] = m.Verts[i * 3]; data[o + 1] = m.Verts[i * 3 + 1]; data[o + 2] = m.Verts[i * 3 + 2];
                 if (m.Normals != null) { data[o + 3] = m.Normals[i * 3]; data[o + 4] = m.Normals[i * 3 + 1]; data[o + 5] = m.Normals[i * 3 + 2]; }
                 else data[o + 4] = 1;
                 if (m.Uvs != null) { data[o + 6] = m.Uvs[i * 2]; data[o + 7] = m.Uvs[i * 2 + 1]; }
+                if (uv2 != null) { data[o + 8] = uv2[i * 2]; data[o + 9] = uv2[i * 2 + 1]; }
             }
             g = new GpuMesh { Vao = GL.GenVertexArray(), Vbo = GL.GenBuffer(), Ebo = new uint[m.Submeshes.Count], Count = new int[m.Submeshes.Count] };
             GL.BindVertexArray(g.Vao);
             GL.BindBuffer(GL.ARRAY_BUFFER, g.Vbo);
             GL.BufferData(GL.ARRAY_BUFFER, data, data.Length, GL.STATIC_DRAW);
-            GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, GL.FLOAT, false, 32, 0);
-            GL.EnableVertexAttribArray(1); GL.VertexAttribPointer(1, 3, GL.FLOAT, false, 32, 12);
-            GL.EnableVertexAttribArray(2); GL.VertexAttribPointer(2, 2, GL.FLOAT, false, 32, 24);
+            GL.EnableVertexAttribArray(0); GL.VertexAttribPointer(0, 3, GL.FLOAT, false, 40, 0);
+            GL.EnableVertexAttribArray(1); GL.VertexAttribPointer(1, 3, GL.FLOAT, false, 40, 12);
+            GL.EnableVertexAttribArray(2); GL.VertexAttribPointer(2, 2, GL.FLOAT, false, 40, 24);
+            GL.EnableVertexAttribArray(3); GL.VertexAttribPointer(3, 2, GL.FLOAT, false, 40, 32);
             GL.BindVertexArray(0);
             for (int s = 0; s < m.Submeshes.Count; s++)
             {

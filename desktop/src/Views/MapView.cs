@@ -34,16 +34,21 @@ namespace KerbinMaps.Views
         public readonly List<MapLayer> Layers = new();
         public MapDot Hover;
         public int TopLabelOffset = 52;           // bajo la barra superior, en píxeles CSS
+        /* De cerca, el suelo lo pinta otro (el renderizador del vuelo en vista cenital, con
+           el relieve, las texturas del juego y los edificios): si lo hace, devuelve true y
+           aquí se omiten el mapa base y la noche, que ya van en su luz. */
+        public Func<bool> Fondo;
 
         double anchorX, anchorY;
         bool zoomAnim;
         ShaderProgram imgProg;
         uint emptyVao;
 
-        static readonly double[] Steps = { 30, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 };
+        static readonly double[] Steps = { 30, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001 };
 
         public double Ppd => 256.0 * Math.Pow(2, Zoom) / 180.0 * S;
         public int TileZoom => Math.Clamp((int)Math.Round(Zoom), MapConfig.MinZoom, MapConfig.MaxZoom);
+        int GridZoom => Math.Clamp((int)Math.Round(Zoom), MapConfig.MinZoom, MapConfig.MaxZoomVista);
 
         /* El zoom más alejado con el que los 180° de latitud aún llenan el alto de la
            ventana: más allá se verían franjas vacías por encima del polo norte y por
@@ -61,7 +66,7 @@ namespace KerbinMaps.Views
 
         public static string FmtDeg(double v, double step)
         {
-            int dec = step < 0.1 ? 2 : step < 1 ? 1 : 0;
+            int dec = step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
             if (Math.Abs(v) < 0.5 * Math.Pow(10, -dec)) v = 0;          // sin «-0°»
             return Geo.F(v, dec) + "°";
         }
@@ -102,7 +107,7 @@ namespace KerbinMaps.Views
 
         public void SetView(double lat, double lon, double zoom)
         {
-            Zoom = TargetZoom = Math.Clamp(zoom, MinZoomFit, MapConfig.MaxZoom);
+            Zoom = TargetZoom = Math.Clamp(zoom, MinZoomFit, MapConfig.MaxZoomVista);
             zoomAnim = false;
             CenterLat = lat; CenterLon = lon;
             Clamp();
@@ -133,7 +138,7 @@ namespace KerbinMaps.Views
             double min = MinZoomFit;
             double next = Math.Round(TargetZoom + delta);
             if (delta > 0 && TargetZoom <= min + 1e-6) next = Math.Floor(min) + Math.Max(1, Math.Round(delta));
-            TargetZoom = Math.Clamp(next, min, MapConfig.MaxZoom);
+            TargetZoom = Math.Clamp(next, min, MapConfig.MaxZoomVista);
             anchorX = x; anchorY = y;
             zoomAnim = Math.Abs(TargetZoom - Zoom) > 1e-6;
         }
@@ -304,9 +309,12 @@ void main() {
             GL.Viewport(0, 0, W, H);
             GL.ClearColor(7 / 255f, 11 / 255f, 17 / 255f, 1);
             GL.Clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
+            bool fondo = Fondo?.Invoke() == true;
+            GL.Viewport(0, 0, W, H);
             b.Begin(W, H);
 
             // mapa base
+            if (!fondo)
             switch (BaseKind)
             {
                 case "grid":
@@ -333,7 +341,7 @@ void main() {
             if (ScanTex != null && ScanOpacity > 0) DrawImage(0, ScanTex, 0, ScanOpacity);
 
             // la noche va sobre el terreno y debajo de la retícula, las trazas y los marcadores
-            if (DayNight) DrawImage(2, null, 0, 1);
+            if (DayNight && !fondo) DrawImage(2, null, 0, 1);
 
             if (Grid) DrawGraticule(b);
 
@@ -411,7 +419,7 @@ void main() {
         {
             var minor = ColorF.Rgba(120, 160, 200, 0.28f);
             var major = ColorF.Rgba(150, 195, 240, 0.55f);
-            double step = StepForZoom(TileZoom);
+            double step = StepForZoom(GridZoom);
             double lw = Math.Max(1, Math.Round(S));
             var (lonMin, lonMax, latMin, latMax) = ViewBounds();
 
@@ -436,7 +444,7 @@ void main() {
 
         void DrawGridLabels(Batch2D b, TextCache tc)
         {
-            int z = (int)Math.Round(Math.Clamp(Zoom, MapConfig.MinZoom, MapConfig.MaxZoom));
+            int z = GridZoom;
             double step = StepForZoom(z);
             var (lonMin, lonMax, latMin, latMax) = ViewBounds();
             var style = new TextStyle(UI.Theme.MonoFamily, 10 * S, false, unchecked((int)0xD9C8DEF5), false);

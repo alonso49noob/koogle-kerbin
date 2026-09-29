@@ -9,6 +9,7 @@ namespace KerbinMaps.Ksp
     {
         public int VertCount;
         public float[] Verts, Normals, Uvs;
+        public float[] Uvs2;                      // segundo canal: la máscara del suelo del KSC
         public readonly List<int[]> Submeshes = new();
         /* Malla con esqueleto: 32 bytes por vértice con cuatro índices de hueso y cuatro
            pesos, y una pose de enlace (16 valores) por hueso. */
@@ -224,7 +225,7 @@ namespace KerbinMaps.Ksp
                     case 22: return m;
                     case 14: m.Verts = Floats(nv * 3); break;
                     case 15: m.Uvs = Floats(nv * 2); break;
-                    case 16: Skip(nv * 8L); break;
+                    case 16: m.Uvs2 = Floats(nv * 2); break;
                     case 17: m.Normals = Floats(nv * 3); break;
                     case 18: Skip(nv * 16L); break;
                     case 20: m.BoneWeightsRaw = br.ReadBytes(nv * 32); break;

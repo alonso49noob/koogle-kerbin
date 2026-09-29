@@ -61,7 +61,10 @@ namespace KerbinMaps.Core
     public static class MapConfig
     {
         public const int MinZoom = 0;
-        public const int MaxZoom = 9;
+        public const int MaxZoom = 9;             // el de las teselas y las imágenes
+        /* El mapa se acerca más: de cerca lo pinta el suelo del vuelo en vista cenital
+           (ver MapView.Fondo), y a 16 ya se distinguen los edificios del KSC. */
+        public const int MaxZoomVista = 16;
         public const double InitialZoom = 2;
         public const double InitialLat = 0, InitialLon = -74.5;
         public const int TileSize = 256;

@@ -312,8 +312,14 @@ namespace KerbinMaps.Ksp
                         m.Suelo ??= new GroundMat();
                         m.Suelo.Tarmac = Textura(ms, f, p);
                         m.Suelo.TarmacScale = new[] { sx, sy };
+                        m.Suelo.TarmacOffset = new[] { ox, oy };
                     }
-                    else if (nombre == "_BlendMaskTexture" && p != 0) (m.Suelo ??= new GroundMat()).Mask = Textura(ms, f, p);
+                    else if (nombre == "_BlendMaskTexture" && p != 0)
+                    {
+                        m.Suelo ??= new GroundMat();
+                        m.Suelo.Mask = Textura(ms, f, p);
+                        m.Suelo.MaskScale = new[] { sx, sy, ox, oy };
+                    }
                 }
                 int nf = r.I32();
                 for (int i = 0; i < nf; i++)
@@ -444,7 +450,7 @@ namespace KerbinMaps.Ksp
                 return o;
             }
 
-            var mesh = new MuMesh { VertCount = (int)vCount, Verts = Canal(0, 3), Normals = Canal(1, 3), Uvs = Canal(4, 2) };
+            var mesh = new MuMesh { VertCount = (int)vCount, Verts = Canal(0, 3), Normals = Canal(1, 3), Uvs = Canal(4, 2), Uvs2 = Canal(5, 2) };
             if (mesh.Verts == null) return null;
             int isz = indexFormat == 1 ? 4 : 2;
             foreach (var (first, count, topo, baseV) in subs)

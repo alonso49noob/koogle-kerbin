@@ -36,22 +36,27 @@ namespace KerbinMaps.Views
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNrm;
 layout(location = 2) in vec2 aUv;
+layout(location = 3) in vec2 aUv2;
 uniform mat4 uModel, uNrm;
 uniform vec4 uUvXform;
+uniform vec2 uOrto;                     // en el mapa 2D: ortográfica, en NDC por metro
 uniform vec3 uF, uR, uU, uEyeR, uSun;
 uniform float uTan, uAspect, uNear, uFar, uRadiusM;
-out vec2 vUv;
+out vec2 vUv, vUv2;
 out vec3 vN, vRel, vIns, vTr, vLocal;
 out float vZ;
 void main() {
   vec3 w = (uModel * vec4(aPos, 1.0)).xyz;
+  vUv2 = aUv2;
   vLocal = aPos;
   vRel = w;
   vN = mat3(uNrm) * aNrm;
   vUv = aUv * uUvXform.xy + uUvXform.zw;
   float vx = dot(w, uR), vy = dot(w, uU), vz = dot(w, uF);
   vZ = vz;
-  gl_Position = vec4(vx / (uTan * uAspect), vy / uTan, (vz * (uFar + uNear) - 2.0 * uFar * uNear) / (uFar - uNear), vz);
+  gl_Position = uOrto.x > 0.0
+    ? vec4(vx * uOrto.x, vy * uOrto.y, 0.0, 1.0)
+    : vec4(vx / (uTan * uAspect), vy / uTan, (vz * (uFar + uNear) - 2.0 * uFar * uNear) / (uFar - uNear), vz);
   vTr = vec3(1.0); vIns = vec3(0.0);
   float dist = length(w);
   if (uAtmos != 0 && dist > 1.0) {
@@ -77,7 +82,8 @@ uniform sampler2D uGrass, uTarmac, uMask;
 uniform float uGrassTiling;
 uniform vec3 uGrassColor, uTarmacColor;
 uniform vec2 uTarmacScale;
-in vec2 vUv;
+uniform vec4 uMaskXform;
+in vec2 vUv, vUv2;
 in vec3 vN, vRel, vIns, vTr, vLocal;
 in float vZ;
 out vec4 frag;
@@ -86,7 +92,8 @@ void main() {
   if (uGround != 0) {
     vec3 g = (uHasGrass != 0 ? texture(uGrass, vLocal.xz * uGrassTiling).rgb : vec3(0.5)) * uGrassColor;
     vec3 t = (uHasTarmac != 0 ? texture(uTarmac, vUv * uTarmacScale).rgb : vec3(0.55)) * uTarmacColor;
-    float m = uHasMask != 0 ? texture(uMask, vUv).r : 0.0;
+    // la máscara va por el segundo canal de UV, que cubre la explanada entera de 0 a 1
+    float m = uHasMask != 0 ? texture(uMask, vUv2 * uMaskXform.xy + uMaskXform.zw).r : 0.0;
     c = vec4(mix(g, t, m), 1.0);
   }
   if (uCutout != 0 && c.a < 0.5) discard;
@@ -111,9 +118,9 @@ void main() {
         readonly List<(KkInstance I, AssembledVessel A, double[] M)> staticsFrame = new();
 
         /* Pinta los edificios encima del suelo ya trazado. `eye` en radios del cuerpo. */
-        void DrawStatics(double[] eye, double[] right, double[] camUp, double tan)
+        void DrawStatics(double[] eye, double[] right, double[] camUp, double tan, double[] orto = null, double radioVista = 0, double far = 0)
         {
-            staticProg ??= new ShaderProgram(StaticVS, StaticFS, ("aPos", 0), ("aNrm", 1), ("aUv", 2));
+            staticProg ??= new ShaderProgram(StaticVS, StaticFS, ("aPos", 0), ("aNrm", 1), ("aUv", 2), ("aUv2", 3));
             staticGpu ??= new ModelGpu();
             double R = Body.Radius;
             // el ojo en el marco de KSP, en metros
@@ -128,12 +135,23 @@ void main() {
                 // posición respecto al ojo, ya en el marco del visor
                 double dx = m[14] - kz, dy = m[13] - ky, dz = m[12] - kx;
                 double dist = Math.Sqrt(dx * dx + dy * dy + dz * dz);
-                if (dist > Math.Min(i.Visibility, ScatterFar) + 500) continue;
+                if (orto != null)
+                {
+                    // en planta: lo que cae en la vista, por la distancia en horizontal
+                    double along = dx * fx + dy * fy + dz * fz;
+                    dist = Math.Sqrt(Math.Max(0, dist * dist - along * along));
+                    if (dist > radioVista + 3000) continue;
+                }
+                else if (dist > Math.Min(i.Visibility, ScatterFar) + 500) continue;
                 var a = StaticModel(i.ModelRef);
                 if (a == null || a.Items.Count == 0) continue;
                 double rad = a.Radius * i.Scale * (i.GroupRef?.Scale ?? 1) + 1;
-                if (dist - rad > ScatterFar) continue;
-                if (dx * fx + dy * fy + dz * fz < -rad) continue;       // detrás de la cámara
+                if (orto != null) { if (dist - rad > radioVista) continue; }
+                else
+                {
+                    if (dist - rad > ScatterFar) continue;
+                    if (dx * fx + dy * fy + dz * fz < -rad) continue;   // detrás de la cámara
+                }
                 var rel = Mat.Mul(SwapXZ, Mat.Mul(Mat.Translate(new[] { -kx, -ky, -kz }), m));
                 staticsFrame.Add((i, a, rel));
             }
@@ -155,11 +173,18 @@ void main() {
             p.Float("uTan", tan);
             p.Float("uAspect", (double)W / H);
             p.Float("uNear", ScatterNear);
-            p.Float("uFar", ScatterFar);
+            p.Float("uFar", far > 0 ? far : ScatterFar);
             p.Float("uRadiusM", R);
-            var sun = Light ? SunDir : Norm(eye);
+            var sun = (cenital ? cenSolReal : Light) ? SunDir : Norm(eye);
+            if (cenital && !cenSolReal)
+            {
+                LocalBasis(eye, out var up0, out var east0, out var north0);
+                sun = Norm(Add(Add(up0, north0, 0.7071), east0, -0.7071));
+            }
             p.Vec3("uSun", sun[0], sun[1], sun[2]);
             AtmosUniforms(p, 4, sunOn: !SkyForceNight);
+            if (orto != null) p.Int("uAtmos", 0);
+            p.Vec2("uOrto", orto?[0] ?? 0, orto?[1] ?? 0);
             p.Float("uCerca", 1);
             p.Int("uTex", 0);
             p.Int("uGrass", 1); p.Int("uTarmac", 2); p.Int("uMask", 3);
@@ -197,6 +222,7 @@ void main() {
                             p.Vec3("uGrassColor", gr.GrassColor[0], gr.GrassColor[1], gr.GrassColor[2]);
                             p.Vec3("uTarmacColor", gr.TarmacColor[0], gr.TarmacColor[1], gr.TarmacColor[2]);
                             p.Vec2("uTarmacScale", gr.TarmacScale[0], gr.TarmacScale[1]);
+                            p.Vec4("uMaskXform", gr.MaskScale[0], gr.MaskScale[1], gr.MaskScale[2], gr.MaskScale[3]);
                         }
                         uint tex = staticGpu.Tex(a, it.TexturePath);
                         GL.BindTexture(GL.TEXTURE_2D, tex);
@@ -257,6 +283,59 @@ void main() {
             }
             return mejor;
         }
+
+        /* Lo más alto de los edificios en la vertical de un punto, en metros sobre el nivel
+           del mar, o null si no hay ninguno. Es donde se pone de pie el observador del cielo
+           cuando cae encima de uno: la plataforma de lanzamiento, que es donde está por
+           defecto, o un tejado. */
+        public double? TechoDeEstaticos(double lat, double lon, double sobre)
+        {
+            if (Statics == null || StaticModel == null || !StaticsOn) return null;
+            var clave = (lat, lon, sobre, Statics, Statics.Instances.Count, Body.Name);
+            if (Equals(techoClave, clave)) return techo;
+            double R = Body.Radius;
+            var n = Sph(lat, lon, 1);
+            // en el marco de KSP (x y z cambiados respecto al del visor), desde 500 m más arriba
+            double top = R + sobre + 500;
+            var o = new[] { n[2] * top, n[1] * top, n[0] * top };
+            var d = new[] { -n[2], -n[1], -n[0] };
+            const double largo = 1000;
+            double tMejor = largo;
+            bool completo = true;
+            foreach (var i in Statics.Instances)
+            {
+                if (!i.Placed || i.Body != Body.Name || i.ModelRef == null || !i.ModelRef.HasMesh) continue;
+                var m = i.M;
+                double cx = m[12] - o[0], cy = m[13] - o[1], cz = m[14] - o[2];
+                if (cx * cx + cy * cy + cz * cz > 4e6) continue;          // a más de 2 km: ni se mira
+                var a = StaticModel(i.ModelRef);
+                if (a == null) { completo = false; continue; }
+                double rad = a.Radius * i.Scale * (i.GroupRef?.Scale ?? 1) + 1;
+                double tc = cx * d[0] + cy * d[1] + cz * d[2];
+                if (cx * cx + cy * cy + cz * cz - tc * tc > rad * rad || tc + rad < 0 || tc - rad > tMejor) continue;
+                foreach (var it in a.Items)
+                {
+                    if (it.Submesh >= it.Mesh.Submeshes.Count) continue;
+                    var inv = Mat.Inverse(Mat.Mul(m, it.M));
+                    if (inv == null) continue;
+                    var om = Mat.Apply(inv, o[0], o[1], o[2]);
+                    var dd = new[]
+                    {
+                        inv[0] * d[0] + inv[4] * d[1] + inv[8] * d[2],
+                        inv[1] * d[0] + inv[5] * d[1] + inv[9] * d[2],
+                        inv[2] * d[0] + inv[6] * d[1] + inv[10] * d[2],
+                    };
+                    tMejor = Math.Min(tMejor, RayMesh(om, dd, it.Mesh.Verts, it.Mesh.Submeshes[it.Submesh], tMejor));
+                }
+            }
+            double? r = tMejor < largo ? top - R - tMejor : null;
+            // si algún modelo aún no estaba montado, se vuelve a mirar la próxima vez
+            if (completo) { techoClave = clave; techo = r; }
+            return r;
+        }
+
+        object techoClave;
+        double? techo;
 
         /* Moller-Trumbore contra una lista de triángulos: el t más cercano por debajo de `max`. */
         static double RayMesh(double[] o, double[] d, float[] v, int[] idx, double max)

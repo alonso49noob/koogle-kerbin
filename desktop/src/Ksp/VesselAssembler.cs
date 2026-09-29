@@ -26,7 +26,8 @@ namespace KerbinMaps.Ksp
     {
         public string Grass, Tarmac, Mask;
         public float GrassTiling = 0.3f;
-        public float[] GrassColor = { 0.58f, 0.61f, 0.39f, 1 }, TarmacColor = { 1, 1, 1, 1 }, TarmacScale = { 1, 1 };
+        public float[] GrassColor = { 0.58f, 0.61f, 0.39f, 1 }, TarmacColor = { 1, 1, 1, 1 }, TarmacScale = { 1, 1 }, TarmacOffset = { 0, 0 };
+        public float[] MaskScale = { 1, 1, 0, 0 };        // escala y desfase de la máscara
     }
 
     public sealed class AssembledVessel
@@ -504,7 +505,7 @@ namespace KerbinMaps.Ksp
                     outN[i * 3] = (float)nx; outN[i * 3 + 1] = (float)ny; outN[i * 3 + 2] = (float)nz;
                 }
             }
-            var mesh = new MuMesh { VertCount = nv, Verts = outV, Normals = outN, Uvs = src.Uvs };
+            var mesh = new MuMesh { VertCount = nv, Verts = outV, Normals = outN, Uvs = src.Uvs, Uvs2 = src.Uvs2 };
             mesh.Submeshes.AddRange(src.Submeshes);
             return mesh;
         }

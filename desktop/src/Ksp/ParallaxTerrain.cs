@@ -112,7 +112,8 @@ namespace KerbinMaps.Ksp
         }
 
         /* De textura de Unity a una lista de niveles lista para la GPU. DXT1 y DXT5, que es
-           lo que usa Parallax, se suben tal cual; los niveles más anchos que `maxAncho` se
+           lo que usa Parallax, se suben tal cual (también las de crunch, que se deshacen
+           hasta sus bloques DXT); los niveles más anchos que `maxAncho` se
            saltan para no llenar la memoria de vídeo con texturas de 4096 que de cerca no se
            notan. Lo demás (algún mapa en R8 o RGBA32) se descomprime a RGBA. */
         internal static TextureFile Convertir(UnitySerialized.Textura u, int maxAncho)
@@ -123,6 +124,16 @@ namespace KerbinMaps.Ksp
             {
                 case 10: block = 8; fmt = TextureFile.DXT1; break;       // DXT1
                 case 12: block = 16; fmt = TextureFile.DXT5; break;      // DXT5
+                case 28: case 29:                                         // DXT1 y DXT5 en crunch
+                {
+                    // en el juego son máscaras de 4096 para un par de km: con 1024 sobra
+                    var c = Crunch.Decodificar(u.Datos, Math.Min(maxAncho, 1024));
+                    if (c.Niveles.Count == 0) throw new InvalidDataException("sin niveles utilizables");
+                    var ct = new TextureFile { CompressedFormat = c.Dxt5 ? TextureFile.DXT5 : TextureFile.DXT1, HasAlpha = c.Dxt5,
+                                               Width = c.Niveles[0].W, Height = c.Niveles[0].H };
+                    foreach (var n in c.Niveles) ct.Levels.Add(n.Bloques);
+                    return ct;
+                }
                 default:
                 {
                     var img = ParallaxPlanets.Decodificar(u, maxAncho) ?? throw new InvalidDataException("sin niveles utilizables");

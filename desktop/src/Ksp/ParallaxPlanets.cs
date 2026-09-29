@@ -125,6 +125,7 @@ namespace KerbinMaps.Ksp
                 case 63: bpp = 1; break;            // R8
                 case 1: bpp = 1; break;             // Alpha8
                 case 4: bpp = 4; break;             // RGBA32
+                case 3: bpp = 3; break;             // RGB24
                 default: throw new NotSupportedException("formato de textura de Unity " + t.Formato);
             }
             int w = t.Ancho, h = t.Alto, off = 0;
@@ -139,6 +140,14 @@ namespace KerbinMaps.Ksp
                     byte[] rgba;
                     if (dxt) rgba = DxtDecoder.Decode(nivel, w, h, t.Formato == 12);
                     else if (bpp == 4) rgba = nivel;
+                    else if (bpp == 3)
+                    {
+                        rgba = new byte[w * h * 4];
+                        for (int k = 0; k < w * h; k++)
+                        {
+                            rgba[k * 4] = nivel[k * 3]; rgba[k * 4 + 1] = nivel[k * 3 + 1]; rgba[k * 4 + 2] = nivel[k * 3 + 2]; rgba[k * 4 + 3] = 255;
+                        }
+                    }
                     else
                     {
                         rgba = new byte[w * h * 4];

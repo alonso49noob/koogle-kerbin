@@ -55,6 +55,11 @@ namespace KerbinMaps.Views
         /* Altura del terreno bajo un punto, en metros sobre el nivel del mar. La pone la
            ventana con el mapa de alturas del cuerpo; sin mapa, todo a cero. */
         public Func<double, double, double> GroundAt;
+        /* El color del mar del mapa de color, para el agua que el relieve pone donde el mapa
+           (de 1 km por texel) aún pinta tierra. Con uno fijo salía un anillo más oscuro que
+           el mar de al lado a lo largo de toda la costa. */
+        public float[] SeaColor = { 0.07f, 0.2f, 0.36f };
+        public Texture SeaTex;                    // el mismo, por zonas (ver MapaDelMar)
 
         public const double FreeMinSpeed = 2, FreeMaxSpeed = 20000;
 

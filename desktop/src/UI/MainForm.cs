@@ -251,6 +251,7 @@ namespace KerbinMaps.UI
                 batch = new Batch2D();
                 text = new TextCache();
                 globe.Init();
+                map.Fondo = FondoCenital;
                 glOk = true;
             }
             catch (Exception ex)

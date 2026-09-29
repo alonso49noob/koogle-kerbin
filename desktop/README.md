@@ -134,14 +134,18 @@ ellos, cada cuerpo se ve con su color y la retícula.
 
 Arriba a la izquierda, **2D**, **3D**, **Cielo** y **Vuelo**.
 
-- **2D**: el mapa plano.
+- **2D**: el mapa plano. De cerca (a partir del zoom 10, unos 7 m por píxel, y hasta el
+  16) el suelo lo pinta el renderizador del vuelo mirando en vertical, ver abajo.
 - **3D**: el globo. Al pinchar una nave, el foco de la cámara pasa del centro de
   Kerbin a la nave y la sigue: arrastrar gira alrededor de ella y la rueda se
   acerca o se aleja. Esc, F o pincharla otra vez devuelven el foco al planeta.
 - **Cielo**: de pie en un punto de la superficie, mirando alrededor. Las naves
   cruzan el cielo con la barra de tiempo; sus órbitas se tapan con el horizonte.
   El punto se elige en la sección «Vista del cielo» (KSC, centro de la vista o un
-  clic en el mapa) o con «Ver el cielo desde aquí» al pinchar en el mapa.
+  clic en el mapa) o con «Ver el cielo desde aquí» al pinchar en el mapa. El ojo nunca
+  queda por debajo del suelo que se pinta (la altitud guardada puede ser de otro mapa de
+  alturas, y la explanada del KSC y el relieve de detalle lo suben), y si cae sobre un
+  edificio se pone encima: en el KSC, de pie en la plataforma de lanzamiento.
 - **Vuelo**: una cámara libre a ras de suelo, con el relieve del terreno. Ver abajo.
 
 ## Día y noche
@@ -436,6 +440,18 @@ los edificios hasta 25 km, y los scatters midiendo desde el ojo y no desde el su
 tiene debajo, así que desde arriba se generan menos y más ralos, y por encima del alcance
 de cada tipo, ninguno.
 
+### El 2D de cerca, visto desde arriba
+
+A partir del zoom 10 el mapa plano ya no estira el mapa de color: el suelo lo pinta el
+mismo renderizador que el vuelo, pero cada píxel lanza su rayo en vertical sobre su propia
+latitud y longitud, así que sale en la proyección exacta del mapa. Lleva el relieve de
+detalle, las texturas del juego y las costas, y los edificios se dibujan en planta con una
+ortográfica (el este estirado 1/cos(lat), como en el mapa). Es un mapa, no una foto: sin
+aire, sin nubes ni brillo del Sol en el agua, que mirando en vertical dejaba todo el mar
+blanco, y con el agua iluminada como el suelo. Con día y noche, la luz del Sol del momento;
+sin, un sombreado de relieve desde el noroeste a 45°. Encima van la retícula (hasta
+milésimas de grado), las trazas y los marcadores del 2D. Cuesta unos 6 ms por fotograma.
+
 ### Relieve de detalle: teselas
 
 El mapa de alturas del cuerpo se sube entero a una resolución que cabe en memoria (en
@@ -462,6 +478,17 @@ Tres detalles que se notaban:
 - La marcha del rayo avanza según la holgura sobre el terreno, con un mínimo que crece
   con la distancia, en lugar de 128 pasos fijos: con pasos fijos, las crestas finas de
   lejos se saltaban y las siluetas salían a escalones.
+
+Al bajar en la vista 3D se pinta con el mismo relieve y las mismas texturas que el vuelo
+(antes el renderizador de cerca solo las activaba en el vuelo y en el cielo, y el 3D de
+cerca salía liso y con el mapa de color estirado).
+
+En las costas, el agua que el relieve pone donde el mapa de color aún pinta tierra toma el
+color del mar abierto de al lado (`MapaDelMar.cs`: un mapa de medio grado con la media de
+los texeles azules a más de 30 m de profundidad, extendida hacia tierra), y el tono por
+profundidad se atenúa exponencialmente, como la luz en el agua. Con el color del mapa, sus
+texeles de costa, mezcla de azul y arena, dejaban un anillo oscuro y un halo arenoso a lo
+largo de toda la orilla.
 
 Cuesta poco: en una RTX 5060 a 1280×720, 1,7 ms por fotograma con la tesela frente a 1,5
 sin ella, y 6,5 ms bajando al KSC con edificios, scatters y nubes.
@@ -630,14 +657,18 @@ edificios del KSC de serie no se mueven ni se borran (no están en ningún `.cfg
 «Duplicar» hace de uno una instancia normal de KK.
 
 El césped del KSC usa el shader «Diffuse Ground KSC» del juego: hierba repetida y teñida con
-`_GrassColor`, y asfalto donde lo diga una máscara. Aquí se reproduce, pero las máscaras
-vienen comprimidas en Crunch, que aún no se lee, así que por ahora todo el suelo sale de
-hierba. Como el mapa de alturas (1,8 km por píxel) no recoge la explanada sobre la que
+`_GrassColor`, y asfalto donde lo diga una máscara. La máscara va por el segundo canal de
+UV de la malla (que cubre la explanada entera de 0 a 1), y viene comprimida en **Crunch**, la
+variante de Unity (formatos 28 y 29): dos paletas, de extremos y de selectores DXT, e
+índices a ellas por bloque con Huffman, agrupados de 2×2 con una referencia que dice si el
+bloque trae extremos nuevos o repite los de al lado. `Crunch.cs` lo deshace hasta los
+bloques DXT de siempre, que van tal cual a la GPU; en el juego son 35 texturas, casi todas
+estas máscaras, y se leen a 1024 (unos 250 ms cada una). Como el mapa de alturas (1,8 km por píxel) no recoge la explanada sobre la que
 está el KSC, el terreno se allana a la altura de sus céspedes hasta 2 km del centro y se
 funde con el de alrededor hasta 3,5 km, en el suelo que se pinta y en las cuentas de la
 cámara, la colocación y los scatters, que dentro no salen, como en el juego.
 
-Lo que aún no: las máscaras en Crunch (el asfalto del suelo del KSC); el césped de las bases
+Lo que aún no: el césped de las bases
 de KK sale con su textura, sin el tinte (`GrassColor`) ni su máscara; los edificios del
 formato antiguo se ven pero no se editan; y del juego no se pintan las mallas con
 esqueleto (dos piezas de la plataforma de nivel 3).

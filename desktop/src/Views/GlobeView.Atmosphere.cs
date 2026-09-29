@@ -106,6 +106,10 @@ vec3 inscatter(vec3 o, vec3 d, float t0, float t1, vec3 s, float jitter, out vec
   return uSunI * (sumR * BETA_R * phaseR(mu) + sumM * BETA_M * phaseM(mu));
 }
 
+/* En el mapa 2D visto desde arriba, sin el brillo del Sol en el agua: mirando en
+   vertical, con el Sol alto, todo el mar caía dentro del brillo y salía blanco. */
+uniform int uSinBrillo;
+
 /* Luz que sale de un punto del suelo hacia el observador (v, unitario hacia él). */
 vec3 shadeGround(vec3 p, vec3 n, vec3 v, vec3 s, vec3 albedo, float water) {
   /* Los mapas de color de Kerbin ya vienen «iluminados»: tomados como albedo, la tierra a
@@ -131,7 +135,7 @@ vec3 shadeGround(vec3 p, vec3 n, vec3 v, vec3 s, vec3 albedo, float water) {
     // a ras de suelo el brillo del Sol en el agua es más concentrado y menos intenso:
     // si no, a mediodía todo el mar sale blanco
     float SP = mix(900.0, 1500.0, uCerca);
-    float spec = (SP + 8.0) / (8.0 * PI) * pow(max(dot(up, h), 0.0), SP);
+    float spec = uSinBrillo != 0 ? 0.0 : (SP + 8.0) / (8.0 * PI) * pow(max(dot(up, h), 0.0), SP);
     float Fh = 0.02 + 0.98 * pow(1.0 - clamp(dot(h, v), 0.0, 1.0), 5.0);
     float cosS = max(dot(up, s), 0.0);
     // el agua absorbe casi todo lo que entra: su color del mapa, más oscuro que el de la tierra

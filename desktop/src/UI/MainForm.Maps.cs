@@ -112,6 +112,7 @@ namespace KerbinMaps.UI
             globe.HeightOff = (int)HeightOffNow;
             globe.HMin = HMinNow;
             globe.HMax = HMaxNow;
+            ActualizarMar();
             globe.Pins.Clear();
             if (OnMapBody)
                 foreach (var m in MarkersAll())
@@ -132,6 +133,40 @@ namespace KerbinMaps.UI
             Vis.Set(reliefHint, !hasHeight);
             ActualizarCampoScatters();
             RequestRender();
+        }
+
+        /* El color del mar abierto, por zonas y de media (ver MapaDelMar). Se calcula en
+           segundo plano cada vez que cambian los mapas o su calibración. */
+        object marDe;
+
+        void ActualizarMar()
+        {
+            var col = MapImg("color");
+            var alt = MapImg("height");
+            var (hmin, hmax) = RangoAltura();
+            double co = ColorOffNow, ao = HeightOffNow;
+            var clave = (col, alt, hmin, hmax, co, ao);
+            if (Equals(marDe, clave)) return;
+            marDe = clave;
+            Task.Run(() =>
+            {
+                try { return (Datos: MapaDelMar.Construir(col, alt, hmin, hmax, co, ao, out var media), Media: media); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[mar] " + ex.Message); return (null, null); }
+            }).ContinueWith(t =>
+            {
+                try
+                {
+                    BeginInvoke((Action)(() =>
+                    {
+                        if (!Equals(marDe, clave) || !glOk || !surface.MakeCurrent()) return;
+                        globe.SeaTex?.Dispose();
+                        globe.SeaTex = t.Result.Datos != null ? Texture.FromRgba(t.Result.Datos, MapaDelMar.Ancho, MapaDelMar.Alto, TexFilter.Linear, true) : null;
+                        globe.SeaColor = t.Result.Media ?? new[] { 0.07f, 0.2f, 0.36f };
+                        RequestRender();
+                    }));
+                }
+                catch (InvalidOperationException) { }
+            });
         }
 
         /* ------------------------------------------------------------ capa base */

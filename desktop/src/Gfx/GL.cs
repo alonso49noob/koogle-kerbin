@@ -120,6 +120,7 @@ namespace KerbinMaps.Gfx
         static delegate* unmanaged<int, int> _swapInterval;
 
         public static float MaxAnisotropy { get; private set; }
+        public static int MaxTextureUnits { get; private set; }
         public static int MaxTextureSize { get; private set; }
         public static bool Loaded { get; private set; }
 
@@ -189,6 +190,7 @@ namespace KerbinMaps.Gfx
             _swapInterval = (delegate* unmanaged<int, int>)Proc("wglSwapIntervalEXT", optional: true);
 
             MaxTextureSize = GetInteger(MAX_TEXTURE_SIZE);
+            MaxTextureUnits = GetInteger(0x8872);                  // GL_MAX_TEXTURE_IMAGE_UNITS
             var ext = new HashSet<string>();
             int n = GetInteger(NUM_EXTENSIONS);
             for (uint i = 0; i < n; i++) ext.Add(GetStringi(EXTENSIONS, i));

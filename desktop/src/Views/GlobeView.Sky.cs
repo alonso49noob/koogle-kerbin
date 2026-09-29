@@ -22,8 +22,16 @@ namespace KerbinMaps.Views
         uint skyVao;
 
         /* Posición del observador: la altitud sobre el nivel del mar más dos metros de
-           ojos, en radios de Kerbin. */
-        public double[] ObserverPos() => Sph(ObsLat, ObsLon, 1 + (Math.Max(ObsAlt, 0) + 2) / Body.Radius);
+           ojos, en radios de Kerbin. Nunca por debajo del suelo que se pinta: la altitud
+           guardada puede ser de otro mapa de alturas, y la explanada del KSC y el relieve
+           de detalle suben el suelo por encima de ella. */
+        public double[] ObserverPos()
+        {
+            double suelo = Math.Max(Math.Max(ObsAlt, 0), GroundAt?.Invoke(ObsLat, ObsLon) ?? 0);
+            // y si hay un edificio justo ahí, encima de él
+            if (TechoDeEstaticos(ObsLat, ObsLon, suelo) is double t && t > suelo) suelo = t;
+            return Sph(ObsLat, ObsLon, 1 + (suelo + 2) / Body.Radius);
+        }
 
         const string SkyVS = @"#version 330 core
 const vec2 P[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
@@ -35,6 +43,11 @@ void main() { gl_Position = vec4(P[gl_VertexID], 0.0, 1.0); }";
         const string SkyFS = Header + AtmosphereGlsl + StarsGlsl + @"
 uniform vec2 uView;
 uniform vec3 uEye, uF, uR, uU, uUp, uEast, uNorth;
+/* Vista cenital para el mapa 2D: cada píxel mira en vertical a su lat/lon, en la
+   proyección del mapa (uCentro en grados, lon y lat; uPpd píxeles por grado). */
+uniform int uCenital;
+uniform vec2 uCentro;
+uniform float uPpd, uCenitalR;
 uniform float uTan, uAspect, uPix, uStarShift, uSunRad;
 uniform sampler2D uColor, uBiome, uHeightTex;
 uniform int uHasColor, uHasBiome, uGrid, uHasHeight, uRelief;
@@ -65,7 +78,9 @@ uniform sampler2D uCloudTex;
 uniform int uHasClouds;
 uniform float uCloudR, uCloudAmt, uCloudOff;
 uniform float uColorOff, uBiomeOff, uBiomeAmt;
-uniform vec3 uSun, uTint;
+uniform vec3 uSun, uTint, uSeaColor;
+uniform sampler2D uSeaTex;
+uniform int uHasSeaTex;
 /* Profundidad para los scatters, que se pintan después con prueba de profundidad: la
    distancia a la que choca el rayo, en escala logarítmica (ver GlobeView.Scatters). */
 uniform int uWriteDepth;
@@ -439,20 +454,30 @@ void main() {
     frag = vec4(th < 0.0 ? vec3(1.0, 0.0, 0.0) : vec3(th * uRadiusM / 30000.0), 1.0);
     return;
   }
-  vec3 d = normalize(uF + uR * ndc.x * uTan * uAspect + uU * ndc.y * uTan);
+  vec3 eye = uEye;
+  vec3 d;
+  if (uCenital != 0) {
+    vec2 ll = uCentro + (gl_FragCoord.xy - 0.5 * uView) / uPpd;
+    if (abs(ll.y) > 90.0) { frag = vec4(0.027, 0.043, 0.067, 1.0); return; }
+    float la = radians(ll.y), lo = radians(ll.x);
+    vec3 n = vec3(cos(la) * sin(lo), sin(la), cos(la) * cos(lo));
+    eye = n * uCenitalR;
+    d = -n;
+  }
+  else d = normalize(uF + uR * ndc.x * uTan * uAspect + uU * ndc.y * uTan);
   float el = asin(clamp(dot(d, uUp), -1.0, 1.0));
   float jit = ign(gl_FragCoord.xy);
-  vec2 ta = raySphere(uEye, d, ATM_TOP);
-  vec2 tg = raySphere(uEye, d, 1.0);
+  vec2 ta = raySphere(eye, d, ATM_TOP);
+  vec2 tg = raySphere(eye, d, 1.0);
 
   vec3 col;
   {
     float t = tg.x;
     vec3 nRel = vec3(0.0); float esMar = 0.0;
     bool relieve = uRelief != 0 && uHasHeight != 0;
-    if (relieve) t = marchTerrain(uEye, d, nRel, esMar);
+    if (relieve) t = marchTerrain(eye, d, nRel, esMar);
     if (t > 0.0) {
-      vec3 p = uEye + d * t;
+      vec3 p = eye + d * t;
       if (uWriteDepth != 0) gl_FragDepth = profundidad(t * uRadiusM * dot(d, uF));
       float lat = asin(clamp(p.y, -1.0, 1.0));
       float lon = atan(p.x, p.z);
@@ -504,10 +529,13 @@ void main() {
         float huellaM = t * uRadiusM * uPix;
         if (esMar > 0.5) {
           float prof = max(-hSuelo, 0.0);
-          vec3 mar = mix(vec3(0.07, 0.2, 0.36), base, water);    // junto a la costa el mapa trae tierra
-          vec3 somero = mar * 1.3 + vec3(0.03, 0.07, 0.065);
-          vec3 hondo = mar * 0.6;
-          base = mix(somero, hondo, smoothstep(1.5, 45.0, prof));
+          // junto a la costa el mapa trae tierra y arena: el color de su mar abierto (ver MapaDelMar)
+          vec3 mar = uHasSeaTex != 0 ? textureLod(uSeaTex, vec2(fract(u), v), 0.0).rgb : mix(uSeaColor, base, water);
+          vec3 somero = mar * 1.25 + vec3(0.03, 0.06, 0.055);
+          vec3 hondo = mar * 0.72;
+          // atenuación exponencial, como la de la luz en el agua: el fondo baja a escalones
+          // de decenas de metros y con una rampa corta cada escalón salía como un borde
+          base = mix(somero, hondo, 1.0 - exp(-prof / 70.0));
           float espuma = (1.0 - smoothstep(0.1, 1.4, prof)) * (1.0 - smoothstep(12.0, 60.0, huellaM));
           base = mix(base, vec3(0.9, 0.93, 0.93), espuma * 0.75);
           water = 1.0 - espuma * 0.85;                           // la espuma no es un espejo
@@ -521,13 +549,15 @@ void main() {
       }
       vec3 nSup = relieve ? nRel : normalize(p);
       if (water < 0.5) base = detalle(p, nSup, base, t * uRadiusM);
-      vec3 L = shadeGround(p, nSup, -d, uSun, pow(base, vec3(2.2)), water);
+      // en el mapa, el agua con su color y la misma luz que el suelo: desde arriba solo
+      // reflejaría el cielo, casi negro sin aire
+      vec3 L = shadeGround(p, nSup, -d, uSun, pow(base, vec3(2.2)), uCenital != 0 ? 0.0 : water);
       vec3 tr = vec3(1.0), ins = vec3(0.0);
-      if (uAtmos != 0) ins = inscatter(uEye, d, max(ta.x, 0.0), t, uSun, jit, tr);
+      if (uAtmos != 0) ins = inscatter(eye, d, max(ta.x, 0.0), t, uSun, jit, tr);
       col = L * tr + ins;
     } else {
       vec3 tr = vec3(1.0), ins = vec3(0.0);
-      if (uAtmos != 0 && ta.y > 0.0) ins = inscatter(uEye, d, max(ta.x, 0.0), ta.y, uSun, jit, tr);
+      if (uAtmos != 0 && ta.y > 0.0) ins = inscatter(eye, d, max(ta.x, 0.0), ta.y, uSun, jit, tr);
       col = ins;
       // el Sol, 1,1° de radio visto desde Kerbin, con el color que le deja el aire
       float ang = acos(clamp(dot(d, uSun), -1.0, 1.0));
@@ -541,11 +571,11 @@ void main() {
      queda por delante de lo que ya se ve (suelo o cielo) y se mezcla con su cobertura.
      Con la camara por debajo vale el corte de salida; por encima, el de entrada. */
   if (uHasClouds != 0 && uCloudAmt > 0.0) {
-    vec2 tn = raySphere(uEye, d, uCloudR);
-    float tc = length(uEye) < uCloudR ? tn.y : tn.x;
+    vec2 tn = raySphere(eye, d, uCloudR);
+    float tc = length(eye) < uCloudR ? tn.y : tn.x;
     float tSuelo = tg.x;
     if (tc > 0.0 && (tSuelo <= 0.0 || tc < tSuelo)) {
-      vec3 pc = uEye + d * tc;
+      vec3 pc = eye + d * tc;
       vec3 nc = normalize(pc);
       float latc = asin(clamp(nc.y, -1.0, 1.0)), lonc = atan(nc.x, nc.z);
       vec2 uvc = vec2(fract(lonc / (2.0 * PI) + 0.5 + uCloudOff), 0.5 - latc / PI);
@@ -562,7 +592,7 @@ void main() {
         vec3 colNube = nube.rgb * luz / PI;
         // lo que hay detras se atenua con el aire que queda por delante de la nube
         vec3 trN = vec3(1.0), insN = vec3(0.0);
-        if (uAtmos != 0) insN = inscatter(uEye, d, max(ta.x, 0.0), tc, uSun, jit, trN);
+        if (uAtmos != 0) insN = inscatter(eye, d, max(ta.x, 0.0), tc, uSun, jit, trN);
         col = mix(col, colNube * trN + insN, a);
         // una nube espesa tapa lo que haya detrás, también los árboles
         if (uWriteDepth != 0 && a > 0.5) gl_FragDepth = min(gl_FragDepth, profundidad(tc * uRadiusM * dot(d, uF)));
@@ -630,6 +660,27 @@ void main() {
             SkyEl = Math.Clamp(SkyEl + del, -89, 89);
         }
 
+        /* El suelo de cerca para el mapa 2D, visto desde arriba en su proyección: el mismo
+           suelo que el vuelo (relieve de detalle, texturas del juego, costas) y los edificios
+           en planta. El mapa pinta luego encima su retícula, trazas y marcadores. */
+        bool cenital, cenSolReal;
+        double cenLat, cenLon, cenPpd;
+        double CenitalAltM => Math.Max(HMax, 0) + 5000;       // el ojo, por encima de todo
+        public double CercaCenital = 1;                        // exposición: 0 la del globo, 1 la de paisaje
+
+        public void RenderCenital(Batch2D batch, TextCache tc, double lat, double lon, double ppd, bool solReal)
+        {
+            if (skyProg == null) return;
+            cenital = true; cenLat = lat; cenLon = lon; cenPpd = ppd; cenSolReal = solReal;
+            try
+            {
+                var n = Sph(lat, lon, 1);
+                LocalBasis(n, out _, out _, out var north);
+                RenderSky(batch, tc, new Cam { Eye = Scale(n, 1 + CenitalAltM / Body.Radius), Target = n, Up = north, Fov = 30 });
+            }
+            finally { cenital = false; }
+        }
+
         void RenderSky(Batch2D batch, TextCache tc, Cam cam)
         {
             GL.Viewport(0, 0, W, H);
@@ -659,25 +710,47 @@ void main() {
             skyProg.Float("uTan", tan);
             skyProg.Float("uAspect", (double)W / H);
             skyProg.Float("uPix", 2 * tan / H);
+            skyProg.Int("uCenital", cenital ? 1 : 0);
+            if (cenital)
+            {
+                skyProg.Vec2("uCentro", cenLon, cenLat);
+                skyProg.Float("uPpd", cenPpd);
+                skyProg.Float("uCenitalR", 1 + CenitalAltM / Body.Radius);
+                // lo que abarca un píxel en el suelo es t·R·uPix, con t la altura del ojo
+                skyProg.Float("uPix", Body.Radius * D2R / cenPpd / CenitalAltM);
+            }
             skyProg.Float("uAlt", Len(eye) - 1);
             skyProg.Float("uStarShift", orbitShift);
-            skyProg.Int("uGrid", SkyGrid && Mode == CamMode.Sky ? 1 : 0);
+            skyProg.Int("uGrid", SkyGrid && Mode == CamMode.Sky && !cenital ? 1 : 0);
             // sin día y noche, el Sol se queda en lo alto del observador; forzando la noche, apagado
-            var sun = Light ? SunDir : up;
+            var sun = (cenital ? cenSolReal : Light) ? SunDir : up;
+            // sin día y noche, el mapa se ilumina como un sombreado de relieve: desde el
+            // noroeste a 45°, que es de donde se espera la luz al leer un mapa
+            if (cenital && !cenSolReal) sun = Norm(Add(Add(Scale(up, 1), north, 0.7071), east, -0.7071));
             skyProg.Vec3("uSun", sun[0], sun[1], sun[2]);
+            skyProg.Int("uSinBrillo", cenital ? 1 : 0);
             skyProg.Float("uSunRad", Math.Max(SunAngularRadius, 0.0015));
             AtmosUniforms(skyProg, 24, sunOn: !SkyForceNight);
+            if (cenital) skyProg.Int("uAtmos", 0);           // un mapa: sin la bruma de 10 km de aire
             // a ras de suelo, el ajuste de exposición para paisaje (ver shadeGround); bajando
             // desde el globo se funde con el de fuera para que no dé un salto
-            skyProg.Float("uCerca", Mode == CamMode.Planet ? 1 - SuaveEntre((Len(eye) - 1) * Body.Radius, 3000, 40000) : 1);
+            skyProg.Float("uCerca", cenital ? CercaCenital : Mode == CamMode.Planet ? 1 - SuaveEntre((Len(eye) - 1) * Body.Radius, 3000, 40000) : 1);
             skyProg.Float("uColorOff", ColorOff / 360);
             skyProg.Float("uBiomeOff", BiomeOff / 360);
             skyProg.Float("uBiomeAmt", BiomeTex != null ? BiomeAmt : 0);
             skyProg.Int("uHasColor", ColorTex != null ? 1 : 0);
+            skyProg.Vec3("uSeaColor", SeaColor[0], SeaColor[1], SeaColor[2]);
+            // la unidad 16 no la tienen todas las GPU (el mínimo son 16: de la 0 a la 15)
+            bool marTex = SeaTex != null && GL.MaxTextureUnits > 16;
+            skyProg.Int("uHasSeaTex", marTex ? 1 : 0);
+            if (marTex) { BindTex(16, SeaTex); skyProg.Int("uSeaTex", 16); }
             skyProg.Int("uHasBiome", BiomeTex != null ? 1 : 0);
             /* Relieve: solo con mapa de alturas, y en la camara libre siempre; de pie en
-               el suelo tambien, que es lo que hace que se vean las montanas de cerca. */
-            bool relieve = HeightTex != null && FreeRelief && (Mode == CamMode.Free || Mode == CamMode.Sky);
+               el suelo tambien, que es lo que hace que se vean las montanas de cerca. Y
+               bajando en la vista 3D, que por debajo de RadioCerca se pinta con esto mismo:
+               tiene que verse igual que el vuelo. */
+            bool cerca = cenital || Mode == CamMode.Free || Mode == CamMode.Sky || Mode == CamMode.Planet;
+            bool relieve = HeightTex != null && FreeRelief && cerca;
             skyProg.Int("uHasHeight", HeightTex != null ? 1 : 0);
             skyProg.Int("uRelief", relieve ? 1 : 0);
             skyProg.Float("uHeightOff", HeightOff / 360);
@@ -709,12 +782,12 @@ void main() {
             BindTex(0, ColorTex); skyProg.Int("uColor", 0);
             BindTex(1, BiomeTex); skyProg.Int("uBiome", 1);
             BindTex(2, HeightTex); skyProg.Int("uHeightTex", 2);
-            /* Detalle del suelo: solo volando, que es donde se ve, y con las cuatro
+            /* Detalle del suelo: solo cerca del suelo, que es donde se ve, y con las cuatro
                texturas cargadas del juego. El origen va en metros ya reducido al tamano
                del mosaico, para no perder precision al sumarlo en el shader. */
-            bool det = Detail && HasDetail && (Mode == CamMode.Free || Mode == CamMode.Sky);
+            bool det = Detail && HasDetail && cerca;
             skyProg.Int("uDebug", Debug);
-            bool nubes = CloudTex != null && Clouds;
+            bool nubes = CloudTex != null && Clouds && !cenital;
             skyProg.Int("uHasClouds", nubes ? 1 : 0);
             skyProg.Float("uCloudR", 1 + CloudAlt / Body.Radius);
             skyProg.Float("uCloudAmt", nubes ? CloudAmount : 0);
@@ -729,6 +802,7 @@ void main() {
             skyProg.Float("uDetAmt", det ? DetailAmount : 0);
             double lat0 = Mode == CamMode.Free ? FreeLat : ObsLat, lon0 = Mode == CamMode.Free ? FreeLon : ObsLon;
             if (Mode == CamMode.Planet) { var g = EyeGround(); lat0 = g.Lat; lon0 = g.Lon; }
+            if (cenital) { lat0 = cenLat; lon0 = cenLon; }
             /* El módulo es un múltiplo de todos los periodos de las texturas (4096 repeticiones:
                la escala más grande que se usa es de 1024) y de su ruido de variación. */
             double periodo = DetailTile * 4096;
@@ -754,10 +828,11 @@ void main() {
             BindTex(6, DetSnow); skyProg.Int("uDetSnow", 6);
             /* Con scatters, el cielo deja en el búfer de profundidad dónde está el suelo. Solo
                se escribe con la prueba activada, así que se activa sin descartar nada. */
-            bool scatters = ScattersActive, edificios = StaticsActive;
+            bool scatters = ScattersActive && !cenital;
+            bool edificios = cenital ? StaticsOn && Statics != null && StaticModel != null : StaticsActive;
             bool profundidad = scatters || edificios;
             skyProg.Int("uWriteDepth", profundidad ? 1 : 0);
-            skyProg.Float("uDepthFar", ScatterFar);
+            skyProg.Float("uDepthFar", cenital ? CenitalAltM + 1000 : ScatterFar);
             if (profundidad)
             {
                 GL.Enable(GL.DEPTH_TEST);
@@ -775,7 +850,19 @@ void main() {
             else ScatterVisibleReset();
             if (edificios)
             {
-                try { DrawStatics(eye, right, camUp, tan); }
+                try
+                {
+                    if (cenital)
+                    {
+                        // ortográfica en la proyección del mapa: en él un grado de longitud mide
+                        // lo mismo que uno de latitud, así que el este va estirado 1/cos(lat)
+                        double pxN = cenPpd / (Body.Radius * D2R);
+                        double pxE = pxN / Math.Max(Math.Cos(cenLat * D2R), 0.01);
+                        double radio = Math.Sqrt(W * W + H * H) / 2 / pxN;
+                        DrawStatics(eye, right, camUp, tan, new[] { pxE / (W / 2.0), pxN / (H / 2.0) }, radio, CenitalAltM + 1000);
+                    }
+                    else DrawStatics(eye, right, camUp, tan);
+                }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[edificios] " + ex.Message); }
             }
             else StaticsVisible = 0;
@@ -787,6 +874,7 @@ void main() {
                 GL.Disable(GL.DEPTH_TEST);
                 GL.Disable(GL.CULL_FACE);
             }
+            if (cenital) return;                            // lo demás lo pone el mapa encima
 
             // órbitas y trazas, tapadas por el planeta con el corte de rayo del shader
             DrawOrbits(eye, occlude: true);
