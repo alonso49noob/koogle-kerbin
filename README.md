@@ -52,7 +52,9 @@ What it does:
   time and selection. The flight view ray-marches the body's height map, so the horizon
   and the mountain silhouettes are exact, and it dresses the ground with the game's own
   terrain textures and cloud maps when you have them installed (the cloud layer shows on
-  the 3D globe too). With Parallax
+  the 3D globe too, drifting west at the speed in the cloud mod's config and changing shape
+  over time). If it finds KSP, it switches Kerbin to the game's own maps: the 8192 colour
+  map, the 4096 biome map and Parallax's 8192 height map. With Parallax
   Continued, each body gets its own surface textures, blended by altitude and slope the
   way the mod does (biplanar mapping, influence, displacement blending, occlusion and
   normal maps, plus anti-tiling variation), and every planet's colour and height maps

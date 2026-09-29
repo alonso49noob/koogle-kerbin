@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using KerbinMaps.Core;
 using KerbinMaps.Gfx;
+using KerbinMaps.Ksp;
 using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
@@ -367,6 +368,7 @@ namespace KerbinMaps.UI
         void LoadCatalog()
         {
             catalog = MapsCatalog.Load(Path.Combine(Store.DataDir, "maps.json"));
+            AgregarPresetDelJuego();
             if (catalog == null) return;
             presetCombo.SetItems(catalog.Presets.Select(p => (p.Id, p.Nombre ?? p.Id)));
             string sel = state.PresetId ?? catalog.Predeterminado ?? catalog.Presets[0].Id;
@@ -392,6 +394,69 @@ namespace KerbinMaps.UI
 
         static Task<ImageData> DecodeFile(string path) => Task.Run(() => ImageData.Decode(File.ReadAllBytes(path)));
 
+        /* El preset con los mapas de la propia instalación de KSP (ver MapasDelJuego): va el
+           primero de la lista y no ocupa nada en data/, se lee del juego cada vez. */
+        const string PresetJuego = "juego";
+
+        void AgregarPresetDelJuego()
+        {
+            if (catalog?.Find(PresetJuego) != null) return;
+            string gd = FindGameData();
+            var sa = gd == null ? null : StockAssets.For(gd);
+            if (sa == null) return;
+            bool color = File.Exists(Path.Combine(sa.Dir, "sharedassets2.assets"));
+            bool biomas = File.Exists(Path.Combine(sa.Dir, "sharedassets9.assets"));
+            string paquete = ParallaxPlanets.FindBundle(gd);
+            (double Min, double Max)? rango = null;
+            if (paquete != null && BodyMaps.ParallaxRanges(gd).TryGetValue("Kerbin", out var r)) rango = r;
+            if (!color && !biomas) return;
+            catalog ??= new MapsCatalog();
+            catalog.Presets.Insert(0, new Preset
+            {
+                Id = PresetJuego,
+                Nombre = Lang.T("De tu instalación — color 8192 + biomas 4096") + (rango != null ? Lang.T(" + altura 8192") : ""),
+                Fuente = Lang.T("tu instalación de KSP: sharedassets2 y 9 del juego, y el paquete de Parallax"),
+                Color = color ? new SlotSpec { File = "KerbinScaledSpace300 (juego)", Juego = "color" } : null,
+                Biome = biomas ? new SlotSpec { File = "kerbin_biome (juego)", Juego = "biome" } : null,
+                Height = rango != null ? new SlotSpec { File = "Kerbin_Height (Parallax)", Juego = "height", HMin = rango.Value.Min, HMax = rango.Value.Max } : null,
+            });
+        }
+
+        async Task<ImageData> CargarDelJuego(string slot)
+        {
+            string gd = FindGameData();
+            var sa = gd == null ? null : StockAssets.For(gd);
+            if (sa == null) return null;
+            string paquete = ParallaxPlanets.FindBundle(gd);
+            switch (slot)
+            {
+                case "biome":
+                {
+                    var r = await Task.Run(() => MapasDelJuego.Biomas(sa, "Kerbin"));
+                    if (r == null) return null;
+                    // los nombres de los biomas del juego, donde no haya uno puesto a mano
+                    foreach (var (hex, nombre) in r.Value.Nombres)
+                        if (!biomeNames.ContainsKey(hex.ToLowerInvariant())) biomeNames[hex.ToLowerInvariant()] = nombre;
+                    return r.Value.Mapa;
+                }
+                case "color":
+                {
+                    var c = await Task.Run(() => MapasDelJuego.ColorCrudo(sa, "Kerbin"));
+                    if (c != null && glOk && surface.MakeCurrent())
+                    {
+                        var rgba = Texture.DescomprimirEnGpu(Texture.BC7, c.Value.Ancho, c.Value.Alto, c.Value.Nivel);
+                        if (rgba != null) return await Task.Run(() => MapasDelJuego.DesdeRgbaDeUnity(rgba, c.Value.Ancho, c.Value.Alto));
+                    }
+                    // sin BC7 en la GPU: el de Parallax, que es el mismo a la mitad
+                    if (paquete == null) return null;
+                    return await Task.Run(() => MapasDelJuego.DesdeParallax(ParallaxPlanets.Load(paquete, "Kerbin", 8192).Color));
+                }
+                default:
+                    if (paquete == null) return null;
+                    return await Task.Run(() => MapasDelJuego.DesdeParallax(ParallaxPlanets.Load(paquete, "Kerbin", 8192).Height));
+            }
+        }
+
         /* Carga un preset entero. El bioma va primero a propósito: es la referencia
            contra la que se mide el giro de los mapas marcados como "auto". */
         async Task<bool> LoadPresetAsync(string id, bool silent)
@@ -410,10 +475,24 @@ namespace KerbinMaps.UI
                     string path = Path.Combine(Store.DataDir, spec.File);
                     try
                     {
-                        if (!File.Exists(path)) { faltan.Add(spec.File); continue; }
-                        var img = await DecodeFile(path);
+                        ImageData img;
+                        if (spec.Juego != null)
+                        {
+                            img = await CargarDelJuego(spec.Juego);
+                            if (img == null) { faltan.Add(spec.File); continue; }
+                        }
+                        else
+                        {
+                            if (!File.Exists(path)) { faltan.Add(spec.File); continue; }
+                            img = await DecodeFile(path);
+                        }
                         SetImage(slot, img);
-                        metas[slot] = new SlotMeta { Name = "data/" + spec.File, W = img.Width, H = img.Height, FromDisk = true };
+                        metas[slot] = spec.Juego != null
+                            ? new SlotMeta { Name = spec.File, W = img.Width, H = img.Height }
+                            : new SlotMeta { Name = "data/" + spec.File, W = img.Width, H = img.Height, FromDisk = true };
+                        /* La copia guardada de un mapa cargado a mano se aparta (a slots/anteriores):
+                           si no, al arrancar volvería a ocupar la ranura en lugar del preset. */
+                        try { Store.ArchiveImage(slot); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[preset] " + ex.Message); }
                         if (spec.Auto) autos.Add(slot);
                         else state.LonOffset.Set(slot, ((spec.LonOffset % 360) + 360) % 360);
                         /* Si el preset sabe a qué metros corresponden el gris 0 y el 255 (los
@@ -742,6 +821,23 @@ namespace KerbinMaps.UI
                 try { await LoadPresetAsync(state.PresetId ?? catalog.Predeterminado, true); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] preset: " + ex.Message); }
             try { await DiscoverDiskMaps(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] data/: " + ex.Message); }
+
+            /* La primera vez que la instalación tiene los mapas del juego, se ponen en lugar de
+               los que haya: son mejores que cualquiera de los que trae el visor. Una sola vez:
+               después manda lo que se elija en «Datos del mapa». */
+            if (!state.MapasDelJuego && catalog?.Find(PresetJuego) != null)
+                try
+                {
+                    state.MapasDelJuego = true;
+                    if (await LoadPresetAsync(PresetJuego, true))
+                    {
+                        presetCombo.SelectedId = PresetJuego;
+                        DescribePreset(PresetJuego);
+                        Flash(Lang.T("Mapas de Kerbin cambiados por los de tu instalación de KSP: color de 8192 y biomas de 4096 del propio juego, y la altura de Parallax. Puedes volver a otros en «Datos del mapa»."));
+                    }
+                    SaveSettings();
+                }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] mapas del juego: " + ex.Message); }
 
             if (state.BaseId == "grid" && Img("color") != null) state.BaseId = "color";
             SetBase(state.BaseId, true);

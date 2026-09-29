@@ -278,7 +278,8 @@ namespace KerbinMaps.UI
 
         static bool AppIdle => !PeekMessage(out _, IntPtr.Zero, 0, 0, 0);
 
-        bool WantsFrames => needsFrame || map.Animating || globe.Animating || globe.WindAnimating || SimWantsFrames || VolandoConTeclas;
+        bool WantsFrames => needsFrame || map.Animating || globe.Animating || globe.WindAnimating
+                            || (GlobeVisible && globe.CloudsAnimating) || SimWantsFrames || VolandoConTeclas;
 
         void OnIdle(object sender, EventArgs e)
         {
@@ -303,6 +304,8 @@ namespace KerbinMaps.UI
             if (map.Animating) { map.Animate(dt); saveViewTimer.Stop(); saveViewTimer.Start(); }
             PasoDeVuelo(now);
             globe.GroundAt ??= AlturaDelSuelo;
+            // las nubes van con el tiempo de la simulación y, además, con el reloj real
+            globe.CloudTime = sim.T + now;
             ActualizarTesela();
 
             int w = Math.Max(1, surface.ClientSize.Width), h = Math.Max(1, surface.ClientSize.Height);

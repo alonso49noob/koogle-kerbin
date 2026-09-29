@@ -128,8 +128,9 @@ namespace KerbinMaps.UI
         }
 
         /* Mapa de nubes del cuerpo, de los mods de nubes que haya instalados. Es de
-           16384x8192 y pesa 179 MB con sus mipmaps: se lee solo un nivel de 2048 de
-           ancho, que para pintarlas sobra y se carga al instante. */
+           16384x8192 y pesa 179 MB con sus mipmaps: se lee desde el nivel de 8192 de ancho
+           (43 MB en la GPU, 5 km por texel), y de cerca lo completa la textura de detalle
+           del mod. La velocidad a la que gira la capa sale de su clouds.cfg. */
         string nubesDe;
 
         async Task CargarNubes()
@@ -146,18 +147,55 @@ namespace KerbinMaps.UI
                 Path.Combine(gd, "BoulderCo", "Clouds", "Textures", Body.Name.ToLowerInvariant() + "1.dds"),
             };
             string ruta = Array.Find(candidatos, File.Exists);
+            string rutaDet = Path.Combine(gd, "StockVolumetricClouds", "Clouds", "Textures", "PluginData", "detail1.dds");
+            string cuerpo = Body.Name;
 
-            var leida = ruta == null ? null : await Task.Run(() =>
+            var (leida, detalle, velocidad) = ruta == null ? (null, null, (double?)null) : await Task.Run(() =>
             {
-                try { return TextureFile.LoadDdsLevel(ruta, 2048); }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[nubes] " + ex.Message); return null; }
+                TextureFile t = null, d = null;
+                try { t = TextureFile.LoadDdsLevel(ruta, 8192); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[nubes] " + ex.Message); }
+                try { if (File.Exists(rutaDet)) d = TextureFile.LoadDdsLevel(rutaDet, 1024); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[nubes] detalle: " + ex.Message); }
+                return (t, d, VelocidadNubes(gd, cuerpo));
             });
 
             if (!glOk || !surface.MakeCurrent()) return;
             globe.CloudTex?.Dispose();
             globe.CloudTex = leida == null ? null : Subir(new System.Collections.Generic.Dictionary<string, TextureFile> { ["n"] = leida }, "n");
+            globe.CloudDetailTex?.Dispose();
+            globe.CloudDetailTex = detalle == null ? null : Subir(new System.Collections.Generic.Dictionary<string, TextureFile> { ["d"] = detalle }, "d");
+            globe.CloudSpeed = velocidad ?? 29.89;
             RenderVueloInfo();
             RequestRender();
+        }
+
+        /* La velocidad de la primera capa del cuerpo en el clouds.cfg del mod de nubes
+           («speed = 0,29.89,0» con speedMode = LinearSurface: m/s en superficie). */
+        static double? VelocidadNubes(string gd, string cuerpo)
+        {
+            try
+            {
+                string cfg = Path.Combine(gd, "StockVolumetricClouds", "Clouds", "clouds.cfg");
+                if (!File.Exists(cfg)) return null;
+                var lineas = File.ReadAllLines(cfg);
+                for (int i = 0; i < lineas.Length; i++)
+                {
+                    var l = lineas[i].Trim();
+                    if (!l.StartsWith("body", StringComparison.Ordinal) || !l.EndsWith("= " + cuerpo, StringComparison.OrdinalIgnoreCase)) continue;
+                    for (int j = i + 1; j < Math.Min(lineas.Length, i + 12); j++)
+                    {
+                        var s = lineas[j].Trim();
+                        if (!s.StartsWith("speed ", StringComparison.Ordinal) && !s.StartsWith("speed=", StringComparison.Ordinal)) continue;
+                        var v = s.Substring(s.IndexOf('=') + 1).Split(',');
+                        if (v.Length == 3 && double.TryParse(v[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double y))
+                            return Math.Abs(y);
+                    }
+                    return null;
+                }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[nubes] cfg: " + ex.Message); }
+            return null;
         }
 
         static Texture Subir(System.Collections.Generic.Dictionary<string, TextureFile> leidas, string slot)

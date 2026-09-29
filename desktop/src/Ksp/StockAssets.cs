@@ -73,6 +73,38 @@ namespace KerbinMaps.Ksp
             }
         }
 
+        /* La textura tal cual viene (formato de Unity y bytes), sin convertir: para las de
+           formatos que hay que descomprimir en otro sitio, como BC7. */
+        public UnitySerialized.Textura LoadCruda(string clave)
+        {
+            if (clave == null || !clave.StartsWith(Prefijo, StringComparison.Ordinal)) return null;
+            var p = clave.Substring(Prefijo.Length).Split(':');
+            if (p.Length != 2 || !long.TryParse(p[1], out long id)) return null;
+            lock (cerrojo)
+            {
+                var s = SerializadoSinCerrojo(p[0]);
+                return s?.LeerTextura(id, (ruta, off, size) => LeerRecursoSinCerrojo(ruta, off, size));
+            }
+        }
+
+        byte[] LeerRecursoSinCerrojo(string ruta, long off, int size)
+        {
+            string nombre = Path.GetFileName(ruta.Replace("archive:/", ""));
+            if (!recursos.TryGetValue(nombre, out var rf))
+            {
+                string full = Path.Combine(dir, nombre);
+                recursos[nombre] = rf = File.Exists(full) ? new UnityFile(full) : null;
+            }
+            return rf?.Read(off, size);
+        }
+
+        /* Los ficheros sharedassets del juego, por nombre. */
+        public IEnumerable<string> Ficheros()
+        {
+            try { return Directory.EnumerateFiles(dir, "sharedassets*.assets").Select(Path.GetFileName).ToList(); }
+            catch { return Array.Empty<string>(); }
+        }
+
         public TextureFile Load(string clave)
         {
             if (!clave.StartsWith(Prefijo, StringComparison.Ordinal)) return null;

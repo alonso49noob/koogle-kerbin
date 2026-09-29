@@ -77,6 +77,7 @@ uniform int uDebug;
 uniform sampler2D uCloudTex;
 uniform int uHasClouds;
 uniform float uCloudR, uCloudAmt, uCloudOff;
+" + NubesGlsl + @"
 uniform float uColorOff, uBiomeOff, uBiomeAmt;
 uniform vec3 uSun, uTint, uSeaColor;
 uniform sampler2D uSeaTex;
@@ -578,13 +579,17 @@ void main() {
       vec3 pc = eye + d * tc;
       vec3 nc = normalize(pc);
       float latc = asin(clamp(nc.y, -1.0, 1.0)), lonc = atan(nc.x, nc.z);
-      vec2 uvc = vec2(fract(lonc / (2.0 * PI) + 0.5 + uCloudOff), 0.5 - latc / PI);
+      vec2 uvc = nubeUv(nc, vec2(lonc / (2.0 * PI) + 0.5 + uCloudOff, 0.5 - latc / PI));
+      uvc.x = fract(uvc.x);
       // el nivel de mipmap, como en el suelo, por el tamano del pixel sobre la capa
       float huella = tc * uRadiusM * uPix;
       float texel = 2.0 * PI * uRadiusM / 2048.0;
       float lodc = clamp(log2(max(huella / texel, 0.0001)), 0.0, 12.0);
       vec4 nube = textureLod(uCloudTex, uvc, lodc);
-      float a = clamp(nube.a * uCloudAmt, 0.0, 1.0);
+      float a = clamp(nube.a * uCloudAmt * nubeVida(nc), 0.0, 1.0);
+      // de cerca, el detalle del mod, que va con la capa
+      float lonN = lonc + uCloudOff * 2.0 * PI;
+      a = clamp(a * nubeDetalle(vec2(lonN * cos(latc), latc) * uRadiusM, 1.0 - smoothstep(4000.0, 30000.0, tc * uRadiusM)), 0.0, 1.0);
       if (a > 0.002) {
         // iluminacion sencilla: el Sol por encima de la capa, algo de cielo por debajo
         vec3 luz = uSunI * sunTransmittance(pc, uSun) * max(dot(nc, uSun), 0.0) * 0.55
@@ -791,7 +796,8 @@ void main() {
             skyProg.Int("uHasClouds", nubes ? 1 : 0);
             skyProg.Float("uCloudR", 1 + CloudAlt / Body.Radius);
             skyProg.Float("uCloudAmt", nubes ? CloudAmount : 0);
-            skyProg.Float("uCloudOff", CloudOff / 360);
+            skyProg.Float("uCloudOff", NubeGiro());
+            NubeUniforms(skyProg, 17);
             BindTex(7, CloudTex); skyProg.Int("uCloudTex", 7);
             skyProg.Int("uHasDetail", det ? 1 : 0);
             skyProg.Float("uDetTile", DetailTile);

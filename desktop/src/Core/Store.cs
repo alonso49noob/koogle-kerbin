@@ -39,6 +39,7 @@ namespace KerbinMaps.Core
         public LonOffsets LonOffset = new();
         public string PresetId;
         public string VolcadoCalibrado;           // el mapa de alturas de Kerbin ya calibrado como volcado
+        public bool MapasDelJuego;                // ya se eligió una vez el preset de la instalación
         public bool View3D;
         public bool BiomeOn, BiomeTouched;
         public double BiomeOpacity = BiomeConfig.DefaultOpacity;
@@ -126,15 +127,19 @@ namespace KerbinMaps.Core
        pesar decenas de MB. Guardar es una comodidad: si falla, el visor sigue. */
     public static class Store
     {
-        public static readonly string RoamingDir =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KoogleKerbin");
-        public static readonly string LocalDir =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KoogleKerbin");
+        /* Con KOOGLE_PERFIL, todo va a esa carpeta: para probar una primera ejecución sin
+           tocar los ajustes de verdad. */
+        static readonly string perfil = Environment.GetEnvironmentVariable("KOOGLE_PERFIL");
+        public static readonly string RoamingDir = !string.IsNullOrEmpty(perfil) ? Path.Combine(perfil, "roaming")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KoogleKerbin");
+        public static readonly string LocalDir = !string.IsNullOrEmpty(perfil) ? Path.Combine(perfil, "local")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KoogleKerbin");
 
         /* La app se llamaba Kerbin Maps: si quedan sus carpetas y aún no hay de las
            nuevas, se renombran para no perder ajustes, marcadores ni mapas cargados. */
         public static void MigrateOldFolders()
         {
+            if (!string.IsNullOrEmpty(perfil)) return;
             foreach (var (root, nuevo) in new[] { (Environment.SpecialFolder.ApplicationData, RoamingDir), (Environment.SpecialFolder.LocalApplicationData, LocalDir) })
             {
                 try
@@ -212,6 +217,18 @@ namespace KerbinMaps.Core
             return (File.ReadAllBytes(img), meta);
         }
 
+        /* La deja aparte en slots/anteriores/<fecha> en lugar de borrarla: al cambiar a un
+           preset, el mapa que se había cargado a mano no se pierde. */
+        public static void ArchiveImage(string slot)
+        {
+            if (!Directory.Exists(SlotDir)) return;
+            var ficheros = Directory.GetFiles(SlotDir, slot + ".*");
+            if (ficheros.Length == 0) return;
+            string dest = Path.Combine(SlotDir, "anteriores", DateTime.Now.ToString("yyyy-MM-dd_HHmmss"));
+            Directory.CreateDirectory(dest);
+            foreach (var f in ficheros) File.Move(f, Path.Combine(dest, Path.GetFileName(f)), true);
+        }
+
         public static void DelImage(string slot)
         {
             if (!Directory.Exists(SlotDir)) return;
@@ -248,6 +265,7 @@ namespace KerbinMaps.Core
         public bool Auto;
         public double LonOffset;
         public double? HMin, HMax;
+        public string Juego;                      // sale de la instalación de KSP: «color», «biome» o «height»
     }
 
     public sealed class Preset

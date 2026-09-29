@@ -100,6 +100,26 @@ KoogleKerbin.exe "C:\ruta\a\persistent.sfs"
 Los ficheros también se pueden soltar directamente sobre el mapa: las partidas
 (`.sfs`) cargan las naves y las imágenes van a su ranura según el nombre.
 
+### Los mapas de Kerbin de tu instalación
+
+Si encuentra KSP, «Datos del mapa» ofrece como primer mapa predeterminado **«De tu
+instalación»**, y la primera vez lo elige solo en lugar del que hubiera (el que se había
+cargado a mano no se pierde: se aparta a `%LOCALAPPDATA%\KoogleKerbin\slots\anteriores`). Se
+lee del juego cada vez que se abre, sin copiarlo (`MapasDelJuego.cs`):
+
+- **Color** de 8192×4096: la textura de Kerbin visto de lejos del propio juego
+  (`KerbinScaledSpace300`, en `sharedassets2.assets`). Viene en BC7, que descomprime la GPU;
+  si no sabe, se usa el de Parallax, que es el mismo a 4096.
+- **Biomas** de 4096×2048: el mapa de atributos del juego (`kerbin_biome` en
+  `sharedassets9.assets`), con el nombre de cada bioma. Los colores son los de siempre.
+- **Altura** de 8192×4096: la del paquete de Parallax, con toda la escala de grises y su
+  calibración (en Kerbin, de −1388 a 6744 m).
+
+Los tres vienen en la convención de Unity (primera fila abajo, longitud al revés y girada
+90°) y se dejan como los del visor, sin giro: contra el mapa de biomas de 1800 coinciden
+en un 99 % los biomas y en un 95 % el color, y el KSC queda a 74 m y en «Shores», como en el
+juego.
+
 ## Idioma
 
 Español o inglés, en la sección «Idioma · Language» del panel lateral (la primera
@@ -578,7 +598,16 @@ scatters».
 Las **nubes** salen del mapa de los mods de nubes que tengas (Stock Volumetric Clouds,
 EVE): una capa esférica a la altura que elijas, con la cobertura del propio mapa e
 iluminada por el Sol. Ese mapa es de 16384×8192 y pesa 179 MB con sus mipmaps, así que se
-lee **solo un nivel de 2048 de ancho**, que para pintarlas sobra y se carga al instante.
+lee desde el **nivel de 8192 de ancho** (43 MB en la GPU, 5 km por texel), y de cerca lo
+completa la textura de detalle del mod (`detail1`), que va con el viento.
+
+Las nubes **se mueven y cambian de forma**, como en el juego. La capa gira hacia el oeste a
+la velocidad de su `clouds.cfg` (en Kerbin, 29,9 m/s en superficie: una vuelta cada 35 h), y
+el mapa se muestrea desplazado por un ruido suave sobre la esfera que evoluciona con el
+tiempo (unos 80 km en celdas de 100 km), con la cobertura subiendo y bajando por zonas: los
+frentes se deforman, se forman y se deshacen (`GlobeView.Nubes.cs`). El tiempo es el de la
+simulación, así que con la barra de tiempo acelerada se ve pasar el tiempo atmosférico, más
+el reloj real, para que en pausa sigan moviéndose al ritmo de x1.
 
 La misma capa se ve también **en el globo 3D**, por encima del suelo y con la bruma del
 aire que queda entre la cámara y la nube. Con el relieve exagerado sube con él, para que

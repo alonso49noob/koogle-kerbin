@@ -316,7 +316,7 @@ void main() {
         /* Las nubes vistas desde fuera: el mapa del mod de nubes sobre una esfera a la altura
            de la capa, con la misma luz que en el cielo y la bruma del aire que queda entre
            la cámara y la nube. */
-        const string CloudFS = Header + AtmosphereGlsl + @"
+        const string CloudFS = Header + AtmosphereGlsl + NubesGlsl + @"
 in vec2 vUv;
 in vec3 vDir;
 in vec3 vWorld;
@@ -326,8 +326,10 @@ uniform vec3 uCamPos, uLightDir;
 uniform int uLit;
 out vec4 frag;
 void main() {
-  vec4 nube = textureGrad(uCloudTex, vec2(fract(vUv.x + uCloudOff), vUv.y), dFdx(vUv), dFdy(vUv));
-  float a = clamp(nube.a * uCloudAmt, 0.0, 1.0);
+  vec3 nd = normalize(vDir);
+  vec2 uvN = nubeUv(nd, vec2(vUv.x + uCloudOff, vUv.y));
+  vec4 nube = textureGrad(uCloudTex, vec2(fract(uvN.x), uvN.y), dFdx(vUv), dFdy(vUv));
+  float a = clamp(nube.a * uCloudAmt * nubeVida(nd), 0.0, 1.0);
   if (a < 0.002) discard;
   if (uLit == 0) { frag = vec4(nube.rgb, a); return; }
   vec3 nc = normalize(vDir);
@@ -986,7 +988,8 @@ void main() {
             cloudProg.Float("uScale", scale);
             cloudProg.Float("uRelief", 0);
             cloudProg.Float("uCloudR", 1 + alt);
-            cloudProg.Float("uCloudOff", CloudOff / 360);
+            cloudProg.Float("uCloudOff", NubeGiro());
+            NubeUniforms(cloudProg, -1);
             cloudProg.Float("uCloudAmt", CloudAmount);
             cloudProg.Vec3("uCamPos", eye[0], eye[1], eye[2]);
             cloudProg.Vec3("uLightDir", lightDir[0], lightDir[1], lightDir[2]);

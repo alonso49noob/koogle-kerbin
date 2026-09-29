@@ -316,9 +316,17 @@ namespace KerbinMaps.Ksp
         public readonly List<string> Externos = new();
 
         public int Version => version;
+        public long DataOffset => dataOffset;
 
         /* Los bytes de un objeto, para leerlo según su clase. */
         public byte[] Leer(long pathId) => Objeto(pathId);
+
+        /* Solo el principio de un objeto: para mirar el nombre de uno grande sin leerlo entero. */
+        public byte[] LeerInicio(long pathId, int n)
+        {
+            var o = Objetos[pathId];
+            return b.Read(baseOff + dataOffset + o.Start, (int)Math.Min(n, o.Size));
+        }
 
         byte[] Objeto(long pathId)
         {

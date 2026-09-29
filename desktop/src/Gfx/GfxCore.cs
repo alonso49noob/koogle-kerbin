@@ -116,6 +116,32 @@ namespace KerbinMaps.Gfx
         /* Textura que ya viene comprimida en DXT con sus mipmaps, como las del juego. Se
            sube tal cual (la GPU descomprime al leer) y se repite, que es lo que hace falta
            para las texturas de detalle del terreno. */
+        /* BC7 (formato 25 de Unity): la GPU lo sabe descomprimir aunque aquí no. Se sube un
+           nivel y se lee de vuelta en RGBA. Null si el controlador no tiene BC7 o falla. */
+        public const uint BC7 = 0x8E8C;                            // GL_COMPRESSED_RGBA_BPTC_UNORM
+
+        public static byte[] DescomprimirEnGpu(uint format, int w, int h, byte[] nivel)
+        {
+            while (GL.GetError() != 0) { }
+            uint id = GL.GenTexture();
+            try
+            {
+                GL.BindTexture(GL.TEXTURE_2D, id);
+                GL.PixelStore(GL.UNPACK_ALIGNMENT, 1);
+                GL.CompressedTexImage2D(GL.TEXTURE_2D, 0, format, w, h, nivel);
+                if (GL.GetError() != 0) return null;
+                var rgba = new byte[(long)w * h * 4];
+                GL.PixelStore(GL.PACK_ALIGNMENT, 1);
+                GL.GetTexImage(GL.TEXTURE_2D, 0, GL.RGBA, GL.UNSIGNED_BYTE, rgba);
+                return GL.GetError() == 0 ? rgba : null;
+            }
+            finally
+            {
+                GL.BindTexture(GL.TEXTURE_2D, 0);
+                GL.DeleteTexture(id);
+            }
+        }
+
         public static Texture FromCompressed(uint format, int w, int h, IReadOnlyList<byte[]> levels)
         {
             uint id = GL.GenTexture();

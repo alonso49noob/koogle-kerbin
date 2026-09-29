@@ -116,6 +116,7 @@ namespace KerbinMaps.Gfx
         static delegate* unmanaged<uint, float*, void> _getFloatv;
         static delegate* unmanaged<uint> _getError;
         static delegate* unmanaged<int, int, int, int, uint, uint, void*, void> _readPixels;
+        static delegate* unmanaged<uint, int, uint, uint, void*, void> _getTexImage;
         static delegate* unmanaged<void> _finish;
         static delegate* unmanaged<int, int> _swapInterval;
 
@@ -186,6 +187,7 @@ namespace KerbinMaps.Gfx
             _getFloatv = (delegate* unmanaged<uint, float*, void>)Proc("glGetFloatv");
             _getError = (delegate* unmanaged<uint>)Proc("glGetError");
             _readPixels = (delegate* unmanaged<int, int, int, int, uint, uint, void*, void>)Proc("glReadPixels");
+            _getTexImage = (delegate* unmanaged<uint, int, uint, uint, void*, void>)Proc("glGetTexImage");
             _finish = (delegate* unmanaged<void>)Proc("glFinish");
             _swapInterval = (delegate* unmanaged<int, int>)Proc("wglSwapIntervalEXT", optional: true);
 
@@ -306,6 +308,11 @@ namespace KerbinMaps.Gfx
         public static int GetInteger(uint name) { int v; _getIntegerv(name, &v); return v; }
         public static float GetFloat(uint name) { float v; _getFloatv(name, &v); return v; }
         public static uint GetError() => _getError();
+        public static void GetTexImage(uint target, int level, uint format, uint type, byte[] data)
+        {
+            fixed (byte* p = data) _getTexImage(target, level, format, type, p);
+        }
+
         public static void ReadPixels(int x, int y, int w, int h, uint format, uint type, byte[] data)
         {
             fixed (byte* p = data) _readPixels(x, y, w, h, format, type, p);
