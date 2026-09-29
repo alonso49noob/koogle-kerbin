@@ -134,6 +134,32 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
+        /* Un mapa de alturas de Kerbin cargado a mano que es un volcado de las texturas del
+           juego (su gris se queda en el 145) se calibra solo, una vez por fichero: con la
+           escala de un export de SCANsat, el KSC salía a −684 m y toda la tierra baja quedaba
+           bajo el mar. Si luego se cambia el rango a mano, se respeta. */
+        void CalibrarVolcadoSiToca()
+        {
+            var img = Img("height");
+            string nombre = metas.GetValueOrDefault("height")?.Name;
+            if (img == null || nombre == null || state.VolcadoCalibrado == nombre) return;
+            if (!parallaxRanges.TryGetValue("Kerbin", out var pr)) return;
+            int tope = img.MaxGray();
+            if (Math.Abs(tope - BodyMaps.GrisTope) > 6) return;
+            state.VolcadoCalibrado = nombre;
+            var c = BodyMaps.Calibracion(pr.Min, pr.Max);
+            if (Math.Abs(state.HMin - Math.Round(c.Min)) < 1 && Math.Abs(state.HMax - Math.Round(c.Max)) < 1) { SaveSettings(); return; }
+            state.HMin = Math.Round(c.Min);
+            state.HMax = Math.Round(c.Max);
+            hMinBox?.SetNumber(state.HMin);
+            hMaxBox?.SetNumber(state.HMax);
+            SaveSettings();
+            if (OnMapBody) { SyncGlobe(); AjustarFiltroAlCuerpo(); }
+            Flash(Lang.F("«{0}» es un volcado de las texturas del juego (su gris llega al {1}, no al 255): calibrado como tal, " +
+                         "gris 0 = {2} m y gris 255 = {3} m. Puedes cambiarlo en «Altura (opcional)».",
+                nombre, tope, Geo.F(state.HMin, 0), Geo.F(state.HMax, 0)));
+        }
+
         void SetAltFilter(bool on)
         {
             state.AltFilter = on;

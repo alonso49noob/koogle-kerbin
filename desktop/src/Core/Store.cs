@@ -38,6 +38,7 @@ namespace KerbinMaps.Core
         public double HMin = HeightRange.Min, HMax = HeightRange.Max;
         public LonOffsets LonOffset = new();
         public string PresetId;
+        public string VolcadoCalibrado;           // el mapa de alturas de Kerbin ya calibrado como volcado
         public bool View3D;
         public bool BiomeOn, BiomeTouched;
         public double BiomeOpacity = BiomeConfig.DefaultOpacity;

@@ -257,6 +257,19 @@ namespace KerbinMaps.Core
             return n > 0 ? sum / n : null;
         }
 
+        /* El gris más claro de la imagen. Un volcado de las texturas del juego se queda en
+           el 145 (ver BodyMaps.GrisTope); un export de SCANsat llega al 255. */
+        public int MaxGray()
+        {
+            int mx = 0;
+            for (long i = 0; i < Rgba.LongLength; i += 4)
+            {
+                int v = Math.Max(Rgba[i], Math.Max(Rgba[i + 1], Rgba[i + 2]));
+                if (v > mx) mx = v;
+            }
+            return mx;
+        }
+
         /* Máscara tierra/agua a 1° por celda, en el espacio de la propia imagen. */
         public byte[] LandMask()
         {

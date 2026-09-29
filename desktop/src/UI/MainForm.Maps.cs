@@ -504,6 +504,7 @@ namespace KerbinMaps.UI
 
             if (slot == "height")
             {
+                CalibrarVolcadoSiToca();
                 double? sat = img.Saturation();
                 if (sat > 0.15)
                     Flash("Ojo: «" + file + "» tiene mucho color (saturación " + Geo.F(sat.Value * 100, 0) + "%). Parece un mapa de " +
@@ -722,7 +723,7 @@ namespace KerbinMaps.UI
 
             // los mapas de los demás cuerpos, si hay carpeta elegida
             DibujarObjetivo();
-            try { IndexarMapasDeCuerpos(); await CargarMapasDelCuerpo(); AplicarAltimetria(); }
+            try { IndexarMapasDeCuerpos(); CalibrarVolcadoSiToca(); await CargarMapasDelCuerpo(); AplicarAltimetria(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] mapas de cuerpos: " + ex.Message); }
 
             try { await CargarKonstructs(); }
