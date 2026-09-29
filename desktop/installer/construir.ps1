@@ -30,12 +30,13 @@ if (Test-Path $zip) { Remove-Item $zip -Force }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($dist, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 
-# la version, desde el proyecto
+# la version, desde el proyecto (1.6.5 pasa a 1.6.5.0; 1.6.5.1 se queda como esta)
 $gen = Join-Path $obj 'Version.g.cs'
+$numerica = if ($version.Split('.').Count -ge 4) { $version } else { "$version.0" }
 @"
 using System.Reflection;
-[assembly: AssemblyVersion("$version.0")]
-[assembly: AssemblyFileVersion("$version.0")]
+[assembly: AssemblyVersion("$numerica")]
+[assembly: AssemblyFileVersion("$numerica")]
 [assembly: AssemblyInformationalVersion("$version")]
 namespace KoogleKerbinSetup { static class Build { public const string Version = "$version"; } }
 "@ | Set-Content -Encoding UTF8 $gen

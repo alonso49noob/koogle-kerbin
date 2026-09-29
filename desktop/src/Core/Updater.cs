@@ -58,8 +58,10 @@ namespace KerbinMaps.Core
             }
         }
 
-        // 1.5 y 1.5.0.0 son la misma versión
-        static Version Norm(Version v) => new(Math.Max(v.Major, 0), Math.Max(v.Minor, 0), Math.Max(v.Build, 0));
+        // 1.5 y 1.5.0.0 son la misma versión; el cuarto número (1.6.5.1) solo cuenta si no es 0
+        static Version Norm(Version v) => v.Revision > 0
+            ? new(Math.Max(v.Major, 0), Math.Max(v.Minor, 0), Math.Max(v.Build, 0), v.Revision)
+            : new(Math.Max(v.Major, 0), Math.Max(v.Minor, 0), Math.Max(v.Build, 0));
 
         /* ¿Salió esta copia del instalador? Solo entonces puede actualizarse sola. */
         public static bool CanSelfUpdate => File.Exists(Path.Combine(AppContext.BaseDirectory, ManifestName));
