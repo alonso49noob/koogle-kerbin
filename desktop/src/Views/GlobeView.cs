@@ -189,6 +189,24 @@ vec3 altPalette(float t) {
   return mix(c4, c5, s - 4.0);
 }
 
+/* La misma altura interpolada entre los cuatro texeles vecinos (el mapa se sube sin
+   filtrar): para teñir el mar por profundidad sin que salgan los cuadros de los texeles. */
+float heightSuave(vec2 uv) {
+  vec2 t = uv * uHeightSize - 0.5;
+  ivec2 i = ivec2(floor(t));
+  vec2 f = fract(t);
+  f = f * f * (3.0 - 2.0 * f);
+  ivec2 sz = ivec2(uHeightSize);
+  float g[4];
+  for (int k = 0; k < 4; k++) {
+    ivec2 p = i + ivec2(k & 1, k >> 1);
+    p.x = (p.x % sz.x + sz.x) % sz.x;
+    p.y = clamp(p.y, 0, sz.y - 1);
+    g[k] = dot(texelFetch(uHeight, p, 0).rgb, vec3(0.2126, 0.7152, 0.0722));
+  }
+  return uHMin + mix(mix(g[0], g[1], f.x), mix(g[2], g[3], f.x), f.y) * (uHMax - uHMin);
+}
+
 // altitud en metros según la calibración del mapa de alturas
 float heightAt(vec2 uv) {
   float lum = dot(textureGrad(uHeight, uv, dFdx(vUv), dFdy(vUv)).rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -235,6 +253,14 @@ void main() {
     vec3 east = normalize(vec3(up.z, 0.0, -up.x) + vec3(1e-6, 0.0, 0.0));
     vec3 north = cross(up, east);
     n = normalize(up - uBump * (sx * east + sy * north) * (1.0 - water));
+  }
+
+  /* El mar por profundidad, como en el vuelo: la plataforma junto a la costa más clara y
+     el mar abierto más oscuro, para que desde órbita se lea bien dónde acaba la tierra. */
+  if (water > 0.0 && uHasHeight != 0) {
+    float prof = max(-heightSuave(vec2(fract(vUv.x + uHeightOff), vUv.y)), 0.0);
+    vec3 mar = mix(base * 1.35 + vec3(0.03, 0.07, 0.07), base * 0.62, smoothstep(20.0, 600.0, prof));
+    base = mix(base, mar, water);
   }
 
   vec3 albedo = pow(base, vec3(2.2));

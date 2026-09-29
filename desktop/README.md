@@ -157,7 +157,16 @@ El globo y la vista del cielo usan el mismo modelo de luz, con base física:
 - **Relieve por píxel** a partir del mapa de alturas: las laderas se sombrean con
   más detalle que la malla, aunque el relieve exagerado esté a cero.
 - **Agua** reconocida por el color del mapa (o por la cota cero si no hay mapa de
-  color), lisa, con Fresnel y el brillo del Sol reflejado.
+  color), lisa, con Fresnel y el brillo del Sol reflejado, y teñida por profundidad:
+  la plataforma junto a la costa más clara y el mar abierto más oscuro, con el propio
+  color del mapa (en Eve, morado).
+- **La costa**, a ras de suelo. Con relieve, lo que es mar lo decide la geometría (el
+  rayo que da en la esfera del mar) y no el color, que a 1 km por texel teñía de azul la
+  tierra de la orilla y la hacía brillar como agua. En tierra, donde el mapa aún dice mar
+  y se está a menos de 20-40 m sobre el agua, una franja de arena, más oscura (mojada) en
+  el último metro; más arriba, un azul del mapa sigue siendo un lago. En el mar, somero
+  claro y hondo oscuro según la profundidad del terreno, y una línea de espuma en la
+  orilla que se apaga cuando un píxel abarca más de unas decenas de metros.
 - **Estrellas** de fondo también en el globo; un cielo luminoso las tapa.
 - La luz se calcula en lineal y se lleva a pantalla con un tonemapping filmic
   (ACES), así que ni el cielo ni el reflejo del mar se queman.
