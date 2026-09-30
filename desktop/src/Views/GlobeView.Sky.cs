@@ -523,16 +523,16 @@ void main() {
           : textureGrad(uBiome, vec2(fract(u + uBiomeOff), v), gx, gy).rgb, uBiomeAmt);
       // cada punto con su Sol: el suelo lejano puede estar al otro lado del terminador
       if (relieve) {
-        /* La costa. El mapa de color es de 1 km por texel: junto al mar la tierra hereda
-           su azul y, tomada por agua, salía con el brillo del mar y la orilla se perdía.
-           Con relieve manda la geometría: es mar lo que el rayo encuentra en la esfera del
-           mar. En KSP no hay agua por encima del nivel del mar (el agua es siempre esa
-           esfera), así que en tierra el azul del mapa es siempre tierra: junto a la orilla
-           una franja de arena (mojada junto al agua) y monte arriba el propio color del
-           mapa, que el mipmap ya funde con la tierra de al lado. En el mar, el color según
-           la profundidad (claro en lo somero, oscuro en lo hondo, a partir del propio color
-           del mapa, que en Eve es morado) y una línea de espuma en la orilla, que se apaga
-           cuando un píxel abarca demasiado suelo para verla sin parpadeo. */
+        /* La costa. El mapa de color es de kilómetros por texel: junto al mar la tierra
+           hereda su azul y, tomada por agua, salía con el brillo del mar y la orilla se
+           perdía. Con relieve manda la geometría: es mar lo que el rayo encuentra en la
+           esfera del mar. En KSP no hay agua por encima del nivel del mar (el agua es
+           siempre esa esfera), así que en tierra el azul del mapa es siempre tierra: arena
+           junto al agua (mojada en la orilla) y, más arriba, el color de la tierra de al
+           lado. En el mar, el color según la profundidad (claro en lo somero, oscuro en lo
+           hondo, a partir del propio color del mapa, que en Eve es morado) y una línea de
+           espuma en la orilla, que se apaga cuando un píxel abarca demasiado suelo para
+           verla sin parpadeo. */
         float hSuelo = terrainH(normalize(p));
         float huellaM = t * uRadiusM * uPix;
         if (esMar > 0.5) {
@@ -548,10 +548,28 @@ void main() {
           base = mix(base, vec3(0.9, 0.93, 0.93), espuma * 0.75);
           water = 1.0 - espuma * 0.85;                           // la espuma no es un espejo
         } else {
-          float playa = water * (1.0 - smoothstep(20.0, 40.0, hSuelo));
-          base = mix(base, vec3(0.8, 0.74, 0.56), playa);
+          /* En KSP no hay lagos por encima del mar: el agua es la esfera del océano. El azul
+             del mapa sobre tierra es un texel de costa (de 4,6 km) que cae dentro: arena
+             junto al agua y hierba más arriba, y encima las texturas del suelo. Tomado por
+             lago, dejaba lagunas de borde recto detrás de la playa. */
+          // el color de la tierra de al lado: los texeles vecinos que no son azules
+          vec3 tierra = vec3(0.4, 0.48, 0.26), acc = vec3(0.0);
+          float pesoT = 0.0;
+          vec2 txl = 1.6 / max(uColorSize, vec2(1.0));
+          for (int k = 0; k < 8; k++) {
+            float ang = float(k) * 0.7853982;
+            vec2 o = vec2(cos(ang), sin(ang)) * txl;
+            vec3 cv = textureLod(uColor, vec2(fract(u + uColorOff + o.x), clamp(v + o.y, 0.0, 1.0)), 0.0).rgb;
+            float wv = 1.0 - smoothstep(0.03, 0.08, cv.b - max(cv.r, cv.g));
+            acc += cv * wv; pesoT += wv;
+          }
+          if (pesoT > 0.2) tierra = acc / pesoT;
+          tierra = mix(tierra, vec3(0.8, 0.74, 0.56), 1.0 - smoothstep(10.0, 40.0, hSuelo));
+          // con una detección del azul más sensible que la del agua: el borde bilineal entre un
+          // texel azul y uno verde ya tiñe de azul antes de contar como agua
+          base = mix(base, tierra, smoothstep(-0.03, 0.05, base.b - max(base.r, base.g)));
           base *= mix(0.7, 1.0, smoothstep(0.15, 1.2, hSuelo));  // arena mojada en la orilla
-          water = 0.0;         // sin agua por encima del nivel del mar: nunca es un lago
+          water = 0.0;
         }
       }
       vec3 nSup = relieve ? nRel : normalize(p);
