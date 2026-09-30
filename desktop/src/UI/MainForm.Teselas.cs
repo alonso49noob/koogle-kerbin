@@ -30,7 +30,7 @@ namespace KerbinMaps.UI
 
         /* El mapa 2D, de cerca, se pinta con el suelo del vuelo visto desde arriba (ver
            GlobeView.RenderCenital): a partir de este zoom, unos 7 m por píxel. */
-        const double ZoomCenital = 10;
+        const double ZoomCenital = 9.5;
 
         bool Cenital2D => !GlobeVisible && glOk && map.Zoom >= ZoomCenital - 0.01;
 
@@ -39,7 +39,11 @@ namespace KerbinMaps.UI
             if (!Cenital2D) return false;
             globe.W = map.W; globe.H = map.H; globe.S = map.S;
             globe.GroundAt ??= AlturaDelSuelo;
-            globe.RenderCenital(batch, text, map.CenterLat, map.CenterLon, map.Ppd, map.DayNight);
+            /* Con la luz de un mapa (la noche la pone el propio mapa encima, igual que sin
+               esto) y, del zoom 10 al 12, pasando poco a poco del aspecto del mapa plano al
+               del suelo del vuelo. */
+            double x = Math.Clamp((map.Zoom - 10) / 2, 0, 1);
+            globe.RenderCenital(batch, text, map.CenterLat, map.CenterLon, map.Ppd, false, 1 - x * x * (3 - 2 * x));
             return true;
         }
 

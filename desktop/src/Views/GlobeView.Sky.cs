@@ -49,6 +49,7 @@ uniform int uCenital;
 uniform vec2 uCentro;
 uniform float uPpd, uCenitalR;
 uniform float uDistCenital;     // la distancia a la que el vuelo vería un píxel tan grande
+uniform float uPlano;           // 1: igual que el mapa plano (su color, sin luz); 0: el suelo del vuelo
 uniform float uTan, uAspect, uPix, uStarShift, uSunRad;
 uniform sampler2D uColor, uBiome, uHeightTex;
 uniform int uHasColor, uHasBiome, uGrid, uHasHeight, uRelief;
@@ -474,6 +475,7 @@ void main() {
 
   vec3 col;
   float tSuelo = -1.0;             // dónde toca el rayo el suelo de verdad (con relieve), o nada
+  vec3 plano = vec3(0.0);          // el color del mapa tal cual, para fundirse con el mapa plano
   {
     float t = tg.x;
     vec3 nRel = vec3(0.0); float esMar = 0.0;
@@ -512,6 +514,7 @@ void main() {
       if (uHasColor != 0) base = relieve
         ? textureLod(uColor, vec2(fract(u + uColorOff), v), lod).rgb
         : textureGrad(uColor, vec2(fract(u + uColorOff), v), gx, gy).rgb;
+      plano = base;
       // el mar por el color, antes de mezclar los biomas
       float water = uHasColor != 0 ? smoothstep(0.03, 0.08, base.b - max(base.r, base.g)) : 0.0;
       if (uHasBiome != 0 && uBiomeAmt > 0.0)
@@ -629,6 +632,10 @@ void main() {
     col = mix(col, vec3(0.31, 0.64, 1.0), horizon * 0.6);
   }
 
+  /* En el mapa 2D, al acercarse, se parte del aspecto del mapa plano y la luz y el detalle
+     entran poco a poco: el cambio de uno a otro apenas se nota. */
+  if (uCenital != 0 && uPlano > 0.0 && tSuelo > 0.0) col = mix(col, plano, uPlano);
+
   frag = vec4(col, 1.0);
 }";
 
@@ -675,14 +682,15 @@ void main() {
            suelo que el vuelo (relieve de detalle, texturas del juego, costas) y los edificios
            en planta. El mapa pinta luego encima su retícula, trazas y marcadores. */
         bool cenital, cenSolReal;
+        double cenPlano;
         double cenLat, cenLon, cenPpd;
         double CenitalAltM => Math.Max(HMax, 0) + 5000;       // el ojo, por encima de todo
         public double CercaCenital = 1;                        // exposición: 0 la del globo, 1 la de paisaje
 
-        public void RenderCenital(Batch2D batch, TextCache tc, double lat, double lon, double ppd, bool solReal)
+        public void RenderCenital(Batch2D batch, TextCache tc, double lat, double lon, double ppd, bool solReal, double plano = 0)
         {
             if (skyProg == null) return;
-            cenital = true; cenLat = lat; cenLon = lon; cenPpd = ppd; cenSolReal = solReal;
+            cenital = true; cenLat = lat; cenLon = lon; cenPpd = ppd; cenSolReal = solReal; cenPlano = Math.Clamp(plano, 0, 1);
             try
             {
                 var n = Sph(lat, lon, 1);
@@ -732,6 +740,7 @@ void main() {
                 skyProg.Float("uPix", mpp / CenitalAltM);
                 // en el vuelo (70° de campo, 1080 píxeles de alto) un píxel abarca 0,0013 radianes
                 skyProg.Float("uDistCenital", mpp / 0.0013);
+                skyProg.Float("uPlano", cenPlano);
             }
             skyProg.Float("uAlt", Len(eye) - 1);
             skyProg.Float("uStarShift", orbitShift);

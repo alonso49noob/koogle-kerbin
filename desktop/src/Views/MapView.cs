@@ -36,8 +36,11 @@ namespace KerbinMaps.Views
         public int TopLabelOffset = 52;           // bajo la barra superior, en píxeles CSS
         /* De cerca, el suelo lo pinta otro (el renderizador del vuelo en vista cenital, con
            el relieve, las texturas del juego y los edificios): si lo hace, devuelve true y
-           aquí se omiten el mapa base y la noche, que ya van en su luz. */
+           el mapa base se desvanece encima (ver FondoDesde). */
         public Func<bool> Fondo;
+        /* Entre estos zooms el mapa plano se desvanece sobre ese suelo, en lugar de cambiar
+           de golpe. */
+        public double FondoDesde = 9.5, FondoHasta = 10.5;
 
         double anchorX, anchorY;
         bool zoomAnim;
@@ -313,8 +316,14 @@ void main() {
             GL.Viewport(0, 0, W, H);
             b.Begin(W, H);
 
-            // mapa base
-            if (!fondo)
+            // mapa base: sin suelo de cerca, entero; con él, desvaneciéndose encima
+            double plano = 1;
+            if (fondo)
+            {
+                double x = Math.Clamp((Zoom - FondoDesde) / Math.Max(FondoHasta - FondoDesde, 1e-6), 0, 1);
+                plano = 1 - x * x * (3 - 2 * x);
+            }
+            if (plano > 0.002)
             switch (BaseKind)
             {
                 case "grid":
@@ -322,7 +331,7 @@ void main() {
                     DrawGraticule(b);
                     break;
                 case "image":
-                    if (BaseTex != null) DrawImage(0, BaseTex, BaseOffset, BaseOpacity);
+                    if (BaseTex != null) DrawImage(0, BaseTex, BaseOffset, BaseOpacity * plano);
                     break;
                 case "xyz":
                     DrawTiles(b);
@@ -341,7 +350,8 @@ void main() {
             if (ScanTex != null && ScanOpacity > 0) DrawImage(0, ScanTex, 0, ScanOpacity);
 
             // la noche va sobre el terreno y debajo de la retícula, las trazas y los marcadores
-            if (DayNight && !fondo) DrawImage(2, null, 0, 1);
+            // la noche, igual con o sin el suelo de cerca (que se ilumina como un mapa)
+            if (DayNight) DrawImage(2, null, 0, 1);
 
             if (Grid) DrawGraticule(b);
 

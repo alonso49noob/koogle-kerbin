@@ -154,8 +154,8 @@ ellos, cada cuerpo se ve con su color y la retícula.
 
 Arriba a la izquierda, **2D**, **3D**, **Cielo** y **Vuelo**.
 
-- **2D**: el mapa plano. De cerca (a partir del zoom 10, unos 7 m por píxel, y hasta el
-  16) el suelo lo pinta el renderizador del vuelo mirando en vertical, ver abajo.
+- **2D**: el mapa plano. De cerca (desde el zoom 9,5 y hasta el 16) el suelo lo pinta el
+  renderizador del vuelo mirando en vertical, ver abajo.
 - **3D**: el globo. Al pinchar una nave, el foco de la cámara pasa del centro de
   Kerbin a la nave y la sigue: arrastrar gira alrededor de ella y la rueda se
   acerca o se aleja. Esc, F o pincharla otra vez devuelven el foco al planeta.
@@ -462,14 +462,17 @@ de cada tipo, ninguno.
 
 ### El 2D de cerca, visto desde arriba
 
-A partir del zoom 10 el mapa plano ya no estira el mapa de color: el suelo lo pinta el
+De cerca el mapa plano ya no estira el mapa de color: el suelo lo pinta el
 mismo renderizador que el vuelo, pero cada píxel lanza su rayo en vertical sobre su propia
 latitud y longitud, así que sale en la proyección exacta del mapa. Lleva el relieve de
 detalle, las texturas del juego y las costas, y los edificios se dibujan en planta con una
 ortográfica (el este estirado 1/cos(lat), como en el mapa). Es un mapa, no una foto: sin
 aire, sin nubes ni brillo del Sol en el agua, que mirando en vertical dejaba todo el mar
-blanco, y con el agua iluminada como el suelo. Con día y noche, la luz del Sol del momento;
-sin, un sombreado de relieve desde el noroeste a 45°. Encima van la retícula (hasta
+blanco, y con el agua iluminada como el suelo. La luz es la de un sombreado de relieve
+(desde el noroeste a 45°) y la noche la pone encima el mapa, igual que sin esto.
+
+El cambio apenas se nota: entre los zooms 9,5 y 10,5 el mapa plano se desvanece encima, y
+del 10 al 12 este suelo pasa poco a poco del color del mapa tal cual a su luz y su detalle. Encima van la retícula (hasta
 milésimas de grado), las trazas y los marcadores del 2D. Cuesta unos 6 ms por fotograma.
 
 ### Relieve de detalle: teselas
