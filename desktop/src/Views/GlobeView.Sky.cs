@@ -48,6 +48,7 @@ uniform vec3 uEye, uF, uR, uU, uUp, uEast, uNorth;
 uniform int uCenital;
 uniform vec2 uCentro;
 uniform float uPpd, uCenitalR;
+uniform float uDistCenital;     // la distancia a la que el vuelo vería un píxel tan grande
 uniform float uTan, uAspect, uPix, uStarShift, uSunRad;
 uniform sampler2D uColor, uBiome, uHeightTex;
 uniform int uHasColor, uHasBiome, uGrid, uHasHeight, uRelief;
@@ -472,12 +473,14 @@ void main() {
   vec2 tg = raySphere(eye, d, 1.0);
 
   vec3 col;
+  float tSuelo = -1.0;             // dónde toca el rayo el suelo de verdad (con relieve), o nada
   {
     float t = tg.x;
     vec3 nRel = vec3(0.0); float esMar = 0.0;
     bool relieve = uRelief != 0 && uHasHeight != 0;
     if (relieve) t = marchTerrain(eye, d, nRel, esMar);
     if (t > 0.0) {
+      tSuelo = t;
       vec3 p = eye + d * t;
       if (uWriteDepth != 0) gl_FragDepth = profundidad(t * uRadiusM * dot(d, uF));
       float lat = asin(clamp(p.y, -1.0, 1.0));
@@ -549,7 +552,9 @@ void main() {
         }
       }
       vec3 nSup = relieve ? nRel : normalize(p);
-      if (water < 0.5) base = detalle(p, nSup, base, t * uRadiusM);
+      // en el mapa, la distancia del ojo (fijo, muy alto) apagaba el detalle a cualquier zoom:
+      // se usa la que tendría en el vuelo un píxel del mismo tamaño
+      if (water < 0.5) base = detalle(p, nSup, base, uCenital != 0 ? uDistCenital : t * uRadiusM);
       // en el mapa, el agua con su color y la misma luz que el suelo: desde arriba solo
       // reflejaría el cielo, casi negro sin aire
       vec3 L = shadeGround(p, nSup, -d, uSun, pow(base, vec3(2.2)), uCenital != 0 ? 0.0 : water);
@@ -574,7 +579,8 @@ void main() {
   if (uHasClouds != 0 && uCloudAmt > 0.0) {
     vec2 tn = raySphere(eye, d, uCloudR);
     float tc = length(eye) < uCloudR ? tn.y : tn.x;
-    float tSuelo = tg.x;
+    /* Con el suelo del relieve, no con la esfera del mar: mirando una ladera casi en
+       horizontal el rayo no llega al mar, y la nube se pintaba encima de la colina. */
     if (tc > 0.0 && (tSuelo <= 0.0 || tc < tSuelo)) {
       vec3 pc = eye + d * tc;
       vec3 nc = normalize(pc);
@@ -722,7 +728,10 @@ void main() {
                 skyProg.Float("uPpd", cenPpd);
                 skyProg.Float("uCenitalR", 1 + CenitalAltM / Body.Radius);
                 // lo que abarca un píxel en el suelo es t·R·uPix, con t la altura del ojo
-                skyProg.Float("uPix", Body.Radius * D2R / cenPpd / CenitalAltM);
+                double mpp = Body.Radius * D2R / cenPpd;
+                skyProg.Float("uPix", mpp / CenitalAltM);
+                // en el vuelo (70° de campo, 1080 píxeles de alto) un píxel abarca 0,0013 radianes
+                skyProg.Float("uDistCenital", mpp / 0.0013);
             }
             skyProg.Float("uAlt", Len(eye) - 1);
             skyProg.Float("uStarShift", orbitShift);
