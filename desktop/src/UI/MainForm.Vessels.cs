@@ -317,8 +317,10 @@ namespace KerbinMaps.UI
         async Task PickSaveFile()
         {
             using var dlg = new OpenFileDialog { Filter = "Partidas de KSP (*.sfs)|*.sfs;*.loadmeta|Todos|*.*" };
-            string saves = @"C:\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\saves";
-            if (Directory.Exists(saves)) dlg.InitialDirectory = saves;
+            // la carpeta de partidas de la instalación de KSP que se encuentre (ver FindGameData)
+            string gd = FindGameData();
+            string saves = gd == null ? null : Path.Combine(Path.GetDirectoryName(gd) ?? "", "saves");
+            if (saves != null && Directory.Exists(saves)) dlg.InitialDirectory = saves;
             if (dlg.ShowDialog(this) == DialogResult.OK) await CargarSave(dlg.FileName);
         }
 

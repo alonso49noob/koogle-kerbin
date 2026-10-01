@@ -757,8 +757,8 @@ namespace KoogleKerbinSetup
             return Directory.Exists(d) && Directory.GetFiles(d, "*.unity3d").Length > 0;
         }
 
-        /* ¿Lo tiene ya en su KSP? Se mira la carpeta de Steam por defecto y la que diga el
-           registro; si está, bajarlo otra vez no aporta nada. */
+        /* ¿Lo tiene ya en su KSP? Se mira la carpeta de KSP elegida en la aplicación y todas
+           las bibliotecas de Steam; si está, bajarlo otra vez no aporta nada. */
         public static bool EnKsp(Extra e)
         {
             foreach (var gd in GameDatas())
@@ -769,21 +769,60 @@ namespace KoogleKerbinSetup
             return false;
         }
 
+        /* Dónde puede estar KSP: la carpeta elegida en la aplicación («Carpeta de KSP…», en
+           sus ajustes) y, con Steam, su carpeta y todas sus bibliotecas, que Steam apunta en
+           steamapps\libraryfolders.vdf. Mirando solo la carpeta de Steam no se encontraba
+           un KSP instalado en otra biblioteca (D:\SteamLibrary...). La aplicación busca
+           igual (Core/Steam.cs). */
         static IEnumerable<string> GameDatas()
         {
-            var raices = new List<string>();
+            var res = new List<string>();
             try
             {
-                using (var k = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
+                string ajustes = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KoogleKerbin", "settings.json");
+                if (File.Exists(ajustes))
                 {
-                    var p = k == null ? null : k.GetValue("SteamPath") as string;
-                    if (!string.IsNullOrEmpty(p)) raices.Add(p.Replace('/', '\\'));
+                    var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(ajustes), @"""KspPath""\s*:\s*""((?:[^""\\]|\\.)*)""");
+                    if (m.Success) res.Add(Path.Combine(System.Text.RegularExpressions.Regex.Unescape(m.Groups[1].Value), "GameData"));
                 }
             }
             catch { }
+
+            var raices = new List<string>();
+            foreach (var par in new[]
+            {
+                new[] { "HKCU", @"Software\Valve\Steam", "SteamPath" },
+                new[] { "HKLM", @"Software\WOW6432Node\Valve\Steam", "InstallPath" },
+                new[] { "HKLM", @"Software\Valve\Steam", "InstallPath" },
+            })
+            {
+                try
+                {
+                    using (var k = (par[0] == "HKCU" ? Registry.CurrentUser : Registry.LocalMachine).OpenSubKey(par[1]))
+                    {
+                        var p = k == null ? null : k.GetValue(par[2]) as string;
+                        if (!string.IsNullOrEmpty(p)) raices.Add(p.Replace('/', '\\'));
+                    }
+                }
+                catch { }
+            }
             raices.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"));
-            foreach (var r in raices.Distinct(StringComparer.OrdinalIgnoreCase))
-                yield return Path.Combine(r, "steamapps", "common", "Kerbal Space Program", "GameData");
+
+            var libs = new List<string>();
+            foreach (var r in raices)
+            {
+                libs.Add(r);
+                try
+                {
+                    string vdf = Path.Combine(r, "steamapps", "libraryfolders.vdf");
+                    if (!File.Exists(vdf)) continue;
+                    foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(vdf), @"""path""\s+""([^""]+)"""))
+                        libs.Add(m.Groups[1].Value.Replace(@"\\", @"\"));
+                }
+                catch { }
+            }
+            foreach (var l in libs) res.Add(Path.Combine(l, "steamapps", "common", "Kerbal Space Program", "GameData"));
+            return res.Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
         /* Baja el zip a un temporal, con progreso, y se queda solo con lo que hace falta. */

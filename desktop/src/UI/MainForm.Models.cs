@@ -41,7 +41,8 @@ namespace KerbinMaps.UI
         }
 
         /* GameData: la elegida a mano, la de la instalación a la que pertenece la partida
-           cargada (saves\<partida>\persistent.sfs) o la de Steam por defecto. */
+           cargada (saves\<partida>\persistent.sfs) o la de Steam, en cualquiera de sus
+           bibliotecas (ver Steam). */
         string FindGameData()
         {
             var cands = new List<string>();
@@ -52,7 +53,7 @@ namespace KerbinMaps.UI
                 var d = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(save)));
                 if (d != null) cands.Add(Path.Combine(d, "GameData"));
             }
-            cands.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam", "steamapps", "common", "Kerbal Space Program", "GameData"));
+            cands.AddRange(Steam.GameDatasDeKsp());
             foreach (var c in cands) if (Directory.Exists(c)) return c;
             return null;
         }
