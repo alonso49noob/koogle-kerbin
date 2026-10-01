@@ -524,21 +524,28 @@ namespace KerbinMaps.UI
             globe.GroundVessels.Clear();
             if (sv.Data == null || !state.ShowVesselModels) { RequestRender(); return; }
             double R = Body.Radius;
-            foreach (var v in sv.Naves)
+            /* De la partida entera, no de sv.Naves: ahí solo entran las que tienen órbita, y
+               a las posadas se les descarta la suya (radial degenerada) al leerla. */
+            foreach (var v in sv.Data.Vessels)
             {
-                if (!sv.Tipos.GetValueOrDefault(v.Type)) continue;
-                if (v.Lat == null || v.Lon == null) continue;
                 if (v.Sit != "LANDED" && v.Sit != "SPLASHED" && v.Sit != "PRELAUNCH") continue;
+                if (v.Lat == null || v.Lon == null || SolarSystem.Find(v.BodyName) != Body.Current) continue;
+                // los tipos apagados en la lista; uno que no esté en ella (porque ninguna nave
+                // de ese tipo orbita) se ve
+                if (sv.Tipos.TryGetValue(v.Type, out bool tipoOn) && !tipoOn) continue;
 
                 /* La altitud: amerizada, al nivel del mar; en una plataforma o pista conocida
                    (su propio «landedAt», o prelanzamiento, que siempre lo está), la del juego,
                    que ahí es exacta; posada en cualquier otro sitio, el terreno propio del
                    mapa más la altura sobre el suelo que guardó la partida, para que se apoye
                    en el suelo que de verdad se ve aquí y no en el que tenía el juego. */
+                // amerizada, la del juego: el mar está a la misma altura aquí que allí, y con
+                // 0 el centro de masas quedaba bajo el agua. Un «hgt» de −1 es que el juego
+                // no la sabía: entonces vale su altitud.
                 double alt;
-                if (v.Sit == "SPLASHED") alt = 0;
-                else if (v.Sit == "PRELAUNCH" || !string.IsNullOrEmpty(v.LandedAt)) alt = v.Alt ?? 0;
-                else alt = AlturaDelSuelo(v.Lat.Value, v.Lon.Value) + (v.Hgt ?? 0);
+                if (v.Sit == "SPLASHED") alt = v.Alt ?? 0;
+                else if (v.Sit == "PRELAUNCH" || !string.IsNullOrEmpty(v.LandedAt) || v.Hgt is not double hg || hg < 0) alt = v.Alt ?? 0;
+                else alt = AlturaDelSuelo(v.Lat.Value, v.Lon.Value) + hg;
 
                 var n = KkDatabase.NVec(v.Lat.Value, v.Lon.Value);
                 var pos = new[] { n[0] * (R + alt), n[1] * (R + alt), n[2] * (R + alt) };

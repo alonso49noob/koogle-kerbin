@@ -36,9 +36,10 @@ namespace KerbinMaps.Views
         ShaderProgram staticProg;
         ModelGpu staticGpu;
 
+        /* Las naves van aparte de «Edificios»: con Kerbal Konstructs apagado se siguen viendo. */
         bool HasGroundVessels => GroundVessels.Count > 0;
-        bool HasBuildings => Statics != null && StaticModel != null;
-        bool StaticsActive => StaticsOn && (HasBuildings || HasGroundVessels)
+        bool HasBuildings => StaticsOn && Statics != null && StaticModel != null;
+        bool StaticsActive => (HasBuildings || HasGroundVessels)
                               && (Mode == CamMode.Free || Mode == CamMode.Sky || PlanetaCerca);
 
         const string StaticVS = Header + AtmosphereGlsl + @"
@@ -137,7 +138,7 @@ void main() {
             double fx = fwdL[0], fy = fwdL[1], fz = fwdL[2];
 
             staticsFrame.Clear();
-            if (Statics != null && StaticModel != null)
+            if (HasBuildings)
                 foreach (var i in Statics.Instances)
                 {
                     if (!i.Placed || i.Body != Body.Name || i.ModelRef == null || !i.ModelRef.HasMesh) continue;

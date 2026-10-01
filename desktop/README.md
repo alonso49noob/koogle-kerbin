@@ -236,6 +236,24 @@ verdad, montada pieza a pieza con los modelos y texturas de **tu instalación de
 KSP** (se leen en su sitio; no se copia nada). La rueda acerca hasta pocos metros
 y el doble clic salta directamente a una distancia en la que se ve entera.
 
+Las **naves posadas, amerizadas o en la rampa** del cuerpo que se ve también salen en su
+sitio en el vuelo, el cielo, el 3D de cerca y el 2D de cerca, montadas igual y pintadas
+con los edificios (no hace falta tener encendidos los de Kerbal Konstructs). Como el
+terreno de aquí no es exactamente el del juego, cada una se apoya en el suelo propio a la
+altura sobre el terreno que guardó la partida (`hgt`); en una rampa o pista conocida
+(`landedAt`, o en prelanzamiento) y en el agua se usa la altitud del juego, que ahí es
+exacta. Respetan los tipos apagados en la lista de naves.
+
+### Calidad gráfica
+
+La primera sección del panel es un atajo para todo lo que cuesta dibujar: **Bajo**,
+**Medio** y **Alto** encienden o apagan de una vez el detalle del suelo, los scatters (y su
+densidad), el viento, las teselas de relieve, las nubes, los edificios y la distancia de
+dibujado de scatters, edificios y naves en tierra (6, 15 o 25 km). «Alto» es el ajuste de
+siempre. En cuanto se toca a mano cualquiera de esos controles, el preset pasa a
+«Personalizado», y al abrir se comprueba que los ajustes guardados coincidan con el
+preset elegido.
+
 Cómo se monta, igual que hace el juego al cargarla:
 
 - De la partida salen las piezas de cada nave, su posición y giro respecto a la

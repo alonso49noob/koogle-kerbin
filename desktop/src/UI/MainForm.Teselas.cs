@@ -116,7 +116,8 @@ namespace KerbinMaps.UI
         void TrasCambioDeSuelo()
         {
             kkFirma = null;
-            if (kk != null) AplicarKonstructs();
+            if (kk != null) AplicarKonstructs();       // que ya recoloca también las naves
+            else ColocarNavesEnSuelo();
             ActualizarCampoScatters();
             RenderVueloInfo();
             RequestRender();

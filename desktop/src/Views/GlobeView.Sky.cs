@@ -871,7 +871,7 @@ void main() {
             /* Con scatters, el cielo deja en el búfer de profundidad dónde está el suelo. Solo
                se escribe con la prueba activada, así que se activa sin descartar nada. */
             bool scatters = ScattersActive && !cenital;
-            bool edificios = cenital ? StaticsOn && (HasBuildings || HasGroundVessels) : StaticsActive;
+            bool edificios = cenital ? HasBuildings || HasGroundVessels : StaticsActive;
             bool profundidad = scatters || edificios;
             skyProg.Int("uWriteDepth", profundidad ? 1 : 0);
             skyProg.Float("uDepthFar", cenital ? CenitalAltM + 1000 : ScatterFar);

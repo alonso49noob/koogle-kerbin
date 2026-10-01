@@ -87,6 +87,8 @@ namespace KerbinMaps.UI
             var s = AddSection("Calidad gráfica", true);
             qualityCombo = new DarkCombo();
             qualityCombo.SetItems(new[] { ("bajo", "Bajo"), ("medio", "Medio"), ("alto", "Alto"), ("personalizado", "Personalizado") });
+            // quien actualiza tiene «alto» por defecto aunque haya tocado sus ajustes
+            if (state.GraphicsPreset != "personalizado" && !CoincidePreset(state.GraphicsPreset)) state.GraphicsPreset = "personalizado";
             qualityCombo.SelectedId = state.GraphicsPreset;
             qualityCombo.SelectedChanged += (o, e) =>
             {
@@ -119,30 +121,45 @@ namespace KerbinMaps.UI
            (texturas de Parallax, scatters con su densidad, viento, relieve de detalle,
            nubes, edificios) se enciende. El relieve del terreno no se apaga nunca: cuesta
            poco y sin él el vuelo se ve mal en cualquier equipo. */
-        void AplicarPresetGrafico(string id)
+        /* Lo que pone cada preset. «Alto» reproduce exactamente el ajuste de siempre (25 km,
+           todo encendido), para que a quien actualiza no le cambie nada sin pedirlo; «Medio»
+           y «Bajo» son los que de verdad aligeran, para equipos más justos. */
+        static (bool Detalle, bool Parallax, bool Variacion, bool Scatters, int Densidad, bool Viento, bool Teselas,
+                bool Nubes, bool Nubes3D, bool Edificios, int DistanciaKm) ValoresPreset(string id)
         {
             bool bajo = id == "bajo", alto = id == "alto";
-            // «Alto» reproduce exactamente el ajuste de siempre (25 km, todo encendido), para
-            // que a quien actualiza no le cambie nada sin pedirlo; «Medio» y «Bajo» son los
-            // que de verdad aligeran, para equipos más justos.
-            double distanciaKm = bajo ? 6 : alto ? 25 : 15;
-            double densidad = bajo ? 0.3 : alto ? 1.0 : 0.6;
+            return (!bajo, !bajo, alto, !bajo, bajo ? 30 : alto ? 100 : 60, !bajo, !bajo, !bajo, alto, !bajo, bajo ? 6 : alto ? 25 : 15);
+        }
 
+        bool CoincidePreset(string id)
+        {
+            if (id != "bajo" && id != "medio" && id != "alto") return false;
+            var p = ValoresPreset(id);
+            return state.FreeRelief && state.FreeDetail == p.Detalle && state.UseParallax == p.Parallax
+                && state.TextureVariation == p.Variacion && state.Scatters == p.Scatters
+                && (int)Math.Round(state.ScatterDensity * 100) == p.Densidad && state.Wind == p.Viento
+                && state.DetailTiles == p.Teselas && state.Clouds == p.Nubes && state.GlobeClouds == p.Nubes3D
+                && state.ShowStatics == p.Edificios && (int)Math.Round(state.ViewDistance / 1000) == p.DistanciaKm;
+        }
+
+        void AplicarPresetGrafico(string id)
+        {
+            var p = ValoresPreset(id);
             aplicandoPresetGrafico = true;
             try
             {
                 chkRelieve.Checked = true;
-                chkDetalle.Checked = !bajo;
-                chkParallax.Checked = !bajo;
-                chkVariacion.Checked = alto;
-                chkScatters.Checked = !bajo;
-                densidadSlider.Value = (int)Math.Round(densidad * 100);
-                chkViento.Checked = !bajo;
-                chkTeselas.Checked = !bajo;
-                chkNubes.Checked = !bajo;
-                chkNubes3D.Checked = alto;
-                chkKK.Checked = !bajo;
-                viewDistSlider.Value = (int)distanciaKm;
+                chkDetalle.Checked = p.Detalle;
+                chkParallax.Checked = p.Parallax;
+                chkVariacion.Checked = p.Variacion;
+                chkScatters.Checked = p.Scatters;
+                densidadSlider.Value = p.Densidad;
+                chkViento.Checked = p.Viento;
+                chkTeselas.Checked = p.Teselas;
+                chkNubes.Checked = p.Nubes;
+                chkNubes3D.Checked = p.Nubes3D;
+                chkKK.Checked = p.Edificios;
+                viewDistSlider.Value = p.DistanciaKm;
             }
             finally { aplicandoPresetGrafico = false; }
 
