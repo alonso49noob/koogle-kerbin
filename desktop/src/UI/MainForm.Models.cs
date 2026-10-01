@@ -31,6 +31,7 @@ namespace KerbinMaps.UI
                 SaveSettings();
                 if (state.ShowVesselModels && Following && sv.Sel != null) RequestModel(sv.Sel);
                 else ClearModel();
+                ColocarNavesEnSuelo();
             };
             naves.Add(Checks(chkModels));
             var elegir = new DarkButton("Carpeta de KSP…", ButtonVariant.Ghost, small: true);
@@ -69,7 +70,9 @@ namespace KerbinMaps.UI
             SaveSettings();
             kspCatalog = null; kspAssembler = null; kspCatalogDir = null;
             vesselModels.Clear();
+            navesCargando.Clear();
             if (Following && sv.Sel != null) RequestModel(sv.Sel);
+            ColocarNavesEnSuelo();
             _ = CargarKonstructs(forzar: true);
         }
 

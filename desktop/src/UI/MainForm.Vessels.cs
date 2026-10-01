@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using KerbinMaps.Core;
 using KerbinMaps.Gfx;
+using KerbinMaps.Ksp;
 using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
@@ -380,6 +381,7 @@ namespace KerbinMaps.UI
             // (con la copia, KSP se busca junto al original)
             loadedSavePath = restoring ? state.SavePath : path;
             vesselModels.Clear();
+            navesCargando.Clear();
             ClearModel();
             SetModelStatus(null);
 
@@ -505,8 +507,91 @@ namespace KerbinMaps.UI
             DibujarTrazaNave();
             DibujarTodas();
             ConstruirAnillos();
+            ColocarNavesEnSuelo();
             SyncGlobe();
             RequestRender();
+        }
+
+        /* ------------------------------------------------------------ naves en el suelo */
+
+        readonly HashSet<Vessel> navesCargando = new();
+
+        /* Las naves posadas o amerizadas del cuerpo que se ve, con sus piezas, para pintarlas
+           en el vuelo y en el cielo igual que los edificios de Kerbal Konstructs (ver
+           GlobeView.Statics.cs). Solo las de los tipos marcados en la lista. */
+        void ColocarNavesEnSuelo()
+        {
+            globe.GroundVessels.Clear();
+            if (sv.Data == null || !state.ShowVesselModels) { RequestRender(); return; }
+            double R = Body.Radius;
+            foreach (var v in sv.Naves)
+            {
+                if (!sv.Tipos.GetValueOrDefault(v.Type)) continue;
+                if (v.Lat == null || v.Lon == null) continue;
+                if (v.Sit != "LANDED" && v.Sit != "SPLASHED" && v.Sit != "PRELAUNCH") continue;
+
+                /* La altitud: amerizada, al nivel del mar; en una plataforma o pista conocida
+                   (su propio «landedAt», o prelanzamiento, que siempre lo está), la del juego,
+                   que ahí es exacta; posada en cualquier otro sitio, el terreno propio del
+                   mapa más la altura sobre el suelo que guardó la partida, para que se apoye
+                   en el suelo que de verdad se ve aquí y no en el que tenía el juego. */
+                double alt;
+                if (v.Sit == "SPLASHED") alt = 0;
+                else if (v.Sit == "PRELAUNCH" || !string.IsNullOrEmpty(v.LandedAt)) alt = v.Alt ?? 0;
+                else alt = AlturaDelSuelo(v.Lat.Value, v.Lon.Value) + (v.Hgt ?? 0);
+
+                var n = KkDatabase.NVec(v.Lat.Value, v.Lon.Value);
+                var pos = new[] { n[0] * (R + alt), n[1] * (R + alt), n[2] * (R + alt) };
+                var m = Mat.Mul(Mat.Translate(pos),
+                    Mat.Mul(Mat.Rotate(v.Rot), Mat.Translate(new[] { -v.CoM[0], -v.CoM[1], -v.CoM[2] })));
+                globe.GroundVessels.Add((m, ModeloNave(v), v));
+            }
+            RequestRender();
+        }
+
+        /* El modelo montado de una nave posada: igual que ModeloKK, pedido en segundo plano
+           la primera vez (null hasta entonces) y compartido con el de la nave enfocada. */
+        AssembledVessel ModeloNave(Vessel v)
+        {
+            if (vesselModels.TryGetValue(v, out var a)) return a;
+            string gd = FindGameData();
+            if (gd == null || !navesCargando.Add(v)) return null;
+            Task.Run(() =>
+            {
+                try
+                {
+                    lock (vesselModels)
+                    {
+                        if (kspCatalog == null || kspCatalogDir != gd)
+                        {
+                            kspCatalog = PartCatalog.Load(gd);
+                            kspAssembler = new VesselAssembler(kspCatalog);
+                            kspCatalogDir = gd;
+                        }
+                    }
+                    var r = kspAssembler.Build(v);
+                    r.LoadTextures();
+                    return r;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("[naves] " + v.Name + ": " + ex.Message);
+                    return new AssembledVessel();
+                }
+            }).ContinueWith(t =>
+            {
+                try
+                {
+                    BeginInvoke((Action)(() =>
+                    {
+                        if (!navesCargando.Remove(v)) return;   // se descartó entretanto
+                        vesselModels[v] = t.Result;
+                        ColocarNavesEnSuelo();
+                    }));
+                }
+                catch (InvalidOperationException) { }
+            });
+            return null;
         }
 
         void DrawVesselRow(Graphics g, Rectangle r, object item, bool hover)

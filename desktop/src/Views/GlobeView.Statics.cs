@@ -26,10 +26,19 @@ namespace KerbinMaps.Views
         public KkInstance StaticSelected;         // la que se está editando, resaltada
         public int StaticsVisible { get; private set; }
 
+        /* Las naves posadas o amerizadas de la partida, en el mismo cuerpo que se ve: se
+           pintan con el mismo pipeline que los edificios de Kerbal Konstructs, una más entre
+           ellos. `M` ya está en el marco del cuerpo de KSP, igual que KkInstance.M (la arma
+           ColocarNavesEnSuelo en MainForm.Vessels.cs); `A` es su modelo montado con las
+           piezas de KSP, o null mientras se monta. */
+        public List<(double[] M, AssembledVessel A, object Tag)> GroundVessels = new();
+
         ShaderProgram staticProg;
         ModelGpu staticGpu;
 
-        bool StaticsActive => StaticsOn && Statics != null && StaticModel != null
+        bool HasGroundVessels => GroundVessels.Count > 0;
+        bool HasBuildings => Statics != null && StaticModel != null;
+        bool StaticsActive => StaticsOn && (HasBuildings || HasGroundVessels)
                               && (Mode == CamMode.Free || Mode == CamMode.Sky || PlanetaCerca);
 
         const string StaticVS = Header + AtmosphereGlsl + @"
@@ -128,32 +137,58 @@ void main() {
             double fx = fwdL[0], fy = fwdL[1], fz = fwdL[2];
 
             staticsFrame.Clear();
-            foreach (var i in Statics.Instances)
+            if (Statics != null && StaticModel != null)
+                foreach (var i in Statics.Instances)
+                {
+                    if (!i.Placed || i.Body != Body.Name || i.ModelRef == null || !i.ModelRef.HasMesh) continue;
+                    var m = i.M;
+                    // posición respecto al ojo, ya en el marco del visor
+                    double dx = m[14] - kz, dy = m[13] - ky, dz = m[12] - kx;
+                    double dist = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+                    if (orto != null)
+                    {
+                        // en planta: lo que cae en la vista, por la distancia en horizontal
+                        double along = dx * fx + dy * fy + dz * fz;
+                        dist = Math.Sqrt(Math.Max(0, dist * dist - along * along));
+                        if (dist > radioVista + 3000) continue;
+                    }
+                    else if (dist > Math.Min(i.Visibility, ScatterFar) + 500) continue;
+                    var a = StaticModel(i.ModelRef);
+                    if (a == null || a.Items.Count == 0) continue;
+                    double rad = a.Radius * i.Scale * (i.GroupRef?.Scale ?? 1) + 1;
+                    if (orto != null) { if (dist - rad > radioVista) continue; }
+                    else
+                    {
+                        if (dist - rad > ScatterFar) continue;
+                        if (dx * fx + dy * fy + dz * fz < -rad) continue;   // detrás de la cámara
+                    }
+                    var rel = Mat.Mul(SwapXZ, Mat.Mul(Mat.Translate(new[] { -kx, -ky, -kz }), m));
+                    staticsFrame.Add((i, a, rel));
+                }
+            // las naves posadas o amerizadas, con la misma distancia de dibujado que los
+            // scatters y los edificios (el ajuste del panel): de más lejos no merece la
+            // pena ni montarlas
+            foreach (var (m, a, _) in GroundVessels)
             {
-                if (!i.Placed || i.Body != Body.Name || i.ModelRef == null || !i.ModelRef.HasMesh) continue;
-                var m = i.M;
-                // posición respecto al ojo, ya en el marco del visor
+                if (a == null || a.Items.Count == 0) continue;
                 double dx = m[14] - kz, dy = m[13] - ky, dz = m[12] - kx;
                 double dist = Math.Sqrt(dx * dx + dy * dy + dz * dz);
                 if (orto != null)
                 {
-                    // en planta: lo que cae en la vista, por la distancia en horizontal
                     double along = dx * fx + dy * fy + dz * fz;
                     dist = Math.Sqrt(Math.Max(0, dist * dist - along * along));
                     if (dist > radioVista + 3000) continue;
                 }
-                else if (dist > Math.Min(i.Visibility, ScatterFar) + 500) continue;
-                var a = StaticModel(i.ModelRef);
-                if (a == null || a.Items.Count == 0) continue;
-                double rad = a.Radius * i.Scale * (i.GroupRef?.Scale ?? 1) + 1;
+                else if (dist > ScatterFar + 500) continue;
+                double rad = a.Radius + 1;
                 if (orto != null) { if (dist - rad > radioVista) continue; }
                 else
                 {
                     if (dist - rad > ScatterFar) continue;
-                    if (dx * fx + dy * fy + dz * fz < -rad) continue;   // detrás de la cámara
+                    if (dx * fx + dy * fy + dz * fz < -rad) continue;
                 }
                 var rel = Mat.Mul(SwapXZ, Mat.Mul(Mat.Translate(new[] { -kx, -ky, -kz }), m));
-                staticsFrame.Add((i, a, rel));
+                staticsFrame.Add((null, a, rel));
             }
             StaticsVisible = staticsFrame.Count;
             picF = new[] { fx, fy, fz }; picR = (double[])right.Clone(); picU = (double[])camUp.Clone(); picTan = tan;
@@ -259,6 +294,7 @@ void main() {
             double tMejor = double.MaxValue;
             foreach (var (inst, a, rel) in staticsFrame)
             {
+                if (inst == null) continue;    // una nave, no un edificio: no se puede editar
                 double cx = rel[12], cy = rel[13], cz = rel[14];
                 double rad = a.Radius * inst.Scale * (inst.GroupRef?.Scale ?? 1) + 1;
                 double tc = cx * d[0] + cy * d[1] + cz * d[2];

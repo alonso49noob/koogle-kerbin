@@ -31,6 +31,10 @@ namespace KerbinMaps.Core
     {
         public string Name, Type, Sit, BodyName;
         public double? Lat, Lon, Alt;
+        // altura sobre el terreno en el instante del guardado y, si estaba en un sitio de
+        // lanzamiento conocido (plataforma, pista...), su nombre; vacío si no
+        public double? Hgt;
+        public string LandedAt;
         public Elements Orbit;
         public double[] Rot = { 0, 0, 0, 1 };      // orientación respecto al planeta que gira
         public double[] CoM = { 0, 0, 0 };         // centro de masas en el marco de la nave
@@ -59,7 +63,7 @@ namespace KerbinMaps.Core
     {
         /* Campos de VESSEL que se conservan; el resto (piezas, tripulación, recursos)
            se ignora, que es la mayor parte del fichero. */
-        static readonly HashSet<string> Campos = new() { "name", "type", "sit", "landed", "splashed", "lat", "lon", "alt", "pid", "rot", "CoM" };
+        static readonly HashSet<string> Campos = new() { "name", "type", "sit", "landed", "splashed", "lat", "lon", "alt", "hgt", "landedAt", "pid", "rot", "CoM" };
         static readonly HashSet<string> Orbita = new() { "SMA", "ECC", "INC", "LPE", "LAN", "MNA", "EPH", "REF", "IDENT" };
 
         public static readonly HashSet<string> ModulosAnimados = new()
@@ -207,6 +211,8 @@ namespace KerbinMaps.Core
                 Lat = Num(v.F.GetValueOrDefault("lat")),
                 Lon = Num(v.F.GetValueOrDefault("lon")),
                 Alt = Num(v.F.GetValueOrDefault("alt")),
+                Hgt = Num(v.F.GetValueOrDefault("hgt")),
+                LandedAt = v.F.TryGetValue("landedAt", out var la) && la.Length > 0 ? la : null,
                 BodyName = o != null && o.TryGetValue("IDENT", out var id) && id.Length > 0 ? id.Split('/').Last() : null
             };
             output.Rot = Vec(v.F.GetValueOrDefault("rot"), 4) ?? output.Rot;

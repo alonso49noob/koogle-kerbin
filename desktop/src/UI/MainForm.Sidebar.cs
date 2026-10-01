@@ -17,7 +17,10 @@ namespace KerbinMaps.UI
         DarkSlider velSlider, nubeAltSlider;
         FieldHeader velHeader, nubeAltHeader;
         RichLabel vueloInfo;
-        DarkCombo baseCombo, presetCombo;
+        DarkCombo baseCombo, presetCombo, qualityCombo;
+        DarkSlider viewDistSlider;
+        FieldHeader viewDistHeader;
+        bool aplicandoPresetGrafico;
         StackPanel customUrlWrap, biomeOpWrap, presetWrap, reliefWrap;
         DarkTextBox customUrl, hMinBox, hMaxBox, fpAlt, orbPe, orbAp, orbInc, orbLan, orbArgp, orbN, svRot;
         FieldHeader opHeader, biomeOpHeader, reliefHeader, svOrbHeader;
@@ -71,9 +74,100 @@ namespace KerbinMaps.UI
             return s;
         }
 
+        /* ------------------------------------------------------- Calidad gráfica */
+
+        /* Un atajo para todo lo que cuesta dibujar: el relieve y las texturas del vuelo,
+           los scatters de Parallax, las nubes, los edificios de Kerbal Konstructs y las
+           naves posadas, más hasta dónde se ve cada cosa. No guarda sus propios números:
+           lo que hace es tocar los controles de siempre («Vuelo», «Vista 3D», «Edificios»),
+           que ya saben avisar al globo y guardar. Tocar cualquiera de ellos a mano después
+           pasa el preset a «Personalizado» (MarcarGraficosPersonalizado). */
+        void BuildGraphicsQualitySection()
+        {
+            var s = AddSection("Calidad gráfica", true);
+            qualityCombo = new DarkCombo();
+            qualityCombo.SetItems(new[] { ("bajo", "Bajo"), ("medio", "Medio"), ("alto", "Alto"), ("personalizado", "Personalizado") });
+            qualityCombo.SelectedId = state.GraphicsPreset;
+            qualityCombo.SelectedChanged += (o, e) =>
+            {
+                if (qualityCombo.SelectedId == "personalizado") { state.GraphicsPreset = "personalizado"; SaveSettings(); return; }
+                AplicarPresetGrafico(qualityCombo.SelectedId);
+            };
+            s.Add(Field("Preset", qualityCombo));
+
+            viewDistSlider = new DarkSlider(5, 100, (int)Math.Round(state.ViewDistance / 1000));
+            viewDistSlider.ValueChanged += (o, e) =>
+            {
+                state.ViewDistance = viewDistSlider.Value * 1000;
+                globe.ScatterFar = state.ViewDistance;
+                viewDistHeader.Value = viewDistSlider.Value + " km";
+                SaveSettings();
+                MarcarGraficosPersonalizado();
+                RequestRender();
+            };
+            s.Add(Field("Distancia de dibujado (scatters, edificios y naves en tierra)", viewDistSlider, out viewDistHeader,
+                        (int)Math.Round(state.ViewDistance / 1000) + " km"));
+            globe.ScatterFar = state.ViewDistance;
+
+            s.Add(Hint("Un atajo para el relieve y las texturas del vuelo, los scatters de Parallax, las nubes, los " +
+                       "edificios de <b>Kerbal Konstructs</b> y las naves posadas, todo junto. En cuanto cambies " +
+                       "cualquiera de esos ajustes a mano, aquí abajo en «Vuelo», «Vista 3D» o «Edificios», esto pasa " +
+                       "solo a «Personalizado»."));
+        }
+
+        /* bajo/medio/alto, de menos a más: qué tan lejos se dibuja y cuánto de lo opcional
+           (texturas de Parallax, scatters con su densidad, viento, relieve de detalle,
+           nubes, edificios) se enciende. El relieve del terreno no se apaga nunca: cuesta
+           poco y sin él el vuelo se ve mal en cualquier equipo. */
+        void AplicarPresetGrafico(string id)
+        {
+            bool bajo = id == "bajo", alto = id == "alto";
+            // «Alto» reproduce exactamente el ajuste de siempre (25 km, todo encendido), para
+            // que a quien actualiza no le cambie nada sin pedirlo; «Medio» y «Bajo» son los
+            // que de verdad aligeran, para equipos más justos.
+            double distanciaKm = bajo ? 6 : alto ? 25 : 15;
+            double densidad = bajo ? 0.3 : alto ? 1.0 : 0.6;
+
+            aplicandoPresetGrafico = true;
+            try
+            {
+                chkRelieve.Checked = true;
+                chkDetalle.Checked = !bajo;
+                chkParallax.Checked = !bajo;
+                chkVariacion.Checked = alto;
+                chkScatters.Checked = !bajo;
+                densidadSlider.Value = (int)Math.Round(densidad * 100);
+                chkViento.Checked = !bajo;
+                chkTeselas.Checked = !bajo;
+                chkNubes.Checked = !bajo;
+                chkNubes3D.Checked = alto;
+                chkKK.Checked = !bajo;
+                viewDistSlider.Value = (int)distanciaKm;
+            }
+            finally { aplicandoPresetGrafico = false; }
+
+            state.GraphicsPreset = id;
+            qualityCombo.SelectedId = id;
+            SaveSettings();
+            RequestRender();
+        }
+
+        /* Cualquier control que el preset toca llama aquí al cambiar; si el cambio viene
+           del propio preset (aplicandoPresetGrafico) no cuenta. */
+        void MarcarGraficosPersonalizado()
+        {
+            if (aplicandoPresetGrafico || state.GraphicsPreset == "personalizado") return;
+            state.GraphicsPreset = "personalizado";
+            qualityCombo.SelectedId = "personalizado";
+            SaveSettings();
+        }
+
         void BuildSidebar()
         {
             sideStack.SuspendLayout();
+
+            /* ------------------------------------------------------- Calidad gráfica */
+            BuildGraphicsQualitySection();
 
             /* ---------------------------------------------------------------- Capas */
             /* ------------------------------------------------------- Cuerpo celeste */
@@ -343,16 +437,17 @@ namespace KerbinMaps.UI
                            "espacio y control para subir y bajar, arrastrar para mirar, la rueda es el acelerador y " +
                            "<b>mayúsculas</b> multiplica la velocidad por cinco. No se puede bajar del suelo."));
             chkRelieve = new DarkCheck("Relieve del terreno", state.FreeRelief);
-            chkRelieve.CheckedChanged += (s, e) => { state.FreeRelief = chkRelieve.Checked; globe.FreeRelief = chkRelieve.Checked; SaveSettings(); RequestRender(); };
+            chkRelieve.CheckedChanged += (s, e) => { state.FreeRelief = chkRelieve.Checked; globe.FreeRelief = chkRelieve.Checked; SaveSettings(); MarcarGraficosPersonalizado(); RequestRender(); };
             chkDetalle = new DarkCheck("Texturas de suelo del juego", state.FreeDetail);
-            chkDetalle.CheckedChanged += (s, e) => { state.FreeDetail = chkDetalle.Checked; globe.Detail = chkDetalle.Checked; SaveSettings(); RequestRender(); };
+            chkDetalle.CheckedChanged += (s, e) => { state.FreeDetail = chkDetalle.Checked; globe.Detail = chkDetalle.Checked; SaveSettings(); MarcarGraficosPersonalizado(); RequestRender(); };
             chkNubes = new DarkCheck("Nubes", state.Clouds);
-            chkNubes.CheckedChanged += (s, e) => { state.Clouds = chkNubes.Checked; globe.Clouds = chkNubes.Checked; SaveSettings(); RenderVueloInfo(); RequestRender(); };
+            chkNubes.CheckedChanged += (s, e) => { state.Clouds = chkNubes.Checked; globe.Clouds = chkNubes.Checked; SaveSettings(); MarcarGraficosPersonalizado(); RenderVueloInfo(); RequestRender(); };
             chkParallax = new DarkCheck("Usar las de Parallax si está instalado", state.UseParallax);
             chkParallax.CheckedChanged += async (s, e) =>
             {
                 state.UseParallax = chkParallax.Checked;
                 SaveSettings();
+                MarcarGraficosPersonalizado();
                 await CargarTexturasDeTerreno();
             };
             chkVariacion = new DarkCheck("Variación de texturas (sin mosaico repetido)", state.TextureVariation);
@@ -361,6 +456,7 @@ namespace KerbinMaps.UI
                 state.TextureVariation = chkVariacion.Checked;
                 globe.DetailVariation = chkVariacion.Checked;
                 SaveSettings();
+                MarcarGraficosPersonalizado();
                 RequestRender();
             };
             chkScatters = new DarkCheck("Scatters de Parallax: hierba, árboles y rocas", state.Scatters);
@@ -369,12 +465,13 @@ namespace KerbinMaps.UI
                 state.Scatters = chkScatters.Checked;
                 globe.Scatters = chkScatters.Checked;
                 SaveSettings();
+                MarcarGraficosPersonalizado();
                 await CargarScatters();
             };
             chkViento = new DarkCheck("Viento en la vegetación", state.Wind);
-            chkViento.CheckedChanged += (s, e) => { state.Wind = chkViento.Checked; globe.Wind = chkViento.Checked; SaveSettings(); RequestRender(); };
+            chkViento.CheckedChanged += (s, e) => { state.Wind = chkViento.Checked; globe.Wind = chkViento.Checked; SaveSettings(); MarcarGraficosPersonalizado(); RequestRender(); };
             chkTeselas = new DarkCheck("Relieve de detalle bajo la cámara (Parallax)", state.DetailTiles);
-            chkTeselas.CheckedChanged += (s, e) => { state.DetailTiles = chkTeselas.Checked; SaveSettings(); if (!chkTeselas.Checked) QuitarTesela(); RequestRender(); };
+            chkTeselas.CheckedChanged += (s, e) => { state.DetailTiles = chkTeselas.Checked; SaveSettings(); MarcarGraficosPersonalizado(); if (!chkTeselas.Checked) QuitarTesela(); RequestRender(); };
             vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkVariacion, chkTeselas, chkScatters, chkViento, chkNubes));
             densidadSlider = new DarkSlider(10, 100, (int)Math.Round(state.ScatterDensity * 100));
             densidadSlider.ValueChanged += (s, e) =>
@@ -383,6 +480,7 @@ namespace KerbinMaps.UI
                 globe.ScatterDensity = state.ScatterDensity;
                 densidadHeader.Value = densidadSlider.Value + " %";
                 SaveSettings();
+                MarcarGraficosPersonalizado();
                 RequestRender();
             };
             vuelo.Add(Field("Densidad de los scatters", densidadSlider, out densidadHeader, (int)Math.Round(state.ScatterDensity * 100) + " %"));
@@ -427,6 +525,7 @@ namespace KerbinMaps.UI
                 state.GlobeClouds = chkNubes3D.Checked;
                 globe.GlobeClouds = chkNubes3D.Checked;
                 SaveSettings();
+                MarcarGraficosPersonalizado();
                 if (chkNubes3D.Checked) _ = CargarNubes();
                 RequestRender();
             };

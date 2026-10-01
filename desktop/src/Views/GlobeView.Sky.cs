@@ -519,12 +519,13 @@ void main() {
         /* La costa. El mapa de color es de 1 km por texel: junto al mar la tierra hereda
            su azul y, tomada por agua, salía con el brillo del mar y la orilla se perdía.
            Con relieve manda la geometría: es mar lo que el rayo encuentra en la esfera del
-           mar. En tierra, donde el mapa aún dice mar y se está a pocos metros sobre el
-           agua, una franja de arena (mojada junto al agua); más arriba, un azul del mapa
-           es un lago y sigue siendo agua. En el mar, el color según la profundidad (claro
-           en lo somero, oscuro en lo hondo, a partir del propio color del mapa, que en Eve
-           es morado) y una línea de espuma en la orilla, que se apaga cuando un píxel
-           abarca demasiado suelo para verla sin parpadeo. */
+           mar. En KSP no hay agua por encima del nivel del mar (el agua es siempre esa
+           esfera), así que en tierra el azul del mapa es siempre tierra: junto a la orilla
+           una franja de arena (mojada junto al agua) y monte arriba el propio color del
+           mapa, que el mipmap ya funde con la tierra de al lado. En el mar, el color según
+           la profundidad (claro en lo somero, oscuro en lo hondo, a partir del propio color
+           del mapa, que en Eve es morado) y una línea de espuma en la orilla, que se apaga
+           cuando un píxel abarca demasiado suelo para verla sin parpadeo. */
         float hSuelo = terrainH(normalize(p));
         float huellaM = t * uRadiusM * uPix;
         if (esMar > 0.5) {
@@ -540,11 +541,10 @@ void main() {
           base = mix(base, vec3(0.9, 0.93, 0.93), espuma * 0.75);
           water = 1.0 - espuma * 0.85;                           // la espuma no es un espejo
         } else {
-          float lago = water * smoothstep(20.0, 40.0, hSuelo);
           float playa = water * (1.0 - smoothstep(20.0, 40.0, hSuelo));
           base = mix(base, vec3(0.8, 0.74, 0.56), playa);
           base *= mix(0.7, 1.0, smoothstep(0.15, 1.2, hSuelo));  // arena mojada en la orilla
-          water = lago;
+          water = 0.0;         // sin agua por encima del nivel del mar: nunca es un lago
         }
       }
       vec3 nSup = relieve ? nRel : normalize(p);
@@ -829,7 +829,7 @@ void main() {
             /* Con scatters, el cielo deja en el búfer de profundidad dónde está el suelo. Solo
                se escribe con la prueba activada, así que se activa sin descartar nada. */
             bool scatters = ScattersActive && !cenital;
-            bool edificios = cenital ? StaticsOn && Statics != null && StaticModel != null : StaticsActive;
+            bool edificios = cenital ? StaticsOn && (HasBuildings || HasGroundVessels) : StaticsActive;
             bool profundidad = scatters || edificios;
             skyProg.Int("uWriteDepth", profundidad ? 1 : 0);
             skyProg.Float("uDepthFar", cenital ? CenitalAltM + 1000 : ScatterFar);

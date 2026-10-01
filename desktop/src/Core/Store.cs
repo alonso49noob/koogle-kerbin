@@ -90,6 +90,10 @@ namespace KerbinMaps.Core
         public bool Progresion;                   // enseñar solo lo que la partida ha descubierto
         public bool ShowScan = true;              // cobertura de SCANsat sobre el mapa
         public bool ShowAnomalies = true;         // anomalías del catálogo
+        // «bajo», «medio», «alto» o «personalizado» (en cuanto se toca algo a mano);
+        // ViewDistance es la distancia de dibujado de scatters, edificios y naves en tierra
+        public string GraphicsPreset = "alto";
+        public double ViewDistance = 25000;
         public bool AutoUpdate = true;            // buscar versiones nuevas al abrir
         public DateTime? LastUpdateCheck;         // UTC de la última consulta a GitHub
         public string SkippedVersion;             // versión que se dijo «omitir»

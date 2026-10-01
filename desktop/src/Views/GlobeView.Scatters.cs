@@ -99,8 +99,10 @@ namespace KerbinMaps.Views
         static readonly System.Diagnostics.Stopwatch relojViento = System.Diagnostics.Stopwatch.StartNew();
 
         /* Hasta dónde llega la escala de profundidad (el scatter más lejano de Kerbin, los
-           icebergs, llega a 20 km). */
-        const double ScatterFar = 25000;
+           icebergs, llega a 20 km) y, con el ajuste de «distancia de dibujado» del panel,
+           también de los edificios de Kerbal Konstructs y las naves en el suelo (ver
+           GlobeView.Statics.cs): los tres comparten la misma cuenta de la cámara. */
+        public double ScatterFar = 25000;
         const double ScatterNear = 0.05;
 
         ShaderProgram scatterProg;

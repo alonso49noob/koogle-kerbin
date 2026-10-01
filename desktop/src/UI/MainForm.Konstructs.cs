@@ -38,6 +38,7 @@ namespace KerbinMaps.UI
             {
                 state.ShowStatics = chkKK.Checked;
                 SaveSettings();
+                MarcarGraficosPersonalizado();
                 if (chkKK.Checked) await CargarKonstructs();
                 else AplicarKonstructs();
             };
@@ -104,6 +105,7 @@ namespace KerbinMaps.UI
         {
             ColocarKK();
             MarcadoresKK();
+            ColocarNavesEnSuelo();         // el terreno bajo las naves puede haber cambiado
             SyncGlobe();
         }
 
