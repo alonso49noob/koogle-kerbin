@@ -80,8 +80,8 @@ namespace KerbinMaps.UI
            mueve las naves. Sin naves en este cuerpo con las que medirla, la del juego. */
         Sun.Position SunNow()
         {
-            if (sv.Data == null) return Sun.Subsolar(0, Sun.DefaultRotation(0));
-            return Sun.Subsolar(sim.T, RotBase() + 360 * ((sim.T - sv.Ut) / Body.SiderealDay));
+            var (ut, rot) = InstanteYGiro();
+            return Sun.Subsolar(ut, rot);
         }
         IEnumerable<GlobePin> VesselPins() => sv.Marcas.Select(m => m.Pin);
 

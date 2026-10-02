@@ -40,6 +40,7 @@ namespace KerbinMaps.Core
         public string PresetId;
         public string VolcadoCalibrado;           // el mapa de alturas de Kerbin ya calibrado como volcado
         public bool MapasDelJuego;                // ya se eligió una vez el preset de la instalación
+        public bool VerCuerpos = true;            // lunas, planetas y el Sol en el globo 3D
         public bool View3D;
         public bool BiomeOn, BiomeTouched;
         public double BiomeOpacity = BiomeConfig.DefaultOpacity;

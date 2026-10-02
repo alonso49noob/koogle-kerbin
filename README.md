@@ -47,6 +47,9 @@ reads your game files where they already are.
 
 What it does:
 
+- **The rest of the solar system on the 3D globe.** Moons, planets and the Sun sit where
+  they are for the time on the time bar, at true scale, lit by the Sun (the Mun shows its
+  phases) and with their Parallax colour maps.
 - **Four views of the same place.** A sliding flat map, a 3D globe, a sky view from a
   point on the surface and a free camera you fly at ground level, all sharing observer,
   time and selection. The flight view ray-marches the body's height map, so the horizon

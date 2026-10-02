@@ -311,6 +311,7 @@ namespace KerbinMaps.UI
             int w = Math.Max(1, surface.ClientSize.Width), h = Math.Max(1, surface.ClientSize.Height);
             if (GlobeVisible)
             {
+                ActualizarCuerpos();
                 globe.W = w; globe.H = h; globe.S = Theme.Scale;
                 globe.Render(batch, text);
             }

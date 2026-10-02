@@ -156,7 +156,11 @@ Arriba a la izquierda, **2D**, **3D**, **Cielo** y **Vuelo**.
 
 - **2D**: el mapa plano. De cerca (desde el zoom 9,5 y hasta el 16) el suelo lo pinta el
   renderizador del vuelo mirando en vertical, ver abajo.
-- **3D**: el globo. Al pinchar una nave, el foco de la cámara pasa del centro de
+- **3D**: el globo, con las lunas, los planetas y el Sol en su sitio para el instante de la
+  barra de tiempo, a escala real: iluminados por el Sol (la Mun con sus fases), con su mapa
+  de color de Parallax si lo hay, tapados por el planeta cuando quedan detrás y como un
+  punto con su nombre los que de lejos miden menos de un par de píxeles (se apagan en
+  «Vista 3D»). Al pinchar una nave, el foco de la cámara pasa del centro de
   Kerbin a la nave y la sigue: arrastrar gira alrededor de ella y la rueda se
   acerca o se aleja. Esc, F o pincharla otra vez devuelven el foco al planeta.
 - **Cielo**: de pie en un punto de la superficie, mirando alrededor. Las naves

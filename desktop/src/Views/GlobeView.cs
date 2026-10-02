@@ -1108,6 +1108,9 @@ void main() {
             GL.Disable(GL.CULL_FACE);
             GL.Disable(GL.DEPTH_TEST);
 
+            // las lunas, los planetas y el Sol, en su sitio (ver GlobeView.Cuerpos.cs)
+            DrawCuerpos(eye);
+
             /* La nave enfocada con su modelo, cuando la cámara está lo bastante cerca como
                para que ocupe algo más que un punto. */
             modelPixels = 0;
@@ -1125,6 +1128,7 @@ void main() {
             }
 
             batch.Begin(W, H);
+            EtiquetasCuerpos(batch, tc, eye);
             PlacePins(batch, tc, eye, vesselsOnly: false);
             batch.End();
         }
@@ -1295,6 +1299,7 @@ void main() {
             modelRenderer?.Dispose();
             DisposeSky();
             DisposeScatters();
+            DisposeCuerpos();
             GL.DeleteBuffer(posBuf); GL.DeleteBuffer(uvBuf); GL.DeleteBuffer(idxBuf); GL.DeleteVertexArray(vao);
             foreach (var lb in new[] { trackG, trackS, orbits })
                 if (lb != null) { GL.DeleteBuffer(lb.Buf); GL.DeleteVertexArray(lb.Vao); }

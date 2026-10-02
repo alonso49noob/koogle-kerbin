@@ -547,6 +547,7 @@ namespace KerbinMaps.UI
                 RequestRender();
             };
             globeSection.Add(Checks(chkLight, chkAtm, chkNubes3D));
+            BuildCuerposControl(globeSection);
             reliefSlider = new DarkSlider(0, 60, 0);
             reliefSlider.ValueChanged += (s, e) =>
             {
