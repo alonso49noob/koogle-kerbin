@@ -87,11 +87,11 @@ float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00
 
 /* Luz dispersada hacia el observador a lo largo del tramo [t0, t1] del rayo o + d·t, y
    la transmitancia del tramo (lo que queda de lo que hay detrás). */
-vec3 inscatter(vec3 o, vec3 d, float t0, float t1, vec3 s, float jitter, out vec3 trans) {
-  float ds = max(t1 - t0, 0.0) / float(uSteps);
+vec3 inscatterN(vec3 o, vec3 d, float t0, float t1, vec3 s, float jitter, int pasos, out vec3 trans) {
+  float ds = max(t1 - t0, 0.0) / float(pasos);
   float odR = 0.0, odM = 0.0;
   vec3 sumR = vec3(0.0), sumM = vec3(0.0);
-  for (int i = 0; i < uSteps; i++) {
+  for (int i = 0; i < pasos; i++) {
     vec3 p = o + d * (t0 + (float(i) + jitter) * ds);
     float alt = max(length(p) - 1.0, 0.0);
     float dR = exp(-alt / HR) * ds, dM = exp(-alt / HM) * ds;
@@ -104,6 +104,10 @@ vec3 inscatter(vec3 o, vec3 d, float t0, float t1, vec3 s, float jitter, out vec
   trans = exp(-(BETA_R * odR + BETA_ME * odM));
   float mu = dot(d, s);
   return uSunI * (sumR * BETA_R * phaseR(mu) + sumM * BETA_M * phaseM(mu));
+}
+
+vec3 inscatter(vec3 o, vec3 d, float t0, float t1, vec3 s, float jitter, out vec3 trans) {
+  return inscatterN(o, d, t0, t1, s, jitter, uSteps, trans);
 }
 
 /* En el mapa 2D visto desde arriba, sin el brillo del Sol en el agua: mirando en

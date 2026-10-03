@@ -27,7 +27,7 @@ namespace KerbinMaps.Gfx
         public const uint FRONT = 0x0404, BACK = 0x0405;
         public const uint TEXTURE_2D = 0x0DE1, TEXTURE0 = 0x84C0;
         public const uint RGBA = 0x1908, RGBA8 = 0x8058, UNSIGNED_BYTE = 0x1401, UNSIGNED_INT = 0x1405, FLOAT = 0x1406;
-        public const uint RED = 0x1903, R32F = 0x822E;
+        public const uint RED = 0x1903, R32F = 0x822E, R8 = 0x8229;
         public const uint TEXTURE_MAG_FILTER = 0x2800, TEXTURE_MIN_FILTER = 0x2801, TEXTURE_WRAP_S = 0x2802, TEXTURE_WRAP_T = 0x2803;
         public const int NEAREST = 0x2600, LINEAR = 0x2601, LINEAR_MIPMAP_LINEAR = 0x2703, REPEAT = 0x2901, CLAMP_TO_EDGE = 0x812F;
         public const uint UNPACK_ALIGNMENT = 0x0CF5, PACK_ALIGNMENT = 0x0D05, TEXTURE_MAX_ANISOTROPY = 0x84FE, MAX_TEXTURE_MAX_ANISOTROPY = 0x84FF;
@@ -73,6 +73,7 @@ namespace KerbinMaps.Gfx
         static delegate* unmanaged<uint, uint, void> _bindTexture;
         static delegate* unmanaged<uint, int, int, int, int, int, uint, uint, void*, void> _texImage2D;
         static delegate* unmanaged<uint, int, uint, int, int, int, int, void*, void> _compressedTexImage2D;
+        static delegate* unmanaged<uint, int, int, int, int, int, uint, uint, void*, void> _texSubImage2D;
         static delegate* unmanaged<uint, uint, int, void> _texParameteri;
         static delegate* unmanaged<uint, uint, float, void> _texParameterf;
         static delegate* unmanaged<uint, int, void> _pixelStorei;
@@ -144,6 +145,7 @@ namespace KerbinMaps.Gfx
             _bindTexture = (delegate* unmanaged<uint, uint, void>)Proc("glBindTexture");
             _texImage2D = (delegate* unmanaged<uint, int, int, int, int, int, uint, uint, void*, void>)Proc("glTexImage2D");
             _compressedTexImage2D = (delegate* unmanaged<uint, int, uint, int, int, int, int, void*, void>)Proc("glCompressedTexImage2D");
+            _texSubImage2D = (delegate* unmanaged<uint, int, int, int, int, int, uint, uint, void*, void>)Proc("glTexSubImage2D");
             _texParameteri = (delegate* unmanaged<uint, uint, int, void>)Proc("glTexParameteri");
             _texParameterf = (delegate* unmanaged<uint, uint, float, void>)Proc("glTexParameterf");
             _pixelStorei = (delegate* unmanaged<uint, int, void>)Proc("glPixelStorei");
@@ -218,6 +220,11 @@ namespace KerbinMaps.Gfx
         public static void TexImage2D(uint target, int level, int internalFormat, int w, int h, uint format, uint type, byte[] data)
         {
             fixed (byte* p = data) _texImage2D(target, level, internalFormat, w, h, 0, format, type, p);
+        }
+        /* Sube un trozo de la textura: filas de `data` a partir de `offset` bytes. */
+        public static void TexSubImage2D(uint target, int level, int x, int y, int w, int h, uint format, uint type, byte[] data, int offset)
+        {
+            fixed (byte* p = data) _texSubImage2D(target, level, x, y, w, h, format, type, p + offset);
         }
         public static void CompressedTexImage2D(uint target, int level, uint format, int w, int h, byte[] data)
         {

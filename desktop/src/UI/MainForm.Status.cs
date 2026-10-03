@@ -40,6 +40,8 @@ namespace KerbinMaps.UI
                 : Lang.F("{0} naves", sv.Marcas?.Count ?? 0);
 
             secMarcadores.Estado = Lang.F("{0}", MarkersAll().Count());
+
+            EstadoFacciones();
         }
     }
 }

@@ -79,7 +79,8 @@ uniform int uDebug;
 uniform sampler2D uCloudTex;
 uniform int uHasClouds;
 uniform float uCloudR, uCloudAmt, uCloudOff;
-" + NubesGlsl + @"
+" + NubesGlsl + AguaGlsl + FaccionesGlsl.Codigo + @"
+uniform int uFacConMar;
 uniform float uColorOff, uBiomeOff, uBiomeAmt;
 uniform vec3 uSun, uTint, uSeaColor;
 uniform sampler2D uSeaTex;
@@ -169,6 +170,20 @@ float terrainH(vec3 n) {
     if (d < uFlatR[i].y) h = mix(h, uFlat[i].w, 1.0 - smoothstep(uFlatR[i].x, uFlatR[i].y, d));
   }
   return h;
+}
+
+/* Profundidad para el color del agua. El mapa de alturas es de 8 bits y el fondo del mar baja a
+   escalones de decenas de metros: visto a través del agua, cada escalón salía como una curva de
+   nivel. Se promedia a texel y medio alrededor; junto a la orilla manda la exacta (la espuma y la
+   arena tienen que casar con la costa). */
+float profColor(vec3 n, float exacta) {
+  float lat = asin(clamp(n.y, -1.0, 1.0)), lon = atan(n.x, n.z);
+  vec2 uv = vec2(fract(lon / (2.0 * PI) + 0.5 + uHeightOff), 0.5 - lat / PI);
+  vec2 e = 1.5 / uHeightSize;
+  float g = (grisSuave(uv) + grisSuave(uv + vec2(e.x, 0.0)) + grisSuave(uv - vec2(e.x, 0.0))
+           + grisSuave(uv + vec2(0.0, e.y)) + grisSuave(uv - vec2(0.0, e.y))) * 0.2;
+  float suave = max(-(uHMin + g * (uHMax - uHMin)), 0.0);
+  return mix(exacta, suave, smoothstep(2.0, 10.0, exacta));
 }
 
 /* Radio de la superficie en ese punto. Bajo el nivel del mar manda el mar: el agua
@@ -474,6 +489,8 @@ void main() {
   vec2 tg = raySphere(eye, d, 1.0);
 
   vec3 col;
+  vec4 facA = vec4(0.0);           // el mapa político sobre el suelo, ya con su luz
+  float tapaNube = 0.0;            // lo que lo tapan las nubes
   float tSuelo = -1.0;             // dónde toca el rayo el suelo de verdad (con relieve), o nada
   vec3 plano = vec3(0.0);          // el color del mapa tal cual, para fundirse con el mapa plano
   {
@@ -522,6 +539,8 @@ void main() {
           ? textureLod(uBiome, vec2(fract(u + uBiomeOff), v), 0.0).rgb
           : textureGrad(uBiome, vec2(fract(u + uBiomeOff), v), gx, gy).rgb, uBiomeAmt);
       // cada punto con su Sol: el suelo lejano puede estar al otro lado del terminador
+      float aguaAmt = water, profA = 300.0;
+      vec3 marA = base;
       if (relieve) {
         /* La costa. El mapa de color es de kilómetros por texel: junto al mar la tierra
            hereda su azul y, tomada por agua, salía con el brillo del mar y la orilla se
@@ -529,24 +548,14 @@ void main() {
            esfera del mar. En KSP no hay agua por encima del nivel del mar (el agua es
            siempre esa esfera), así que en tierra el azul del mapa es siempre tierra: arena
            junto al agua (mojada en la orilla) y, más arriba, el color de la tierra de al
-           lado. En el mar, el color según la profundidad (claro en lo somero, oscuro en lo
-           hondo, a partir del propio color del mapa, que en Eve es morado) y una línea de
-           espuma en la orilla, que se apaga cuando un píxel abarca demasiado suelo para
-           verla sin parpadeo. */
+           lado. El mar se pinta abajo (ver GlobeView.Agua) con su profundidad: el fondo a
+           través del agua donde cubre poco, olas, brillo del Sol y espuma en la orilla. */
         float hSuelo = terrainH(normalize(p));
-        float huellaM = t * uRadiusM * uPix;
+        aguaAmt = esMar;
         if (esMar > 0.5) {
-          float prof = max(-hSuelo, 0.0);
+          profA = max(-hSuelo, 0.0);
           // junto a la costa el mapa trae tierra y arena: el color de su mar abierto (ver MapaDelMar)
-          vec3 mar = uHasSeaTex != 0 ? textureLod(uSeaTex, vec2(fract(u), v), 0.0).rgb : mix(uSeaColor, base, water);
-          vec3 somero = mar * 1.25 + vec3(0.03, 0.06, 0.055);
-          vec3 hondo = mar * 0.72;
-          // atenuación exponencial, como la de la luz en el agua: el fondo baja a escalones
-          // de decenas de metros y con una rampa corta cada escalón salía como un borde
-          base = mix(somero, hondo, 1.0 - exp(-prof / 70.0));
-          float espuma = (1.0 - smoothstep(0.1, 1.4, prof)) * (1.0 - smoothstep(12.0, 60.0, huellaM));
-          base = mix(base, vec3(0.9, 0.93, 0.93), espuma * 0.75);
-          water = 1.0 - espuma * 0.85;                           // la espuma no es un espejo
+          marA = uHasSeaTex != 0 ? textureLod(uSeaTex, vec2(fract(u), v), 0.0).rgb : mix(uSeaColor, base, water);
         } else {
           /* En KSP no hay lagos por encima del mar: el agua es la esfera del océano. El azul
              del mapa sobre tierra es un texel de costa (de 4,6 km) que cae dentro: arena
@@ -572,13 +581,44 @@ void main() {
           water = 0.0;
         }
       }
+      else if (water > 0.0 && uHasHeight != 0) profA = max(-terrainH(normalize(p)), 0.0);
       vec3 nSup = relieve ? nRel : normalize(p);
+      vec3 L = vec3(0.0);
       // en el mapa, la distancia del ojo (fijo, muy alto) apagaba el detalle a cualquier zoom:
       // se usa la que tendría en el vuelo un píxel del mismo tamaño
-      if (water < 0.5) base = detalle(p, nSup, base, uCenital != 0 ? uDistCenital : t * uRadiusM);
-      // en el mapa, el agua con su color y la misma luz que el suelo: desde arriba solo
-      // reflejaría el cielo, casi negro sin aire
-      vec3 L = shadeGround(p, nSup, -d, uSun, pow(base, vec3(2.2)), uCenital != 0 ? 0.0 : water);
+      if (aguaAmt < 0.999) {
+        base = detalle(p, nSup, base, uCenital != 0 ? uDistCenital : t * uRadiusM);
+        L = shadeGround(p, nSup, -d, uSun, pow(base, vec3(2.2)), 0.0);
+      }
+      if (aguaAmt > 0.001) {
+        vec3 up0 = normalize(p);
+        // metros por píxel sobre el agua; mirando de refilón, el píxel se alarga hacia el fondo
+        float cosInc = max(abs(dot(d, up0)), 0.02);
+        float pxm = t * uRadiusM * uPix;
+        float pxOla = pxm / mix(sqrt(cosInc), cosInc, 0.6);
+        vec3 c = uEyeMod + (p - uEye) * uRadiusM;
+        float sig2 = 0.0, alto = 0.0;
+        vec3 nA = uOlas != 0 ? aNormalOlas(c, up0, pxOla, sig2, alto) : up0;
+        float s2 = (uOlaCapilar + sig2) * aViento(up0);
+        // el cielo que refleja, con el mismo aire que el cielo de verdad (pocos pasos)
+        vec3 cielo = vec3(-1.0);
+        if (uAtmos != 0 && uCenital == 0) {
+          vec3 r = reflect(d, nA);
+          r = normalize(r + up0 * max(0.0, 0.03 - dot(r, up0)));
+          vec3 trR;
+          cielo = inscatterN(p, r, 0.0, max(raySphere(p, r, ATM_TOP).y, 0.0), uSun, 0.5, 8, trR);
+        }
+        float esp = relieve ? aEspuma(c, up0, profA, alto, pxm / mix(1.0, cosInc, 0.5)) : 0.0;
+        L = mix(L, aLuz(p, nA, -d, uSun, marA, uHasHeight != 0 ? profColor(up0, profA) : profA, s2, cielo, esp), aguaAmt);
+      }
+      // los territorios, recortados por la costa del relieve (ver FaccionesGlsl)
+      if (uFacOn != 0 && uCenital == 0) {
+        vec3 upF = normalize(p);
+        float cosF = max(abs(dot(d, upF)), 0.05);
+        float celdas = t * uRadiusM * uPix / sqrt(cosF) / (PI * uRadiusM / uFacSize.y);
+        facA = faccionEn(vec2(fract(u), v), celdas) * (uFacConMar != 0 ? 1.0 - aguaAmt : 1.0);
+        facA.rgb *= mix(0.45, 1.0, smoothstep(-0.12, 0.2, dot(upF, uSun)));
+      }
       vec3 tr = vec3(1.0), ins = vec3(0.0);
       if (uAtmos != 0) ins = inscatter(eye, d, max(ta.x, 0.0), t, uSun, jit, tr);
       col = L * tr + ins;
@@ -626,6 +666,7 @@ void main() {
         vec3 trN = vec3(1.0), insN = vec3(0.0);
         if (uAtmos != 0) insN = inscatter(eye, d, max(ta.x, 0.0), tc, uSun, jit, trN);
         col = mix(col, colNube * trN + insN, a);
+        tapaNube = a;
         // una nube espesa tapa lo que haya detrás, también los árboles
         if (uWriteDepth != 0 && a > 0.5) gl_FragDepth = min(gl_FragDepth, profundidad(tc * uRadiusM * dot(d, uF)));
       }
@@ -633,6 +674,7 @@ void main() {
   }
 
   col = toneMap(col);
+  if (facA.a > 0.0) col = col * (1.0 - facA.a * (1.0 - tapaNube)) + facA.rgb * (1.0 - tapaNube);
 
   /* Rejilla de altura y acimut: círculos cada 15° y meridianos cada 30°. El acimut
      salta en ±180°; su derivada se toma de la versión que no salta. */
@@ -851,6 +893,9 @@ void main() {
             double Mod(double v) => ((v % periodo) + periodo) % periodo;
             skyProg.Vec3("uEyeMod", Mod(eye[0] * Body.Radius), Mod(eye[1] * Body.Radius), Mod(eye[2] * Body.Radius));
             skyProg.Float("uPeriodo", 4096);
+            AguaUniforms(skyProg, periodo);
+            // el mapa político, solo bajando en la vista del planeta (unidad 18, si la hay)
+            FacUniforms(skyProg, 18, Mode == CamMode.Planet && !cenital && GL.MaxTextureUnits > 18);
             skyProg.Int("uVariacion", DetailVariation ? 1 : 0);
             skyProg.Int("uPxHasInf", DetailParallax && PxInfluence != null ? 1 : 0);
             skyProg.Int("uPxHasDisp", DetailParallax && PxDisplacement != null ? 1 : 0);
@@ -923,7 +968,9 @@ void main() {
             DrawTrack(eye, occlude: true, ground: false);
 
             batch.Begin(W, H);
+            if (Mode == CamMode.Planet) DrawFacEtiquetas(batch, tc, eye, cam.Fov);
             PlacePins(batch, tc, eye, vesselsOnly: Mode != CamMode.Planet);
+            DrawTrazos(batch, eye);
             if (SkyGrid && Mode == CamMode.Sky) DrawCompass(batch, tc, eye, up, east, north);
             batch.End();
         }

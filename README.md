@@ -74,6 +74,16 @@ What it does:
   game's `sharedassets` files). An editor moves, rotates, scales, duplicates, deletes and
   adds buildings, and saves back to the `.cfg` files by changing only the lines involved,
   after backing each file up.
+- **Countries and factions.** A political-map maker: create countries or factions, give
+  them a name and a colour, and paint them on the 2D map or the globe with a brush, a fill
+  (a whole island, or the gap left by borders), a polygon or an eraser. Only land gets
+  painted — the drawing is clipped at the coastline — and borders keep the same width at
+  any zoom, with each territory's name at its deepest point. One map per body, saved
+  automatically, with undo, JSON export/import and a transparent PNG export.
+- **A living sea.** Sixteen wave trains with deep-water dispersion, a Beckmann/Cox–Munk
+  sun glint that widens with distance into the glitter path and the broad glint seen from
+  orbit, the real sky reflected with Fresnel, shallows that show the sea floor (sand turns
+  turquoise, then the map's open-sea colour) and foam that rolls in along the shore.
 - **From orbit to the ground with the mouse wheel.** The 3D globe zooms all the way down
   to the terrain, tilting towards the horizon as it descends, and switches to the flight
   renderer near the ground, loading close-up textures, vegetation and buildings on the

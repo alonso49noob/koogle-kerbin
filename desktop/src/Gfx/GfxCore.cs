@@ -113,6 +113,33 @@ namespace KerbinMaps.Gfx
             return new Texture { Id = id, Width = w, Height = h };
         }
 
+        /* Un byte por texel (el mapa político: el número de la facción de cada celda), sin
+           filtrar; da la vuelta en horizontal. Se va actualizando por filas mientras se pinta. */
+        public static Texture FromR8(byte[] data, int w, int h)
+        {
+            uint id = GL.GenTexture();
+            GL.BindTexture(GL.TEXTURE_2D, id);
+            GL.PixelStore(GL.UNPACK_ALIGNMENT, 1);
+            GL.TexImage2D(GL.TEXTURE_2D, 0, (int)GL.R8, w, h, GL.RED, GL.UNSIGNED_BYTE, data);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.REPEAT);
+            GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+            GL.BindTexture(GL.TEXTURE_2D, 0);
+            return new Texture { Id = id, Width = w, Height = h };
+        }
+
+        /* Vuelve a subir las filas y0..y1 (incluidas) de una textura de un byte por texel. */
+        public void SubirFilasR8(byte[] data, int y0, int y1)
+        {
+            y0 = Math.Max(0, y0); y1 = Math.Min(Height - 1, y1);
+            if (y1 < y0) return;
+            GL.BindTexture(GL.TEXTURE_2D, Id);
+            GL.PixelStore(GL.UNPACK_ALIGNMENT, 1);
+            GL.TexSubImage2D(GL.TEXTURE_2D, 0, 0, y0, Width, y1 - y0 + 1, GL.RED, GL.UNSIGNED_BYTE, data, y0 * Width);
+            GL.BindTexture(GL.TEXTURE_2D, 0);
+        }
+
         /* Textura que ya viene comprimida en DXT con sus mipmaps, como las del juego. Se
            sube tal cual (la GPU descomprime al leer) y se repite, que es lo que hace falta
            para las texturas de detalle del terreno. */

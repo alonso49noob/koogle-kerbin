@@ -64,6 +64,7 @@ namespace KerbinMaps.UI
             _ = CargarMapasDelCuerpo();
             RenderBodyMapsInfo();
             AjustarFiltroAlCuerpo();
+            CambiarCuerpoFacciones();
             ApplyMapTextures();
             SyncGlobe();
             RenderBodyInfo();

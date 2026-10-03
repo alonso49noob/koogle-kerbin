@@ -205,17 +205,33 @@ El globo y la vista del cielo usan el mismo modelo de luz, con base física:
   sombra del planeta con su penumbra.
 - **Relieve por píxel** a partir del mapa de alturas: las laderas se sombrean con
   más detalle que la malla, aunque el relieve exagerado esté a cero.
-- **Agua** reconocida por el color del mapa (o por la cota cero si no hay mapa de
-  color), lisa, con Fresnel y el brillo del Sol reflejado, y teñida por profundidad:
-  la plataforma junto a la costa más clara y el mar abierto más oscuro, con el propio
-  color del mapa (en Eve, morado).
+- **El mar** (`GlobeView.Agua.cs`), reconocido por el color del mapa desde fuera (o por
+  la cota cero si no hay mapa de color) y por la geometría de cerca:
+  - **Olas.** Dieciséis trenes de onda de 1,6 a 80 m, con la velocidad de las olas de
+    aguas profundas (ω² = g·k, con la gravedad del cuerpo), el mar de fondo de un lado y
+    el oleaje corto de cualquiera, y en grupos que suben y bajan como en el mar de verdad.
+    Solo inclinan la normal (la superficie sigue siendo la esfera del océano), se mueven
+    con el reloj real y no con el de la simulación, y están ancladas al mundo con la
+    misma aritmética que las texturas del suelo, así que no tiemblan ni saltan al volar.
+  - **El brillo del Sol** es una distribución de microfacetas de Beckmann con la rugosidad
+    de Cox y Munk. Cada tren de olas se apaga cuando su longitud de onda ocupa pocos
+    píxeles, y su pendiente pasa a esa rugosidad: de cerca se ven las olas y los destellos
+    sueltos del camino del Sol; de lejos, el reflejo se ensancha solo hasta la gran mancha
+    de brillo que se ve desde órbita, con zonas más lisas y más rizadas según el viento.
+  - **El cielo reflejado** con Fresnel: a ras de suelo, el de verdad (el mismo aire que el
+    cielo, en ocho pasos), con su color al atardecer.
+  - **Transparencia.** El fondo se ve donde cubre poco: la luz que baja y sube se atenúa
+    por canal (el rojo se pierde enseguida), así que la arena de la orilla pasa a turquesa
+    y luego al color del mar abierto del mapa (en Eve, morado). Como el mapa de alturas es
+    de 8 bits y el fondo baja a escalones, la profundidad se promedia para el color.
+  - **Espuma** en la orilla, en líneas que llegan con las olas y se deshacen, y alguna
+    cresta rota mar adentro cuando las olas se ven de cerca.
+  - Se apagan en «Vuelo › Olas y espuma en el mar», y entonces queda el mar liso.
 - **La costa**, a ras de suelo. Con relieve, lo que es mar lo decide la geometría (el
   rayo que da en la esfera del mar) y no el color, que a 1 km por texel teñía de azul la
   tierra de la orilla y la hacía brillar como agua. En tierra, donde el mapa aún dice mar
   y se está a menos de 20-40 m sobre el agua, una franja de arena, más oscura (mojada) en
-  el último metro; más arriba, un azul del mapa sigue siendo un lago. En el mar, somero
-  claro y hondo oscuro según la profundidad del terreno, y una línea de espuma en la
-  orilla que se apaga cuando un píxel abarca más de unas decenas de metros.
+  el último metro.
 - **Estrellas** de fondo también en el globo; un cielo luminoso las tapa.
 - La luz se calcula en lineal y se lleva a pantalla con un tonemapping filmic
   (ACES), así que ni el cielo ni el reflejo del mar se queman.
@@ -727,6 +743,45 @@ de KK sale con su textura, sin el tinte (`GrassColor`) ni su máscara; los edifi
 formato antiguo se ven pero no se editan; y del juego no se pintan las mallas con
 esqueleto (dos piezas de la plataforma de nivel 3).
 
+## Países y facciones
+
+La sección «Países y facciones» es un creador de mapas políticos: países, facciones o lo
+que quieras repartirte, cada uno con su nombre y su color, pintados sobre el cuerpo que se
+ve. Cada cuerpo tiene su propio mapa.
+
+- **Solo sobre tierra.** El mar no es de nadie: lo que se pinta se recorta por la costa al
+  dibujarlo, con la costa del mapa que se esté viendo (la del mapa de color de lejos y la
+  del relieve de cerca, que es más fina que la rejilla). En un cuerpo sin mar, como la
+  Mun, todo es superficie.
+- **Cuatro herramientas.** El *pincel* pinta arrastrando, con un radio de 1 a 316 km
+  (`[` y `]` lo cambian); el *relleno* se queda con la isla, o con la zona cerrada por
+  fronteras, donde hagas clic; el *polígono* va vértice a vértice y se cierra con doble
+  clic, Intro o pinchando en el primero (Retroceso quita el último); la *goma* borra.
+  Con «No pisar el territorio de otras facciones» marcado, nada se come lo que ya es de
+  otro, y la goma solo borra lo de la facción elegida.
+- **En el mapa 2D y en el globo**, también bajando hasta el suelo (de cerca, el cursor
+  sigue el relieve). Con una herramienta activa, el botón izquierdo pinta y el derecho
+  mueve el mapa; Esc la suelta y **Ctrl+Z** / **Ctrl+Y** deshacen y rehacen (hasta 40
+  pasos).
+- **Como un mapa político**: relleno translúcido que se intensifica junto a la frontera,
+  una raya de frontera del mismo grosor a cualquier zoom (cada mitad del color de su lado)
+  y el nombre de cada territorio en su punto más hondo, del tamaño que quepa. Se sigue
+  leyendo de noche. El HUD y el clic en el mapa dicen de quién es cada sitio, y la lista
+  la superficie de tierra de cada facción.
+- **Se guarda solo**, en `%APPDATA%\KoogleKerbin\facciones-<cuerpo>.json`. «Exportar» e
+  «Importar» usan ese mismo fichero, para pasárselo a otro; «Imagen PNG» saca el mapa
+  político como una equirectangular de 4096×2048 con transparencia en el mar.
+
+Por dentro (`Core/Facciones.cs`, `Views/FaccionesGlsl.cs`) es una rejilla equirectangular
+de 4096×2048 celdas (920 m en el ecuador de Kerbin) con el número de la facción de cada
+una. Cada píxel mira las cuatro celdas que lo rodean: con los pesos de la interpolación
+bilineal gana la facción que más pesa y la frontera es donde empatan las dos que más pesan;
+como esa mezcla es lineal dentro de la celda, su gradiente da la distancia a la frontera
+en píxeles, y por eso la raya no sale a escalones. Una máscara de tierra (del mapa de
+alturas, o del de color) le dice al relleno qué es una isla y cuenta la superficie. Lo que
+el pincel deja sobre el mar se guarda pero no se ve: si se cambia de mapas y la costa se
+mueve un poco, el territorio sigue llegando hasta el agua.
+
 ## Controles
 
 | Acción | Cómo |
@@ -740,12 +795,14 @@ esqueleto (dos piezas de la plataforma de nivel 3).
 | Pausa / continuar | espacio |
 | Más rápido hacia delante / hacia atrás | `.` / `,` |
 | Salir de una herramienta o de «Elegir en el mapa» | Esc |
+| Pintar territorios (con una herramienta de «Países y facciones») | arrastrar o clic; botón derecho para mover el mapa |
+| Radio del pincel / deshacer / rehacer | `[` `]` / Ctrl+Z / Ctrl+Y |
 
 ## Dónde guarda las cosas
 
 - `%APPDATA%\KoogleKerbin\`: `settings.json` (capas, vista, ventana, observador
-  del cielo), `markers.json` (tus marcadores) y `biomes.json` (los nombres de
-  bioma).
+  del cielo), `markers.json` (tus marcadores), `biomes.json` (los nombres de
+  bioma) y `facciones-<cuerpo>.json` (el mapa político de cada cuerpo).
 - `%LOCALAPPDATA%\KoogleKerbin\slots\`: una copia de las imágenes que cargas a
   mano, para que sigan ahí la próxima vez. Las de `data\` no se copian.
 - `%LOCALAPPDATA%\KoogleKerbin\kk-copias\`: la copia de cada `.cfg` de Kerbal

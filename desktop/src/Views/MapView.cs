@@ -32,6 +32,15 @@ namespace KerbinMaps.Views
         public bool DayNight = true;
         public double SunLat, SunLon;
         public readonly List<MapLayer> Layers = new();
+        /* El mapa político (ver FaccionesGlsl): la rejilla con sus colores y, para recortar por
+           la costa, el mapa de alturas y el de color con sus desfases. */
+        public Texture FacTex;
+        public float[] FacColores;
+        public double FacRelleno = 0.45;
+        public bool FacConMar;
+        public Texture FacAltura, FacColor;
+        public double FacAlturaOff, FacColorOff, FacHMin, FacHMax;
+        public readonly List<MapEtiqueta> Etiquetas = new();
         public MapDot Hover;
         public int TopLabelOffset = 52;           // bajo la barra superior, en píxeles CSS
         /* De cerca, el suelo lo pinta otro (el renderizador del vuelo en vista cenital, con
@@ -44,7 +53,7 @@ namespace KerbinMaps.Views
 
         double anchorX, anchorY;
         bool zoomAnim;
-        ShaderProgram imgProg;
+        ShaderProgram imgProg, facProg;
         uint emptyVao;
 
         static readonly double[] Steps = { 30, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001 };
@@ -272,6 +281,123 @@ void main() {
   frag = vec4(t.rgb * t.a, t.a) * uOpacity;
 }";
 
+        /* El mapa político encima del terreno. La costa se recorta con el mapa de alturas, que
+           es la que se ve de cerca; de lejos, con el de color si es el que hace de mapa base (los
+           dos pueden no casar del todo y un par de texeles de color son decenas de píxeles). */
+        const string FacFS = @"#version 330 core
+uniform vec2 uView, uCenter;
+uniform float uPpd;
+uniform sampler2D uAltTex, uColTex;
+uniform vec2 uAltSize;
+uniform float uAltOff, uColOff, uHMin, uHMax, uMezcla;
+uniform int uMascara;           // 1: con alturas; 2: con color; 3: las dos
+" + FaccionesGlsl.Codigo + @"
+out vec4 frag;
+
+float gris(ivec2 p) {
+  ivec2 sz = ivec2(uAltSize);
+  p.x = (p.x % sz.x + sz.x) % sz.x;
+  p.y = clamp(p.y, 0, sz.y - 1);
+  return dot(texelFetch(uAltTex, p, 0).rgb, vec3(0.2126, 0.7152, 0.0722));
+}
+
+// la misma interpolación que el suelo de cerca (grisSuave), para que la costa case
+float alturaEn(vec2 uv) {
+  vec2 t = uv * uAltSize - 0.5;
+  ivec2 i = ivec2(floor(t));
+  vec2 f = t - vec2(i);
+  f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  float a = mix(gris(i), gris(i + ivec2(1, 0)), f.x);
+  float b = mix(gris(i + ivec2(0, 1)), gris(i + ivec2(1, 1)), f.x);
+  return uHMin + mix(a, b, f.y) * (uHMax - uHMin);
+}
+
+void main() {
+  float px = gl_FragCoord.x;
+  float py = uView.y - gl_FragCoord.y;
+  float lon = uCenter.x + (px - uView.x * 0.5) / uPpd;
+  float lat = uCenter.y - (py - uView.y * 0.5) / uPpd;
+  vec2 uv = vec2((lon + 180.0) / 360.0, clamp((90.0 - lat) / 180.0, 0.0, 1.0));
+  float h = (uMascara & 1) != 0 ? alturaEn(vec2(fract(uv.x + uAltOff / 360.0), uv.y)) : 1.0;
+  float tH = smoothstep(-0.5, 0.5, h / max(fwidth(h), 0.01));
+  float tC = 1.0;
+  if ((uMascara & 2) != 0) {
+    vec3 c = texture(uColTex, vec2(fract(uv.x + uColOff / 360.0), uv.y)).rgb;
+    tC = 1.0 - smoothstep(0.03, 0.08, c.b - max(c.r, c.g));
+  }
+  float tierra = (uMascara & 3) == 3 ? mix(tC, tH, uMezcla) : (uMascara & 1) != 0 ? tH : tC;
+  if (lat > 90.0 || lat < -90.0) discard;
+  vec4 f = faccionEn(uv, uFacSize.x / (360.0 * uPpd)) * tierra;
+  if (f.a < 0.002) discard;
+  frag = f;
+}";
+
+        void DrawFacciones(double plano)
+        {
+            if (FacTex == null || FacColores == null) return;
+            facProg ??= new ShaderProgram(ImgVS, FacFS);
+            facProg.Use();
+            facProg.Vec2("uView", W, H);
+            facProg.Vec2("uCenter", CenterLon, CenterLat);
+            facProg.Float("uPpd", Ppd);
+            int mascara = 0;
+            if (FacConMar && FacAltura != null) mascara |= 1;
+            if (FacConMar && FacColor != null) mascara |= 2;
+            // el de color solo si es el que se ve de mapa base, y solo de lejos
+            bool colorDeBase = BaseKind == "image" && BaseTex == FacColor;
+            if (!colorDeBase && (mascara & 1) != 0) mascara = 1;
+            facProg.Int("uMascara", mascara);
+            facProg.Float("uMezcla", colorDeBase ? 1 - plano : 1);
+            facProg.Vec2("uAltSize", FacAltura?.Width ?? 1, FacAltura?.Height ?? 1);
+            facProg.Float("uAltOff", FacAlturaOff);
+            facProg.Float("uColOff", FacColorOff);
+            facProg.Float("uHMin", FacHMin);
+            facProg.Float("uHMax", FacHMax);
+            GL.ActiveTexture(GL.TEXTURE0);
+            GL.BindTexture(GL.TEXTURE_2D, FacAltura?.Id ?? 0);
+            facProg.Int("uAltTex", 0);
+            GL.ActiveTexture(GL.TEXTURE0 + 1);
+            GL.BindTexture(GL.TEXTURE_2D, FacColor?.Id ?? 0);
+            facProg.Int("uColTex", 1);
+            FaccionesGlsl.Uniformes(facProg, FacTex, FacColores, FacRelleno, 2.2 * S, 2);
+            GL.Enable(GL.BLEND);
+            GL.BlendFunc(GL.ONE, GL.ONE_MINUS_SRC_ALPHA);
+            GL.BindVertexArray(emptyVao);
+            GL.DrawArrays(GL.TRIANGLES, 0, 3);
+            GL.BindVertexArray(0);
+            GL.ActiveTexture(GL.TEXTURE0);
+        }
+
+        static readonly float[] TamanosEtiqueta = { 11, 13, 15, 18, 22, 27, 32 };
+
+        /* El nombre de cada territorio, centrado en su punto más hondo, con un tamaño según lo
+           que ocupe en pantalla (por escalones, para no rasterizar un texto por cada zoom). */
+        void DrawEtiquetas(Batch2D b, TextCache tc)
+        {
+            double pxPorM = Ppd / (Body.Radius * Geo.D2R);
+            foreach (var e in Etiquetas)
+            {
+                double r = e.RadioM * pxPorM;
+                if (r < 16 * S || string.IsNullOrEmpty(e.Texto)) continue;
+                double want = Math.Min(r * 0.42, 32 * S) / S;
+                float size = TamanosEtiqueta[0];
+                foreach (float t in TamanosEtiqueta) if (t <= want) size = t;
+                var t2 = tc.Get(e.Texto, new TextStyle("Segoe UI", size * S, true, ArgbClaro(e.Color), true));
+                if (t2 == null || t2.TextW > r * 3.2) continue;
+                double y = Project(e.Lat, 0).y;
+                if (y < -20 * S || y > H + 20 * S) continue;
+                foreach (double x in CopiesX(e.Lat, e.Lon, t2.TextW))
+                    b.Text(t2, Math.Round(x - t2.TextW / 2.0), Math.Round(y - t2.TextH / 2.0));
+            }
+        }
+
+        /* El color de una facción aclarado hacia el blanco, para escribir encima de ella. */
+        public static int ArgbClaro(ColorF c)
+        {
+            int Canal(float v) => Math.Clamp((int)(255 * (v * 0.45 + 0.55)), 0, 255);
+            return unchecked((int)0xFF000000) | (Canal(c.R) << 16) | (Canal(c.G) << 8) | Canal(c.B);
+        }
+
         void EnsureGl()
         {
             if (imgProg != null) return;
@@ -353,6 +479,9 @@ void main() {
             // la noche, igual con o sin el suelo de cerca (que se ilumina como un mapa)
             if (DayNight) DrawImage(2, null, 0, 1);
 
+            // los territorios, encima de la noche: un mapa político se tiene que leer siempre
+            DrawFacciones(plano);
+
             if (Grid) DrawGraticule(b);
 
             foreach (var layer in Layers)
@@ -373,6 +502,8 @@ void main() {
                         foreach (double x in CopiesX(d.Lat, d.Lon, 300 * S))
                             Chip(b, tc, d.Label, x + 12 * S, Project(d.Lat, 0).y);
             }
+
+            DrawEtiquetas(b, tc);
 
             if (Grid) DrawGridLabels(b, tc);
 
@@ -602,6 +733,7 @@ void main() {
         public void Dispose()
         {
             imgProg?.Dispose();
+            facProg?.Dispose();
             GL.DeleteVertexArray(emptyVao);
         }
     }

@@ -96,6 +96,12 @@ namespace KerbinMaps.Core
         // ViewDistance es la distancia de dibujado de scatters, edificios y naves en tierra
         public string GraphicsPreset = "alto";
         public double ViewDistance = 25000;
+        public bool FaccionesOn = true;           // países y facciones en el mapa y el globo
+        public double FacRelleno = 0.45;          // opacidad del relleno de los territorios
+        public bool FacNombres = true;            // nombres sobre cada territorio
+        public bool FacRespetar = true;           // no pisar el territorio de otras facciones
+        public double FacPincelKm = 25;           // radio del pincel
+        public bool Olas = true;                  // olas y espuma en el mar
         public bool AutoUpdate = true;            // buscar versiones nuevas al abrir
         public DateTime? LastUpdateCheck;         // UTC de la última consulta a GitHub
         public string SkippedVersion;             // versión que se dijo «omitir»

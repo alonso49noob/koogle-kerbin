@@ -138,6 +138,8 @@ namespace KerbinMaps.UI
             {
                 if (mouseDown) return;
                 map.Hover = null;
+                facCursor = null;
+                FacPrevia();
                 // en el cielo el HUD es el del cielo, no el de la posición bajo el cursor
                 if (isSky) RefreshSkyHud(); else UpdateHud(null);
                 RequestRender();
@@ -278,7 +280,7 @@ namespace KerbinMaps.UI
 
         static bool AppIdle => !PeekMessage(out _, IntPtr.Zero, 0, 0, 0);
 
-        bool WantsFrames => needsFrame || map.Animating || globe.Animating || globe.WindAnimating
+        bool WantsFrames => needsFrame || map.Animating || globe.Animating || globe.WindAnimating || (GlobeVisible && globe.MarAnimating)
                             || (GlobeVisible && globe.CloudsAnimating) || SimWantsFrames || VolandoConTeclas;
 
         void OnIdle(object sender, EventArgs e)
@@ -306,7 +308,9 @@ namespace KerbinMaps.UI
             globe.GroundAt ??= AlturaDelSuelo;
             // las nubes van con el tiempo de la simulación y, además, con el reloj real
             globe.CloudTime = sim.T + now;
+            globe.AguaT = now;
             ActualizarTesela();
+            FacSubir();
 
             int w = Math.Max(1, surface.ClientSize.Width), h = Math.Max(1, surface.ClientSize.Height);
             if (GlobeVisible)
@@ -376,10 +380,13 @@ namespace KerbinMaps.UI
             // la partida ya está copiada desde que se cargó; falta en qué instante se dejó
             state.SimT = HasVessels ? sim.T : null;
             SaveView();
+            GuardarFacciones();
             Application.Idle -= OnIdle;
             if (glOk && surface.MakeCurrent())
             {
                 DisposeTextures();
+                facTex?.Dispose();
+                facTex = null;
                 map.Dispose();
                 globe.Dispose();
                 batch.Dispose();
@@ -391,12 +398,13 @@ namespace KerbinMaps.UI
 
         /* ------------------------------------------------------------ entrada */
 
-        bool Picking => ToolMode != null || calibTarget != null || skyPicking;
+        bool Picking => ToolMode != null || calibTarget != null || skyPicking || FacPuedePintar;
 
         void SurfaceMouseDown(object sender, MouseEventArgs e)
         {
             surface.Focus();
             Vis.Set(searchBox, false);
+            if (FacMouseDown(e)) { RequestRender(); return; }
             if (e.Button != MouseButtons.Left) return;
             mouseDown = true; moved = false;
             downPt = lastPt = e.Location;
@@ -405,6 +413,7 @@ namespace KerbinMaps.UI
 
         void SurfaceMouseMove(object sender, MouseEventArgs e)
         {
+            if (FacMouseMove(e)) return;
             if (GlobeVisible)
             {
                 if (globe.Dragging)
@@ -451,6 +460,7 @@ namespace KerbinMaps.UI
 
         void SurfaceMouseUp(object sender, MouseEventArgs e)
         {
+            if (FacMouseUp(e)) return;
             if (e.Button != MouseButtons.Left || !mouseDown) return;
             mouseDown = false;
             if (GlobeVisible)
@@ -488,6 +498,12 @@ namespace KerbinMaps.UI
 
         void SurfaceDoubleClick(object sender, MouseEventArgs e)
         {
+            // pintando territorios, el doble clic cierra el polígono (y no acerca)
+            if (FacPuedePintar)
+            {
+                if (facTool == "poligono" && e.Button == MouseButtons.Left) { CerrarPoligono(); RequestRender(); }
+                return;
+            }
             // siguiendo una nave con su modelo, doble clic se acerca a verla
             if (is3D && e.Button == MouseButtons.Left && globe.ZoomToFocusModel()) { RequestRender(); return; }
             if (GlobeVisible || e.Button != MouseButtons.Left || ToolMode != null) return;
@@ -517,6 +533,7 @@ namespace KerbinMaps.UI
         void SurfaceKeyDown(object sender, KeyEventArgs e)
         {
             if (KKKeyDown(e)) { RequestRender(); return; }
+            if (FacKeyDown(e)) { RequestRender(); return; }
             if (isFree) { VueloKeyDown(e); if (e.Handled) return; }
             if (isSky)
             {
@@ -570,9 +587,19 @@ namespace KerbinMaps.UI
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            // deshacer y rehacer los territorios pintados
+            if (e.Control && !FocusInText() && politico != null && (e.KeyCode == Keys.Z || e.KeyCode == Keys.Y))
+            {
+                if (e.KeyCode == Keys.Z) FacDeshacer(); else FacRehacer();
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                RequestRender();
+                return;
+            }
             if (e.KeyCode == Keys.Escape && !FocusInText())
             {
                 if (ToolMode != null) SetToolMode(null);
+                else if (FacEscape()) { }
                 else if (skyPicking) ToggleSkyPick();
                 else if (!popup.Visible && Following) Seguir(false);
                 popup.Hide();
@@ -587,6 +614,7 @@ namespace KerbinMaps.UI
         protected override void OnKeyPress(KeyPressEventArgs e)
         {
             base.OnKeyPress(e);
+            if (FacKeyPress(e.KeyChar)) { e.Handled = true; return; }
             if (FocusInText() || !HasVessels || ModifierKeys.HasFlag(Keys.Control) || ModifierKeys.HasFlag(Keys.Alt)) return;
             switch (e.KeyChar)
             {
@@ -630,6 +658,11 @@ namespace KerbinMaps.UI
             }
             if (state.DayNight)
                 rows.Add(("hora solar", p.HasValue ? FmtSolar(Sun.LocalHours(Geo.WrapLon(p.Value.Lon), globe.SunLon)) : "—"));
+            if (politico != null && politico.Facciones.Count > 0)
+            {
+                var f = p.HasValue && politico.EsTierra(p.Value.Lat, p.Value.Lon) ? politico.Buscar(politico.IdEn(p.Value.Lat, p.Value.Lon)) : null;
+                rows.Add(("facción", f?.Nombre ?? "—"));
+            }
             hud.SetRows(rows.ToArray());
             hud.Location = new Point(mapArea.Width - Theme.S(12) - hud.Width, Theme.S(56));
             PlaceOrbitInfo();

@@ -11,7 +11,7 @@ namespace KerbinMaps.UI
     {
         Section globeSection;
         Section secCuerpo, secScan, secAltim, secTransfer, secAterrizaje, secNaves, secMarcadores, secVuelo;
-        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax, chkVariacion, chkScatters, chkViento, chkTeselas;
+        DarkCheck chkRelieve, chkDetalle, chkNubes, chkParallax, chkVariacion, chkScatters, chkViento, chkTeselas, chkOlas;
         DarkSlider densidadSlider;
         FieldHeader densidadHeader;
         DarkSlider velSlider, nubeAltSlider;
@@ -487,9 +487,12 @@ namespace KerbinMaps.UI
             };
             chkViento = new DarkCheck("Viento en la vegetación", state.Wind);
             chkViento.CheckedChanged += (s, e) => { state.Wind = chkViento.Checked; globe.Wind = chkViento.Checked; SaveSettings(); MarcarGraficosPersonalizado(); RequestRender(); };
+            chkOlas = new DarkCheck("Olas y espuma en el mar", state.Olas);
+            chkOlas.CheckedChanged += (s, e) => { state.Olas = chkOlas.Checked; globe.Olas = chkOlas.Checked; SaveSettings(); RequestRender(); };
+            globe.Olas = state.Olas;
             chkTeselas = new DarkCheck("Relieve de detalle bajo la cámara (Parallax)", state.DetailTiles);
             chkTeselas.CheckedChanged += (s, e) => { state.DetailTiles = chkTeselas.Checked; SaveSettings(); MarcarGraficosPersonalizado(); if (!chkTeselas.Checked) QuitarTesela(); RequestRender(); };
-            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkVariacion, chkTeselas, chkScatters, chkViento, chkNubes));
+            vuelo.Add(Checks(chkRelieve, chkDetalle, chkParallax, chkVariacion, chkTeselas, chkScatters, chkViento, chkNubes, chkOlas));
             densidadSlider = new DarkSlider(10, 100, (int)Math.Round(state.ScatterDensity * 100));
             densidadSlider.ValueChanged += (s, e) =>
             {
@@ -655,6 +658,9 @@ namespace KerbinMaps.UI
                                 "sin ningún mod: cierra el juego antes, que si no sobrescribe la partida al guardar. Se hace " +
                                 "copia de seguridad del .sfs antes de tocarlo. Las anomalías se mandan desde su propia sección."));
             RenderWaypointInfo();
+
+            /* ---------------------------------------------------- Países y facciones */
+            BuildFaccionesSection();
 
             /* --------------------------------------------------------------- Cuerpo */
 

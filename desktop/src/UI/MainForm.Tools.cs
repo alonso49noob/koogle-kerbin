@@ -33,6 +33,7 @@ namespace KerbinMaps.UI
 
         void SetToolMode(string mode)
         {
+            if (mode != null && facTool != null) SetFacTool(null);
             if (toolMode == "measure" && mode != "measure") EndMeasure();
             toolMode = toolMode == mode ? null : mode;
             toolPts.Clear();
@@ -316,6 +317,8 @@ namespace KerbinMaps.UI
                     actions.Add((nm != null ? "Renombrar bioma" : "Poner nombre al bioma", b => RenameBiome(hex)));
                 }
             }
+            if (politico != null && politico.EsTierra(lat, lon) && politico.Buscar(politico.IdEn(lat, lon)) is Faccion fac)
+                h += "\n<m>" + Lang.T("facción") + " </m><sw=" + fac.Color + "><m>" + RichLabel.Esc(fac.Nombre) + "</m>";
             string coords = Geo.F(lat, 6) + ", " + Geo.F(lon, 6);
             actions.Add(("Copiar", b => CopyText(coords, b)));
             if (!isSky)

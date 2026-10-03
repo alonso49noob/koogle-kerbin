@@ -133,6 +133,9 @@ namespace KerbinMaps.UI
             Vis.Set(reliefWrap, hasHeight);
             Vis.Set(reliefHint, !hasHeight);
             ActualizarCampoScatters();
+            // la máscara de tierra de los territorios sale de estos mismos mapas
+            ActualizarTierraFacciones();
+            AplicarFacciones();
             RequestRender();
         }
 
@@ -812,6 +815,7 @@ namespace KerbinMaps.UI
         {
             if (!glOk) Flash(surface.Error ?? glError ?? "No se pudo arrancar OpenGL.");
             try { InitMarkers(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] marcadores: " + ex.Message); }
+            try { InitFacciones(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] facciones: " + ex.Message); }
             try { await RestoreSlots(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] imágenes: " + ex.Message); }
             try { LoadCatalog(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] catálogo: " + ex.Message); }
 

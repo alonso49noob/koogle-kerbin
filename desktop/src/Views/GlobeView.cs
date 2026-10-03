@@ -155,7 +155,8 @@ void main() {
   gl_Position = uProj * uView * vec4(vWorld, 1.0);
 }";
 
-        const string FS = Header + AtmosphereGlsl + @"
+        const string FS = Header + AtmosphereGlsl + AguaGlsl + FaccionesGlsl.Codigo + @"
+uniform int uFacConMar;
 in vec2 vUv;
 in vec3 vNormal;
 in vec3 vDir;
@@ -214,6 +215,8 @@ float heightAt(vec2 uv) {
 }
 
 void main() {
+  // lo que mide un píxel en celdas del mapa político (aquí, antes de cualquier rama)
+  float facPx = length(fwidth(vUv * uFacSize)) * 0.7071;
   vec3 base = uTint;                       // sin mapa, el color del cuerpo
   if (uHasColor != 0) base = shifted(uColor, uColorOff);
   vec3 ground = base;
@@ -231,7 +234,17 @@ void main() {
     base = mix(base, sc.rgb, sc.a * uScanAmt);
     ground = mix(ground, sc.rgb, sc.a * uScanAmt);
   }
-  if (uLit == 0) { frag = vec4(base, 1.0); return; }
+  // el mapa político, recortado por la costa (la del mapa de color, que es la que se ve aquí)
+  vec4 fac = vec4(0.0);
+  if (uFacOn != 0) {
+    float tierraF = 1.0;
+    if (uFacConMar != 0) {
+      if (uHasColor != 0) tierraF = 1.0 - smoothstep(0.03, 0.08, ground.b - max(ground.r, ground.g));
+      else if (uHasHeight != 0) tierraF = smoothstep(-10.0, 10.0, heightSuave(vec2(fract(vUv.x + uHeightOff), vUv.y)));
+    }
+    fac = faccionEn(vUv, facPx) * tierraF;
+  }
+  if (uLit == 0) { frag = vec4(base * (1.0 - fac.a) + fac.rgb, 1.0); return; }
 
   vec3 up = normalize(vDir);
   vec3 n = up;
@@ -255,17 +268,22 @@ void main() {
     n = normalize(up - uBump * (sx * east + sy * north) * (1.0 - water));
   }
 
-  /* El mar por profundidad, como en el vuelo: la plataforma junto a la costa más clara y
-     el mar abierto más oscuro, para que desde órbita se lea bien dónde acaba la tierra. */
-  if (water > 0.0 && uHasHeight != 0) {
-    float prof = max(-heightSuave(vec2(fract(vUv.x + uHeightOff), vUv.y)), 0.0);
-    vec3 mar = mix(base * 1.35 + vec3(0.03, 0.07, 0.07), base * 0.62, smoothstep(20.0, 600.0, prof));
-    base = mix(base, mar, water);
-  }
-
-  vec3 albedo = pow(base, vec3(2.2));
   vec3 v = normalize(uCamPos - vWorld);
-  vec3 L = shadeGround(vWorld, n, v, uLightDir, albedo, water);
+  vec3 L = shadeGround(vWorld, n, v, uLightDir, pow(base, vec3(2.2)), 0.0);
+  /* El mar, como en el vuelo (ver GlobeView.Agua): el fondo se ve donde cubre poco, así que
+     la plataforma junto a la costa sale turquesa y el mar abierto con su color; y el brillo
+     del Sol con la rugosidad de las olas, que desde aquí no se ven una a una. */
+  if (water > 0.0) {
+    float prof = 300.0;
+    if (uHasHeight != 0) {
+      // promediada a texel y medio: el mapa es de 8 bits y el fondo sale a escalones (ver profColor)
+      vec2 uvh = vec2(fract(vUv.x + uHeightOff), vUv.y), e = 1.5 / uHeightSize;
+      prof = max(-(heightSuave(uvh) + heightSuave(uvh + vec2(e.x, 0.0)) + heightSuave(uvh - vec2(e.x, 0.0))
+                 + heightSuave(uvh + vec2(0.0, e.y)) + heightSuave(uvh - vec2(0.0, e.y))) * 0.2, 0.0);
+    }
+    vec3 W = aLuz(vWorld, up, v, uLightDir, base, prof, uOlaSigmaTotal * aViento(up), vec3(-1.0), 0.0);
+    L = mix(L, W, water);
+  }
   if (uAtmos != 0) {
     // perspectiva aérea: el aire entre la cámara y el suelo añade bruma y se come contraste
     vec3 d = -v;
@@ -277,7 +295,9 @@ void main() {
       L = L * tr + ins;
     }
   }
-  frag = vec4(toneMap(L), 1.0);
+  // de noche los territorios se apagan algo, pero se siguen leyendo
+  float dia = mix(0.45, 1.0, smoothstep(-0.12, 0.2, dot(up, uLightDir)));
+  frag = vec4(toneMap(L) * (1.0 - fac.a) + fac.rgb * dia, 1.0);
 }";
 
         /* La capa de aire sobre el espacio: solo los rayos que no tocan el planeta (los que
@@ -1070,6 +1090,8 @@ void main() {
             prog.Float("uBump", Math.Max(Relief, 4));
             prog.Vec3("uCamPos", eye[0], eye[1], eye[2]);
             AtmosUniforms(prog, 16);
+            AguaUniforms(prog, DetailTile * 4096);
+            FacUniforms(prog, 4, true);
             BindTex(0, ColorTex); prog.Int("uColor", 0);
             BindTex(1, BiomeTex); prog.Int("uBiome", 1);
             BindTex(2, HeightTex); prog.Int("uHeight", 2);
@@ -1129,7 +1151,9 @@ void main() {
 
             batch.Begin(W, H);
             EtiquetasCuerpos(batch, tc, eye);
+            DrawFacEtiquetas(batch, tc, eye, cam.Fov);
             PlacePins(batch, tc, eye, vesselsOnly: false);
+            DrawTrazos(batch, eye);
             batch.End();
         }
 

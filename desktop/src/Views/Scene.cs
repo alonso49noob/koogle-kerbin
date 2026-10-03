@@ -53,6 +53,16 @@ namespace KerbinMaps.Views
         }
     }
 
+    /* Rótulo grande sobre un territorio (el nombre de una facción): se ve si el territorio
+       mide en pantalla lo bastante para que quepa. */
+    public sealed class MapEtiqueta
+    {
+        public double Lat, Lon;
+        public double RadioM;                   // lo que mide el territorio alrededor del punto
+        public string Texto;
+        public ColorF Color;
+    }
+
     public sealed class MapLayer
     {
         public readonly List<MapLine> Lines = new();
