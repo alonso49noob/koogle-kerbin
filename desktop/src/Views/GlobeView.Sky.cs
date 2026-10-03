@@ -220,12 +220,15 @@ float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
 
   /* Pasos según la holgura sobre el terreno: con pendientes de hasta unos 60° no se
      salta nada avanzando la mitad de la altura que queda por encima. Un mínimo que
-     crece con la distancia (lo que abarca un píxel) y otro que asegura llegar al final
-     en 256 pasos. Con pasos fijos, las crestas finas de lejos se saltaban (escalones en
-     las siluetas), sobre todo con la tesela de detalle. */
+     crece con la distancia (lo que abarca un píxel) y otro fijo y pequeño. Con pasos
+     fijos, las crestas finas de lejos se saltaban (escalones en las siluetas), sobre todo
+     con la tesela de detalle. El mínimo fijo era antes (t1 - t0) / 256, que a ras de una
+     montaña son unos 300 m: un rayo rasante saltaba la cima y salían discos planos
+     flotando. Ahora es 1/1500, y para llegar siempre al final (un rayo pegado al suelo
+     gasta los pasos mucho antes) el último tercio del presupuesto reparte lo que quede. */
   float prevT = t0, tt = t0;
-  float pasoMin = (t1 - t0) / 256.0;
-  for (int i = 0; i < 256; i++) {
+  float pasoMin = (t1 - t0) / 1500.0;
+  for (int i = 0; i < 400; i++) {
     vec3 p = o + d * tt;
     float encima = length(p) - terrainR(p);
     if (encima < 0.0) {
@@ -241,7 +244,8 @@ float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
     }
     if (tt >= t1) break;
     prevT = tt;
-    tt = min(t1, tt + max(max(encima * 0.5, tt * 0.0015 + 1.0 / uRadiusM), pasoMin));
+    float rescate = i > 260 ? (t1 - tt) / float(400 - i) : 0.0;
+    tt = min(t1, tt + max(max(max(encima * 0.5, tt * 0.0015 + 1.0 / uRadiusM), pasoMin), rescate));
   }
   if (tSea.x > 0.0) { wasSea = 1.0; nOut = normalize(o + d * tSea.x); return tSea.x; }
   return -1.0;
