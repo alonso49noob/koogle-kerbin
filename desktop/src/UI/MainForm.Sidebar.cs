@@ -585,6 +585,9 @@ namespace KerbinMaps.UI
             tools.Add(new BtnRow(toolClear));
             toolHint = tools.Add(Hint("Ninguna herramienta activa."));
 
+            /* --------------------------------------------------------------- Rutas */
+            BuildRutasSection();
+
             /* ---------------------------------------------------------------- Órbita */
             var orbita = AddSection("Órbita · traza terrestre", false);
             orbPe = Num(100); orbAp = Num(100); orbInc = Num(0); orbLan = Num(0); orbArgp = Num(0); orbN = Num(4);

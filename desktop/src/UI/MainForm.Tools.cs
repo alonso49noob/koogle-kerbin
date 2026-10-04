@@ -40,8 +40,10 @@ namespace KerbinMaps.UI
             RemovePreview();
             toolMeasure.Active = toolMode == "measure";
             toolFootprint.Active = toolMode == "footprint";
+            if (rutaElegirBtn != null) rutaElegirBtn.Active = toolMode == "route";
             toolHint.SetText(toolMode == "measure" ? "Haz clic para encadenar puntos. Esc para terminar."
                            : toolMode == "footprint" ? "Haz clic donde esté el satélite. Esc para terminar."
+                           : toolMode == "route" ? RutaHint()
                            : "Ninguna herramienta activa.");
             surface.Cursor = toolMode != null ? Cursors.Cross : Cursors.Default;
             RequestRender();
@@ -80,6 +82,7 @@ namespace KerbinMaps.UI
         {
             if (toolMode == "measure") AddMeasurePoint(ll);
             else if (toolMode == "footprint") AddFootprint(ll);
+            else if (toolMode == "route") RutaClick(ll);
         }
 
         void AddMeasurePoint(LatLon p)
@@ -181,6 +184,7 @@ namespace KerbinMaps.UI
             foreach (var m in MarkersAll())
                 markerLayer.Dots.Add(new MapDot { Lat = m.Lat, Lon = m.Lon, Style = DotStyle.Pin, Fill = ColorF.Hex(MarkerColor(m.Cat)), Tooltip = m.Name, Tag = m });
             mkList.SetItems(MarkersAll());
+            RellenarCombosRuta();
             SyncGlobe();
             RequestRender();
         }
@@ -298,6 +302,7 @@ namespace KerbinMaps.UI
 
         void OnMapClick(LatLon ll)
         {
+            if (toolMode == "route") { RutaClick(new LatLon(ll.Lat, Geo.WrapLon(ll.Lon))); return; }   // también desde el globo
             if (toolMode != null) return;                 // una herramienta activa manda
             double lat = ll.Lat, lon = Geo.WrapLon(ll.Lon);
             if (skyPicking) { SkyPick(new LatLon(lat, lon)); return; }

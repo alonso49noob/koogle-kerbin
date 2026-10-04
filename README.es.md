@@ -8,7 +8,7 @@ Visor de Kerbin (KSP stock) en dos versiones:
   y rocas en 3D, si lo tienes o las baja el instalador desde la página de su autor), día y noche, un
   mar con olas, brillo del Sol, aguas someras y espuma, las naves de una
   partida con sus modelos de verdad, cualquier cuerpo del sistema con sus mapas, lo
-  que llevas escaneado con SCANsat, filtro de altimetría, waypoints en la partida,
+  que llevas escaneado con SCANsat, filtro de altimetría, waypoints en la partida, rutas con su tiempo en avión, barco y rover,
   asistente de aterrizaje, ventanas de lanzamiento y un creador de mapas políticos
   (países y facciones pintados solo sobre tierra). Instalador en las
   [releases](https://github.com/alonso49noob/koogle-kerbin/releases).

@@ -52,6 +52,7 @@ namespace KerbinMaps.UI
             popup.Hide();
             if (skyPicking) ToggleSkyPick();
             ClearTools();
+            LimpiarRuta();
             ClearOrbit();
             ClearModel();
             globe.ExitFocus();

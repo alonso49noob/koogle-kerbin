@@ -129,6 +129,10 @@ What it does:
   to set down on a target, a launch-window calculator (patched conics, Lambert, a
   single ballistic burn with no mid-course corrections), and waypoints written
   straight into the save so KSP shows them on the map and the navball.
+- **Routes by air, sea and land.** A sat-nav for Kerbin: pick two points and get the
+  travel time by plane (great circle), by boat (only over water) and by rover (only
+  over land, going around slopes steeper than the maximum and slower on steep ground),
+  drawn on the map and the globe with the fastest one highlighted.
 - **Automatic updates.** On startup the app checks the latest GitHub release and offers to update; it verifies the installer's SHA-256 and reinstalls in place. Can be turned off in the panel.
 - **English and Spanish**, both in the app and in the installer.
 

@@ -8,7 +8,8 @@ del sistema (de serie o de Kopernicus), día y noche con atmósfera física, la 
 del cielo desde la superficie, el foco de la cámara en una nave con su modelo
 montado pieza a pieza, lo que la partida lleva escaneado con SCANsat, un filtro de
 altimetría, waypoints que se escriben en la propia partida, un asistente de
-aterrizaje y una calculadora de ventanas de lanzamiento.
+aterrizaje, una calculadora de ventanas de lanzamiento y rutas con su tiempo por aire,
+mar y tierra.
 
 Está escrita en **C# con .NET 10**. La interfaz usa WinForms con controles
 dibujados a mano para copiar el tema oscuro de la web, y el mapa, el globo y el
@@ -396,6 +397,26 @@ pesando por `cos(lat)` (sin eso, los polos contarían muchísimo más de lo que 
 Necesita mapa de alturas: el de Kerbin que trae el visor o el del cuerpo, de la carpeta
 de mapas. La conversión de gris a metros es la de la ranura de altura, o la que SCANsat
 tiene tabulada para ese cuerpo.
+
+## Rutas: aire, mar y tierra
+
+Un navegador al estilo de Waze: eliges origen y destino (con «Elegir en el mapa», en el
+2D o en el globo, o entre los marcadores) y salen tres rutas con su distancia y su
+tiempo, dibujadas a la vez y con la más rápida marcada:
+
+- **Avión**: en línea recta por el gran círculo, con lo más alto que hay debajo. En un
+  cuerpo sin atmósfera se da la distancia pero no el tiempo.
+- **Barco**: solo por el mar. Si el origen o el destino quedan tierra adentro, la ruta
+  empieza o acaba en el agua más cercana y se dice a cuánto.
+- **Rover**: solo por tierra, sin cuestas de más de la pendiente máxima y más despacio
+  cuanto más empinadas (a un 30 % de la velocidad en el límite). Da el desnivel
+  acumulado y la pendiente más dura.
+
+Las velocidades de crucero y la pendiente se cambian en el panel. Con una partida
+cargada, cada ruta dice también la fecha de llegada partiendo del instante de la barra
+de tiempo. Por debajo (`Core/Rutas.cs`) es una búsqueda A* sobre una rejilla de
+4096×2048 celdas con la altura de cada una, hecha con los mapas que se vean, y el camino
+se endereza después uniendo en recta los tramos que no tarden más.
 
 ## Waypoints en la partida
 

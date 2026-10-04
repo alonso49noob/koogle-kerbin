@@ -88,9 +88,9 @@ namespace KerbinMaps.Views
         readonly float[] proj = new float[16], view = new float[16];
 
         sealed class LineBuf { public uint Vao, Buf; public int N; }
-        LineBuf trackG, trackS, orbits;
+        LineBuf trackG, trackS, orbits, rutas;
         bool trackSpace;
-        readonly List<(int off, int n, ColorF c)> orbitSegs = new();
+        readonly List<(int off, int n, ColorF c)> orbitSegs = new(), rutaSegs = new();
         double orbitShift;
 
         // cámara del último fotograma, para el picking
@@ -500,6 +500,7 @@ void main() {
             trackG = NewLineBuf();
             trackS = NewLineBuf();
             orbits = NewLineBuf();
+            rutas = NewLineBuf();
             InitSky();
         }
 
@@ -572,6 +573,33 @@ void main() {
                 orbitSegs.Add((off, o.Points.Count, o.Color.WithAlpha(o.Alpha)));
             }
             Fill(orbits, data, total);
+        }
+
+        /* Las rutas del planificador (aire, mar y tierra), pegadas al suelo con su relieve. */
+        public void SetRutas(List<(IReadOnlyList<LatLon> Pts, ColorF Color)> list)
+        {
+            rutaSegs.Clear();
+            if (rutas == null) return;
+            if (list == null || list.Count == 0) { rutas.N = 0; return; }
+            int total = 0;
+            foreach (var r in list) total += r.Pts.Count;
+            var data = new float[total * 6];
+            int k = 0;
+            foreach (var r in list)
+            {
+                int off = k;
+                foreach (var p in r.Pts)
+                {
+                    var d = Sph(p.Lat, p.Lon, 1);
+                    int i = k * 6;
+                    data[i] = (float)d[0]; data[i + 1] = (float)d[1]; data[i + 2] = (float)d[2];
+                    data[i + 3] = 1;
+                    data[i + 4] = (float)((Geo.WrapLon(p.Lon) + 180) / 360); data[i + 5] = (float)((90 - p.Lat) / 180);
+                    k++;
+                }
+                rutaSegs.Add((off, r.Pts.Count, r.Color));
+            }
+            Fill(rutas, data, total);
         }
 
         public void SetOrbitShift(double deg) => orbitShift = (((deg % 360) + 360) % 360) * D2R;
@@ -1099,6 +1127,7 @@ void main() {
             GL.DrawElements(GL.TRIANGLES, count, GL.UNSIGNED_INT, 0);
 
             DrawTrack(eye, false);
+            DrawRutas(eye);
             DrawOrbits(eye, false);
             DrawGlobeClouds(eye, lightDir);
 
@@ -1224,6 +1253,25 @@ void main() {
             GL.BindVertexArray(0);
         }
 
+        void DrawRutas(double[] eye)
+        {
+            if (rutas.N < 2 || rutaSegs.Count == 0) return;
+            LineUniforms(HeightTex != null ? Relief : 0, eye, false);
+            lineProg.Float("uLonShift", 0);
+            lineProg.Float("uLift", 0.0016);
+            lineProg.Float("uUseRelief", 1);
+            GL.Enable(GL.BLEND);
+            GL.BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
+            GL.BindVertexArray(rutas.Vao);
+            foreach (var g in rutaSegs)
+            {
+                lineProg.Vec4("uLineColor", g.c.R, g.c.G, g.c.B, g.c.A);
+                GL.DrawArrays(GL.LINE_STRIP, g.off, g.n);
+            }
+            GL.Disable(GL.BLEND);
+            GL.BindVertexArray(0);
+        }
+
         void DrawOrbits(double[] eye, bool occlude)
         {
             if (orbits.N == 0 || orbitSegs.Count == 0) return;
@@ -1325,7 +1373,7 @@ void main() {
             DisposeScatters();
             DisposeCuerpos();
             GL.DeleteBuffer(posBuf); GL.DeleteBuffer(uvBuf); GL.DeleteBuffer(idxBuf); GL.DeleteVertexArray(vao);
-            foreach (var lb in new[] { trackG, trackS, orbits })
+            foreach (var lb in new[] { trackG, trackS, orbits, rutas })
                 if (lb != null) { GL.DeleteBuffer(lb.Buf); GL.DeleteVertexArray(lb.Vao); }
         }
     }

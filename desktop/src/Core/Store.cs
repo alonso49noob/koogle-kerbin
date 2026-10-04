@@ -102,6 +102,10 @@ namespace KerbinMaps.Core
         public bool FacRespetar = true;           // no pisar el territorio de otras facciones
         public double FacPincelKm = 25;           // radio del pincel
         public bool Olas = true;                  // olas y espuma en el mar
+        public double RutaVAire = 300;            // velocidades de crucero de las rutas, m/s
+        public double RutaVMar = 15;
+        public double RutaVTierra = 20;
+        public double RutaPendiente = 30;         // la cuesta más empinada que sube o baja el rover, °
         public bool AutoUpdate = true;            // buscar versiones nuevas al abrir
         public DateTime? LastUpdateCheck;         // UTC de la última consulta a GitHub
         public string SkippedVersion;             // versión que se dijo «omitir»

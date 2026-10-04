@@ -152,7 +152,7 @@ namespace KerbinMaps.UI
             surface.LostFocus += (s, e) => teclas.Clear();
             mapArea.Controls.Add(surface);
 
-            map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, landLayer, toolLayer, observerLayer, anomalyLayer, kkLayer, vesselLayer, markerLayer });
+            map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, landLayer, rutaLayer, toolLayer, observerLayer, anomalyLayer, kkLayer, vesselLayer, markerLayer });
             map.SetView(state.CenterLat, state.CenterLon, state.Zoom);
 
             // barra superior
