@@ -3,8 +3,8 @@ imagen entera desde el panel "Datos del mapa".
 
 Estructura esperada:   tiles/{z}/{x}/{y}.png
 
-Esquema de coordenadas: geográfico (EPSG:4326 / plate carrée), el mismo que usa
-Leaflet con CRS.EPSG4326. En este esquema el zoom 0 son DOS teselas, no una:
+Esquema de coordenadas: geográfico (EPSG:4326 / plate carrée). En este esquema el
+zoom 0 son DOS teselas, no una:
 
     z=0  ->  x = 0..1,  y = 0        (2 x 1 teselas, 512 x 256 px)
     z=1  ->  x = 0..3,  y = 0..1

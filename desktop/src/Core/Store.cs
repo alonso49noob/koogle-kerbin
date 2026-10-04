@@ -287,7 +287,7 @@ namespace KerbinMaps.Core
     }
 
     /* Catálogo de mapas predeterminados (data/maps.json) y sitios de referencia
-       (data/landmarks.json). Los mismos ficheros que usa la versión web. */
+       (data/landmarks.json). */
     public sealed class MapsCatalog
     {
         public string Predeterminado;

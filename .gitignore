@@ -6,9 +6,6 @@ desktop/installer/obj/
 *.user
 .vs/
 
-# Node
-node_modules/
-
 # Sistema
 Thumbs.db
 desktop.ini

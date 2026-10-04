@@ -1,9 +1,9 @@
 # Koogle Kerbin
 
-La versión nativa para Windows del visor de Kerbin. Hace lo mismo que la web
-(mapa plano, globo 3D, biomas, alturas, herramientas, órbitas y naves de una
-partida con su simulación en el tiempo), pero es un `.exe`: no hace falta
-navegador ni servidor. Además tiene bastantes cosas que la web no: cualquier cuerpo
+El visor de Kerbin para Windows: mapa plano, globo 3D, biomas, alturas, herramientas,
+órbitas y naves de una partida con su simulación en el tiempo, en un `.exe`. Nació como
+la versión nativa de un visor web que vivió en este repositorio hasta la 1.6.10 (está
+en la release `web-v1.6.10`) y fue mucho más allá: cualquier cuerpo
 del sistema (de serie o de Kopernicus), día y noche con atmósfera física, la vista
 del cielo desde la superficie, el foco de la cámara en una nave con su modelo
 montado pieza a pieza, lo que la partida lleva escaneado con SCANsat, un filtro de
@@ -12,7 +12,7 @@ aterrizaje, una calculadora de ventanas de lanzamiento y rutas con su tiempo por
 mar y tierra.
 
 Está escrita en **C# con .NET 10**. La interfaz usa WinForms con controles
-dibujados a mano para copiar el tema oscuro de la web, y el mapa, el globo y el
+dibujados a mano con el tema oscuro del antiguo visor web, y el mapa, el globo y el
 cielo se pintan con **OpenGL 3.3** llamado directamente. No usa ningún paquete
 externo: compila sin conexión.
 
@@ -82,7 +82,7 @@ y `desinstalar.exe /uninstall /silent` para quitarlo.
 
 Abre Koogle Kerbin desde su acceso directo, o `dist\KoogleKerbin\KoogleKerbin.exe` si
 lo has compilado tú. Junto al `.exe` va la carpeta `data\`
-con los mapas y catálogos, los mismos ficheros que usa la web: puedes cambiarlos
+con los mapas y catálogos (la carpeta `data\` del repositorio): puedes cambiarlos
 sin recompilar.
 
 Requisitos del equipo:
@@ -863,11 +863,11 @@ proyecto.
 
 | Carpeta | Qué hay |
 |---|---|
-| `src\Core` | Lo que no depende de la pantalla (también las teselas de relieve, `TeselaAltura.cs`, y las explanadas, `Aplanado.cs`): geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Es la traducción directa de `geo.js`, `orbit.js`, `savefile.js`, `probe.js` y `storage.js`, más lo que la web no tiene: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
+| `src\Core` | Lo que no depende de la pantalla (también las teselas de relieve, `TeselaAltura.cs`, y las explanadas, `Aplanado.cs`): geodesia, Kepler, lectura de partidas y calibración de la rotación, imágenes (sonda, paleta de biomas, giro automático), catálogo y almacenamiento. Empezó como traducción del antiguo visor web, más lo que aquel no tenía: sistema solar (`SolarSystem.cs`), SCANsat (`ScanSat.cs`), el resto de la partida (`SaveExtras.cs`: hitos y waypoints), anomalías, mapas por cuerpo, descenso (`Landing.cs`) y transferencias (`Transfer.cs`, con Lambert). |
 | `src\Gfx` | Enlaces a OpenGL, el control con el contexto (con antialias multimuestra), shaders, texturas, dibujo 2D por lotes y rótulos. |
 | `src\Views` | El mapa plano, el globo (`GlobeView.cs`, con sus tres modos de cámara), el cielo (`GlobeView.Sky.cs`), el modelo de la nave enfocada (`VesselModelRenderer.cs`, en metros y relativo a la cámara para que no tiemble), los scatters de Parallax (`ScatterField.cs` los reparte en segundo plano; `GlobeView.Scatters.cs` los pinta) y los edificios de Kerbal Konstructs (`GlobeView.Statics.cs`, con la elección por clic); `ModelGpu.cs` sube mallas y texturas para los dos. |
 | `src\Ksp` | Lectura de la instalación de KSP: ConfigNode, modelos `.mu`, texturas DDS/TGA/PNG, catálogo de piezas y montaje de naves, los paquetes de Unity de Parallax (`UnityBundle.cs`: UnityFS con LZ4 y acceso aleatorio por bloques, y también los `.assets` sueltos del juego; `DxtDecoder.cs`; `ParallaxPlanets.cs`, `ParallaxTerrain.cs` y `ParallaxScatters.cs`), las texturas de serie (`StockAssets.cs`) y Kerbal Konstructs (`Konstructs.cs` lee y coloca; `KonstructsWriter.cs` guarda) y los edificios del KSC sacados de los datos de Unity (`StockPrefabs.cs`). |
-| `src\UI` | La ventana, el panel lateral y los controles de tema oscuro. `MainForm` está repartida como `app.js`: mapas, naves, herramientas y cielo. |
+| `src\UI` | La ventana, el panel lateral y los controles de tema oscuro. `MainForm` está repartida en ficheros por tema: mapas, naves, herramientas, cielo, etc. |
 
 Decisiones que no son evidentes:
 
@@ -883,6 +883,6 @@ Decisiones que no son evidentes:
 - **Las transiciones entre modos interpolan el ojo por la esfera**, dirección y
   radio por separado, para que la cámara no atraviese el planeta.
 - **Un clic en una nave la selecciona sin abrir además la información del punto**,
-  que en la web salía a la vez.
+  que en el antiguo visor web salía a la vez.
 - **Los nombres de bioma se ponen pinchando la fila de la leyenda**, en vez de
   escribirlos en una casilla dentro de la lista.
