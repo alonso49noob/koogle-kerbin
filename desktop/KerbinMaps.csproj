@@ -26,6 +26,10 @@
   <ItemGroup>
     <None Include="..\data\**\*" Exclude="..\data\test-*;..\data\_tmp*" LinkBase="data"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\LICENSE" Link="license.txt"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\THIRD-PARTY.md" Link="THIRD-PARTY.md"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\tiles\LEEME.txt" Link="tiles\LEEME.txt"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

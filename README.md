@@ -786,3 +786,16 @@ the heightmap, if you have one) and no lat/lon graticule in 3D.
   <img width="1919" height="1077" alt="imagen" src="https://github.com/user-attachments/assets/e35b70cb-cd00-488f-aa34-c08c5b75fc5c" />
   <img width="1919" height="1068" alt="imagen" src="https://github.com/user-attachments/assets/d955dafe-b568-45fd-95a9-f5c61f571d1e" />
   <img width="1919" height="1079" alt="imagen" src="https://github.com/user-attachments/assets/3883a61c-0ff2-43c9-a0a5-3bd7f4278631" />
+
+---
+
+## License
+
+Koogle Kerbin is free software, licensed under the **GNU General Public License
+v3.0 only** (GPL-3.0-only). The full text is in [LICENSE](LICENSE) (shipped as
+`license.txt` in the desktop download). Copyright (C) 2026 alonso cardenas.
+
+Third-party components and their licenses are listed in
+[THIRD-PARTY.md](THIRD-PARTY.md). Kerbal Space Program, its textures and any
+data extracted from the game belong to Squad and Take-Two Interactive and are
+not covered by this license.

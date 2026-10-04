@@ -670,3 +670,16 @@ el heightmap, si lo tienes) ni retícula lat/lon en 3D.
   parte en el antimeridiano y cerca del polo eso se nota.
 - **Sin día y noche.** La iluminación de la versión web es plana: el terminador,
   la atmósfera y la vista del cielo son de la aplicación de escritorio.
+
+---
+
+## Licencia
+
+Koogle Kerbin es software libre, bajo la **Licencia Pública General de GNU v3.0
+únicamente** (GPL-3.0-only). El texto completo está en [LICENSE](LICENSE) (en la
+descarga de escritorio se llama `license.txt`). Copyright (C) 2026 alonso cardenas.
+
+Los componentes de terceros y sus licencias están en
+[THIRD-PARTY.md](THIRD-PARTY.md). Kerbal Space Program, sus texturas y cualquier
+dato extraído del juego pertenecen a Squad y Take-Two Interactive y no están
+cubiertos por esta licencia.
