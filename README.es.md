@@ -44,6 +44,9 @@ aficionados sin relación con ellos.
 
 ## Versión web: Kerbin Maps
 
+> **El visor web está terminado.** La 1.6.10 es su última versión y no se va a
+> actualizar más; lo nuevo sale solo en la app de escritorio. Sigue funcionando tal cual.
+
 Visor de superficie de Kerbin (KSP stock) para ejecutar en local, en la línea de
 Kerbal Maps: un mapa deslizante con retícula, biomas superpuestos, marcadores,
 regla y trazas terrestres de órbitas.
@@ -371,6 +374,17 @@ importarlos.
 **Búsqueda.** Por nombre de marcador o por coordenadas: `-0.0972, -74.5577` y
 `0.0972 S 74.5577 W` valen las dos.
 
+**Rutas por aire, mar y tierra.** El mismo navegador que la app de escritorio: eliges
+origen y destino (en el mapa, en el globo o entre tus marcadores) y salen los tiempos en
+avión (gran círculo), barco (solo por el mar) y rover (solo por tierra, rodeando las
+cuestas de más de la pendiente máxima y más despacio en las empinadas), dibujadas a la vez
+y con la más rápida marcada. La búsqueda va en un Web Worker sobre una rejilla hecha con tu
+mapa de alturas (o con el de color, sin cuestas, si no hay mapa de alturas).
+
+**Filtro de altimetría.** Eliges una franja de altura y el terreno que cae dentro se pinta
+con una paleta tipo SCANsat mientras el resto se apaga, con el porcentaje de superficie
+que queda dentro. Solo en el mapa plano; usa la calibración del mapa de alturas.
+
 ---
 
 ## Sobre las coordenadas que incluye
@@ -433,6 +447,9 @@ js/orbit.js           propagación kepleriana y traza terrestre
 js/savefile.js        lector de .sfs y calibración de la rotación con las naves
 js/markers.js         marcadores de referencia y propios
 js/tools.js           regla y huella
+js/rutas.js           rutas por aire, mar y tierra: panel y dibujo
+js/rutas-worker.js    la búsqueda de rutas (A* sobre una rejilla), en un Web Worker
+js/altimetria.js      filtro de altimetría
 js/app.js             cableado de la interfaz
 data/landmarks.json   puntos de referencia
 data/maps.json        qué fichero va en cada ranura, su desfase y su procedencia

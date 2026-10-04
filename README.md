@@ -143,6 +143,9 @@ The detailed documentation is in **[desktop/README.md](desktop/README.md)**
 
 ## Web version: Kerbin Maps
 
+> **The web version is finished.** 1.6.10 is its last release and it won't be updated
+> again; new features only go into the desktop app. It still works as it is.
+
 A Kerbin surface viewer (stock KSP) to run locally, along the lines of Kerbal
 Maps: a sliding map with a graticule, a biome overlay, markers, a ruler and
 orbital ground tracks.
@@ -473,6 +476,17 @@ import them.
 **Search.** By marker name or by coordinates: `-0.0972, -74.5577` and
 `0.0972 S 74.5577 W` both work.
 
+**Routes by air, sea and land.** The same sat-nav as the desktop app: pick an origin
+and a destination (on the map, on the globe or from your markers) and get the travel
+time by plane (great circle), boat (only over water) and rover (only over land, around
+slopes steeper than the maximum and slower on steep ground), all drawn at once with the
+fastest one highlighted. The search runs in a Web Worker on a grid built from your
+heightmap (or from the colour map, without slopes, if there is no heightmap).
+
+**Altimetry filter.** Pick a height band and the terrain inside it is painted with a
+SCANsat-style palette while the rest is dimmed, with the share of the surface that
+falls inside. Flat map only; it uses the heightmap calibration.
+
 ---
 
 ## About the included coordinates
@@ -534,6 +548,9 @@ js/orbit.js           Keplerian propagation and ground track
 js/savefile.js        .sfs reader and rotation calibration from the vessels
 js/markers.js         reference and user markers
 js/tools.js           ruler and footprint
+js/rutas.js           routes by air, sea and land: panel and drawing
+js/rutas-worker.js    the route search (A* on a grid), in a Web Worker
+js/altimetria.js      altimetry filter
 js/app.js             interface wiring
 data/landmarks.json   reference points
 data/maps.json        which file goes in which slot, its offset and its provenance

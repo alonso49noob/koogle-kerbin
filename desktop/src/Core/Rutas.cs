@@ -40,6 +40,7 @@ namespace KerbinMaps.Core
     {
         public const int Ancho = 4096, Alto = 2048;
         const int MaxAcercar = 256;               // celdas que se busca el agua o la tierra más cercana
+        const double MaxAcercarM = 100000;        // más lejos que esto, el agua (o la tierra) no cuenta como «cerca»
 
         readonly float[] alt;                     // altura de cada celda sobre el mar, m
         readonly bool[] tierra;
@@ -190,12 +191,12 @@ namespace KerbinMaps.Core
                 int sa = Cercana(ia, enTierra, 0), sb = Cercana(ib, enTierra, 0);
                 if (sa < 0 || sb < 0)
                 {
-                    r.Motivo = enTierra ? "No hay tierra cerca del origen o del destino." : "No hay mar cerca del origen o del destino.";
+                    r.Motivo = enTierra ? "No hay tierra a menos de 100 km del origen o del destino." : "No hay mar a menos de 100 km del origen o del destino.";
                     return r;
                 }
-                /* En tierra no se cruza el mar hasta la costa de enfrente: un destino en otra isla no se
-                   alcanza en rover. Solo se acerca a la tierra más cercana una punta que esté en el agua. */
-                if (zona[sa] != zona[sb] && enTierra && tierra[ia] && tierra[ib])
+                /* En tierra no se cruza el mar hasta la costa de enfrente: si la tierra más cercana a
+                   cada punta no es la misma isla o continente, no hay ruta en rover. */
+                if (zona[sa] != zona[sb] && enTierra)
                 {
                     r.Motivo = "Origen y destino están en tierras separadas por el mar.";
                     return r;
@@ -253,7 +254,7 @@ namespace KerbinMaps.Core
             int x0 = i % Ancho, y0 = i / Ancho;
             int mejor = -1, hasta = MaxAcercar;
             double dMejor = double.MaxValue;
-            for (int r = 1; r <= hasta; r++)
+            for (int r = 1; r <= hasta && r * dy <= MaxAcercarM * 1.5; r++)
             {
                 for (int dyy = -r; dyy <= r; dyy++)
                 {
@@ -271,7 +272,7 @@ namespace KerbinMaps.Core
                 // las celdas se estrechan hacia los polos: se mira un poco más allá del primer hallazgo
                 if (mejor >= 0 && hasta == MaxAcercar) hasta = Math.Min(MaxAcercar, r + r / 2 + 2);
             }
-            return mejor;
+            return dMejor <= MaxAcercarM ? mejor : -1;
         }
 
         List<int> AEstrella(int s, int g, bool enTierra, double v, double pendMax, CancellationToken ct)

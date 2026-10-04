@@ -415,6 +415,68 @@
       gl.bindVertexArray(null);
     },
 
+    /* Rutas del planificador (aire, mar y tierra), pegadas al suelo con su relieve.
+       list: [{ pts: [[lat, lon], ...], color: '#rrggbb', alpha }] */
+    setRutas(list) {
+      const gl = this.gl;
+      if (!gl) return;
+      if (!list || !list.length) { this.rutas = null; this._dirty = true; return; }
+      let total = 0;
+      for (const r of list) total += r.pts.length;
+      const data = new Float32Array(total * 6);
+      const segs = [];
+      let k = 0;
+      for (const r of list) {
+        const off = k;
+        for (const p of r.pts) {
+          const d = sph(p[0], p[1], 1), o = k * 6;
+          data[o] = d[0]; data[o+1] = d[1]; data[o+2] = d[2];
+          data[o+3] = 1;
+          data[o+4] = (KM.geo.wrapLon(p[1]) + 180) / 360; data[o+5] = (90 - p[0]) / 180;
+          k++;
+        }
+        const h = parseInt(r.color.slice(1), 16);
+        segs.push({ off, n: r.pts.length, rgba: [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255, r.alpha] });
+      }
+      if (!this._rutasBuf) {
+        this._rutasBuf = { vao: gl.createVertexArray(), buf: gl.createBuffer() };
+        this._trackVao(this._rutasBuf.vao, this._rutasBuf.buf);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, this._rutasBuf.buf);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+      this.rutas = segs;
+      this._dirty = true;
+    },
+
+    _drawRutas() {
+      const gl = this.gl, o = this.opts;
+      if (!this.rutas || !this.rutas.length) return;
+      gl.useProgram(this.lineProg);
+      const u = n => gl.getUniformLocation(this.lineProg, n);
+      gl.uniformMatrix4fv(u('uProj'), false, this.proj);
+      gl.uniformMatrix4fv(u('uView'), false, this.view);
+      gl.uniform1f(u('uRadius'), KM.BODY.radius);
+      gl.uniform1f(u('uRelief'), this.tex.height ? o.relief : 0);
+      gl.uniform1f(u('uHeightOff'), (o.heightOff || 0) / 360);
+      gl.uniform1f(u('uHMin'), o.hMin);
+      gl.uniform1f(u('uHMax'), o.hMax);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, this.tex.height);
+      gl.uniform1i(u('uHeight'), 2);
+      gl.uniform1f(u('uLonShift'), 0);
+      gl.uniform1f(u('uLift'), 0.0016);
+      gl.uniform1f(u('uUseRelief'), 1);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.bindVertexArray(this._rutasBuf.vao);
+      for (const g of this.rutas) {
+        gl.uniform4f(u('uLineColor'), g.rgba[0], g.rgba[1], g.rgba[2], g.rgba[3]);
+        gl.drawArrays(gl.LINE_STRIP, g.off, g.n);
+      }
+      gl.disable(gl.BLEND);
+      gl.bindVertexArray(null);
+    },
+
     _drawTrack() {
       const gl = this.gl, t = this.track, o = this.opts;
       if (!t || !t.n) return;
@@ -803,6 +865,7 @@
       gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_INT, 0);
 
       this._drawTrack();
+      this._drawRutas();
       this._drawOrbits();
 
       if (o.atmosphere) {

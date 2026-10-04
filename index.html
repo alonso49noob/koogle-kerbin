@@ -14,7 +14,12 @@
   <aside id="sidebar">
     <header class="sb-head">
       <h1>Kerbin<span>Maps</span></h1>
-      <p class="sb-sub">Visor de superficie · KSP stock</p>
+      <p class="sb-sub">Visor de superficie · KSP stock · v1.6.10</p>
+      <p class="fin">
+        <b>Última versión del visor web.</b> No va a recibir más actualizaciones: lo nuevo
+        sale solo en la <a href="https://github.com/alonso49noob/koogle-kerbin/releases" target="_blank" rel="noopener">app
+        de escritorio para Windows</a>.
+      </p>
     </header>
 
     <div class="sb-scroll">
@@ -195,6 +200,60 @@
       </details>
 
       <details>
+        <summary>Rutas: aire, mar y tierra</summary>
+        <div class="panel">
+          <label class="field"><span>Origen</span><select id="ruta-origen"></select></label>
+          <label class="field"><span>Destino</span><select id="ruta-destino"></select></label>
+          <div class="btn-row">
+            <button id="ruta-elegir" class="btn btn-primary" title="Primer clic, el origen; segundo, el destino. También en el globo.">Elegir en el mapa</button>
+            <button id="ruta-invertir" class="btn btn-ghost">Invertir</button>
+            <button id="ruta-quitar" class="btn btn-ghost">Quitar</button>
+          </div>
+          <p class="hint" id="ruta-estado"></p>
+          <div class="row2">
+            <label class="field"><span>Avión (m/s)</span><input id="rv-aire" type="number" step="10"></label>
+            <label class="field"><span>Barco (m/s)</span><input id="rv-mar" type="number" step="1"></label>
+          </div>
+          <div class="row2">
+            <label class="field"><span>Rover (m/s)</span><input id="rv-tierra" type="number" step="1"></label>
+            <label class="field"><span>Pendiente máx. (°)</span><input id="rv-pendiente" type="number" step="1"></label>
+          </div>
+          <div id="ruta-info" class="readout"></div>
+          <p class="hint">
+            Como un navegador: elige el origen y el destino y salen las tres rutas con su tiempo.
+            El <b>avión</b> va en línea recta por el gran círculo. El <b>barco</b> solo navega por
+            el mar y el <b>rover</b> solo pisa tierra, rodeando las cuestas de más de la pendiente
+            máxima y yendo más despacio cuanto más empinadas (a un 30 % en el límite). Si el barco
+            sale de tierra adentro, la ruta empieza en el agua más cercana. Las velocidades son de
+            crucero, sin despegues ni paradas. Sin mapa de alturas no hay cuestas, y la tierra
+            sale del mapa de color.
+          </p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Filtro de altimetría</summary>
+        <div class="panel">
+          <div class="checks"><label><input id="alt-on" type="checkbox"> Pintar una franja de altura</label></div>
+          <div class="row2">
+            <label class="field"><span>Desde (m)</span><input id="alt-min" type="number" step="50"></label>
+            <label class="field"><span>Hasta (m)</span><input id="alt-max" type="number" step="50"></label>
+          </div>
+          <label class="field">
+            <span>Opacidad <b id="alt-op-val">85 %</b></span>
+            <input id="alt-op" type="range" min="10" max="100" value="85">
+          </label>
+          <button id="alt-reset" class="btn btn-ghost btn-sm">Todo el rango</button>
+          <div id="alt-info" class="readout"></div>
+          <p class="hint">
+            El terreno dentro de la franja se pinta con una paleta tipo SCANsat y el de fuera se
+            apaga: sirve para ver dónde hay meseta a tal altura o qué queda por debajo de una
+            altitud de aterrizaje. Solo en el mapa plano; usa la calibración de «Altura (opcional)».
+          </p>
+        </div>
+      </details>
+
+      <details>
         <summary>Órbita · traza terrestre</summary>
         <div class="panel">
           <div class="row2">
@@ -329,6 +388,8 @@
 <script src="js/savefile.js"></script>
 <script src="js/markers.js"></script>
 <script src="js/tools.js"></script>
+<script src="js/rutas.js"></script>
+<script src="js/altimetria.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

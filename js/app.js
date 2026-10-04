@@ -870,6 +870,7 @@
       syncGlobe();
       construirAnillos();
       pushTrack();
+      globe.setRutas(KM.rutas.paraGlobo());
       globe.start();
     } else {
       const c = globe.center();
@@ -1047,6 +1048,7 @@
   }
 
   function renderSlots() {
+    if (KM.altimetria) KM.altimetria.refrescar();
     document.querySelectorAll('.slot').forEach(el => {
       const slot = el.dataset.slot;
       const m = meta[slot];
@@ -1098,6 +1100,8 @@
   }
 
   function onMapClick(e) {
+    // las rutas también se eligen en el globo, que llega por aquí
+    if (KM.tools.mode === 'route') { KM.rutas.click(e.latlng.lat, KM.geo.wrapLon(e.latlng.lng)); return; }
     if (KM.tools.mode) return;                 // una herramienta activa manda
     const lat = e.latlng.lat, lon = KM.geo.wrapLon(e.latlng.lng);
 
@@ -1291,6 +1295,7 @@
 
   function saveSettings() {
     KM.store.saveJSON(KM.STORAGE_KEYS.settings, state);
+    if (KM.altimetria) KM.altimetria.refrescar();     // la calibración o el desfase pueden haber cambiado
   }
 
   function download(name, text, type) {
@@ -1507,9 +1512,12 @@
     KM.tools.onModeChange = mode => {
       $('tool-measure').classList.toggle('active', mode === 'measure');
       $('tool-footprint').classList.toggle('active', mode === 'footprint');
+      $('ruta-elegir').classList.toggle('active', mode === 'route');
+      $('ruta-estado').textContent = mode === 'route' ? KM.rutas.hint() : '';
       $('tool-hint').textContent =
         mode === 'measure'  ? 'Haz clic para encadenar puntos. Esc para terminar.' :
         mode === 'footprint' ? 'Haz clic donde esté el satélite. Esc para terminar.' :
+        mode === 'route'    ? KM.rutas.hint() :
                                'Ninguna herramienta activa.';
     };
     $('tool-measure').addEventListener('click', () => KM.tools.setMode('measure'));
@@ -1604,6 +1612,16 @@
     wireUI();
     renderBodyInfo();
     KM.tools.init(map);
+    KM.rutas.init(map, {
+      mapas: () => ({ height: bitmaps.height, color: bitmaps.color, hMin: state.hMin, hMax: state.hMax,
+                      offHeight: state.lonOffset.height, offColor: state.lonOffset.color }),
+      globe: () => globe,
+      fecha: fechaKerbal,
+      ahora: () => sv.naves.length || sv.ut ? sim.t : null
+    });
+    KM.altimetria.init(map, {
+      mapas: () => ({ height: bitmaps.height, hMin: state.hMin, hMax: state.hMax, offHeight: state.lonOffset.height })
+    });
 
     /* Ninguno de estos pasos puede impedir que el mapa llegue a dibujarse: si
        falla el almacenamiento o falta un fichero, se sigue adelante sin él. */

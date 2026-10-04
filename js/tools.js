@@ -4,7 +4,7 @@
   KM.tools = {
     map: null,
     layer: null,
-    mode: null,          // null | 'measure' | 'footprint'
+    mode: null,          // null | 'measure' | 'footprint' | 'route'
     _pts: [],
     _preview: null,
     onModeChange: null,
@@ -39,6 +39,7 @@
       const lat = e.latlng.lat, lon = KM.geo.wrapLon(e.latlng.lng);
       if (this.mode === 'measure') this._addMeasurePoint(lat, lon);
       else if (this.mode === 'footprint') this._addFootprint(lat, lon);
+      else if (this.mode === 'route') KM.rutas.click(lat, lon);
     },
 
     _onMove(e) {
