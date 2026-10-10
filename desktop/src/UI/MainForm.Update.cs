@@ -5,9 +5,9 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.UI
 {
-    /* Actualizaciones automáticas: la sección del panel y el aviso al abrir. La lógica de
-       GitHub, la descarga y la verificación están en Core/Updater.cs; el instalador nuevo
-       hace el resto (ver /update en installer/Instalador.cs). */
+    /* Automatic updates: the panel section and the notice on startup. The GitHub logic, the
+       download and the verification are in Core/Updater.cs; the new installer does the rest
+       (see /update in installer/Instalador.cs). */
     public sealed partial class MainForm
     {
         static readonly TimeSpan updateEvery = TimeSpan.FromHours(12);
@@ -36,7 +36,8 @@ namespace KerbinMaps.UI
                        "en la misma carpeta: el visor se cierra y vuelve a abrirse solo. Tus ajustes y tu partida se conservan."));
         }
 
-        /* Al abrir se pregunta como mucho cada 12 horas y en silencio: solo se molesta si hay algo nuevo. */
+        /* On startup it checks at most every 12 hours and silently: it only bothers you if there's something
+           new. */
         async Task ComprobarActualizacion(bool manual)
         {
             if (updBusy) return;
@@ -44,7 +45,7 @@ namespace KerbinMaps.UI
             {
                 if (!state.AutoUpdate) return;
                 if (state.LastUpdateCheck is DateTime last && DateTime.UtcNow - last < updateEvery && updPending == null) return;
-                await Task.Delay(2500);                           // que la ventana acabe de arrancar
+                await Task.Delay(2500);                           // let the window finish starting up
             }
 
             updBusy = true;
@@ -127,7 +128,7 @@ namespace KerbinMaps.UI
                     updInfo.SetText(Lang.F("Descargando {0}… {1} %", u.Version, p.Total > 0 ? (int)(100.0 * p.Hecho / p.Total) : 0)));
                 string exe = await Updater.DownloadAsync(u, (a, b) => ((IProgress<(long, long)>)progreso).Report((a, b)));
 
-                // igual que al cambiar de idioma: se deja guardado lo que hay antes de cerrar
+                // same as when changing language: what's there is saved before closing
                 state.SimT = HasVessels ? sim.T : null;
                 SaveView();
                 if (!Updater.Launch(exe)) throw new InvalidOperationException(Lang.T("No se pudo abrir el instalador."));

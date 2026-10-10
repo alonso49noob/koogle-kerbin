@@ -12,14 +12,14 @@ namespace KerbinMaps.Core
         public bool Synchronous, Suborbital, InAtmosphere;
     }
 
-    /* Traza terrestre de una órbita alrededor de Kerbin.
+    /* Ground track of an orbit around Kerbin.
 
-       KSP usa cónicas parcheadas: dentro de la SOI de Kerbin la órbita es una elipse
-       kepleriana exacta, sin achatamiento ni J2. Basta propagar Kepler y restar la
-       rotación del planeta para pasar del marco inercial al fijo al cuerpo. */
+       KSP uses patched conics: inside Kerbin's SOI the orbit is an exact Keplerian ellipse,
+       with no flattening or J2. It's enough to propagate Kepler and subtract the planet's
+       rotation to go from the inertial frame to the body-fixed one. */
     public static class ManualOrbit
     {
-        /* Ecuación de Kepler M = E - e·sen E, por Newton-Raphson. */
+        /* Kepler's equation M = E - e·sin E, by Newton-Raphson. */
         public static double EccentricAnomaly(double M, double e, double tol = 1e-12)
         {
             M = ((M % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -33,7 +33,7 @@ namespace KerbinMaps.Core
             return E;
         }
 
-        /* pe/ap en metros sobre el nivel del mar; ángulos en grados. */
+        /* pe/ap in meters above sea level; angles in degrees. */
         public static OrbitResult Compute(double pe, double ap, double incDeg, double lanDeg, double argpDeg, int orbitsIn)
         {
             if (ap < pe) (pe, ap) = (ap, pe);
@@ -41,15 +41,15 @@ namespace KerbinMaps.Core
             double rp = Body.Radius + pe, ra = Body.Radius + ap;
             double a = (rp + ra) / 2;
             double e = (ra - rp) / (ra + rp);
-            double n = Math.Sqrt(Body.Mu / (a * a * a));     // movimiento medio, rad/s
-            double T = 2 * Math.PI / n;                       // periodo orbital, s
-            double wb = 2 * Math.PI / Body.SiderealDay;       // rotación de Kerbin, rad/s
+            double n = Math.Sqrt(Body.Mu / (a * a * a));     // mean motion, rad/s
+            double T = 2 * Math.PI / n;                       // orbital period, s
+            double wb = 2 * Math.PI / Body.SiderealDay;       // Kerbin's rotation, rad/s
 
             double inc = incDeg * Geo.D2R, lan = lanDeg * Geo.D2R, argp = argpDeg * Geo.D2R;
             int orbits = Math.Max(1, Math.Min(60, orbitsIn == 0 ? 1 : orbitsIn));
 
-            /* Más muestras en órbitas excéntricas: cerca del periapsis la traza avanza
-               muy rápido y con pocos puntos se ve angulosa. */
+            /* More samples on eccentric orbits: near periapsis the track moves very fast and
+               with few points it looks jagged. */
             int perOrbit = (int)Math.Round(180 * (1 + 2 * e), MidpointRounding.AwayFromZero);
             int steps = orbits * perOrbit;
             var pts = new List<TrackPoint>(steps + 1);
@@ -60,7 +60,7 @@ namespace KerbinMaps.Core
                 double E = EccentricAnomaly(n * t, e);
                 double nu = 2 * Math.Atan2(Math.Sqrt(1 + e) * Math.Sin(E / 2), Math.Sqrt(1 - e) * Math.Cos(E / 2));
                 double r = a * (1 - e * Math.Cos(E));
-                double u = argp + nu;                          // argumento de latitud
+                double u = argp + nu;                          // argument of latitude
 
                 double X = r * (Math.Cos(lan) * Math.Cos(u) - Math.Sin(lan) * Math.Sin(u) * Math.Cos(inc));
                 double Y = r * (Math.Sin(lan) * Math.Cos(u) + Math.Cos(lan) * Math.Sin(u) * Math.Cos(inc));
@@ -77,7 +77,7 @@ namespace KerbinMaps.Core
                 A = a, E = e, T = T,
                 VPe = Math.Sqrt(Body.Mu * (2 / rp - 1 / a)),
                 VAp = Math.Sqrt(Body.Mu * (2 / ra - 1 / a)),
-                Drift = -(T / Body.SiderealDay) * 360,        // desplazamiento de la traza por vuelta
+                Drift = -(T / Body.SiderealDay) * 360,        // track shift per revolution
                 Pe = pe, Ap = ap,
                 MaxLat = Math.Min(90, Math.Abs(incDeg) <= 90 ? Math.Abs(incDeg) : 180 - Math.Abs(incDeg)),
                 FootprintPe = Geo.HorizonRadius(pe),

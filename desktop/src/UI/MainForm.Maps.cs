@@ -14,8 +14,8 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Imágenes del mapa: ranuras, capa base, biomas, catálogo de mapas, desfases de
-       longitud y calibración de alturas. */
+    /* Map images: slots, base layer, biomes, map catalog, longitude offsets and height
+       calibration. */
     public sealed partial class MainForm
     {
         static readonly string[] Slots = { "color", "biome", "height" };
@@ -43,7 +43,7 @@ namespace KerbinMaps.UI
         string BiomeName(string hex) =>
             hex != null && biomeNames.TryGetValue(hex.ToLowerInvariant(), out var n) && !string.IsNullOrEmpty(n) ? n : null;
 
-        /* ------------------------------------------------------------ texturas */
+        /* ------------------------------------------------------------ textures */
 
         void SetImage(string slot, ImageData img)
         {
@@ -51,7 +51,7 @@ namespace KerbinMaps.UI
             if (textures.TryGetValue(slot, out var old) && surface.MakeCurrent()) old.Dispose();
             textures.Remove(slot);
             if (img == null || !glOk || !surface.MakeCurrent()) return;
-            // biomas y alturas se leen por color exacto: nada de interpolar
+            // biomes and heights are read by exact color: no interpolation
             textures[slot] = Texture.FromRgba(img.Rgba, img.Width, img.Height, slot == "color" ? TexFilter.Mipmap : TexFilter.Nearest, true);
         }
 
@@ -63,7 +63,7 @@ namespace KerbinMaps.UI
             tileLayer = null;
         }
 
-        /* Empuja al mapa 2D lo que haya cargado y los ajustes de capas. */
+        /* Pushes whatever is loaded and the layer settings to the 2D map. */
         void ApplyMapTextures()
         {
             var def = Bases.GetValueOrDefault(state.BaseId);
@@ -100,8 +100,8 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Lo mismo para el globo. Se llama tras cualquier cambio de imagen o de ajuste,
-           para que las dos vistas no se separen. */
+        /* Same for the globe. Called after any image or setting change, so the two views don't
+           drift apart. */
         void SyncGlobe()
         {
             globe.ColorTex = MapTex("color");
@@ -133,14 +133,14 @@ namespace KerbinMaps.UI
             Vis.Set(reliefWrap, hasHeight);
             Vis.Set(reliefHint, !hasHeight);
             ActualizarCampoScatters();
-            // la máscara de tierra de los territorios sale de estos mismos mapas
+            // the land mask for territories comes from these same maps
             ActualizarTierraFacciones();
             AplicarFacciones();
             RequestRender();
         }
 
-        /* El color del mar abierto, por zonas y de media (ver MapaDelMar). Se calcula en
-           segundo plano cada vez que cambian los mapas o su calibración. */
+        /* The color of the open sea, by area and on average (see MapaDelMar). Computed in the
+           background every time the maps or their calibration change. */
         object marDe;
 
         void ActualizarMar()
@@ -173,7 +173,7 @@ namespace KerbinMaps.UI
             });
         }
 
-        /* ------------------------------------------------------------ capa base */
+        /* ------------------------------------------------------------ base layer */
 
         void SetBase(string id, bool silent = false)
         {
@@ -253,7 +253,7 @@ namespace KerbinMaps.UI
         void SetGrid(bool on) { state.Grid = on; ApplyMapTextures(); SaveSettings(); }
         void SetLandmarks(bool on) { state.Landmarks = on; ApplyMapTextures(); SaveSettings(); }
 
-        /* ------------------------------------------------------------ biomas */
+        /* ------------------------------------------------------------ biomes */
 
         void ScanBiomes()
         {
@@ -276,7 +276,7 @@ namespace KerbinMaps.UI
             var e = (PaletteEntry)item;
             int sw = Theme.S(14), x = r.X + Theme.S(4);
             var swr = new RectangleF(x, r.Y + (r.Height - sw) / 2f, sw, sw);
-            Theme.FillRound(g, Theme.Hex(e.Hex), Color.FromArgb(56, 255, 255, 255), swr, Theme.Sf(3));
+            Theme.FillRound(g, Theme.Hex(e.Hex), Color.FromArgb(56, Theme.Fg), swr, Theme.Sf(3));
             x += sw + Theme.S(7);
             string name = BiomeName(e.Hex);
             string pct = Geo.F(e.Pct, 1) + "%";
@@ -331,22 +331,22 @@ namespace KerbinMaps.UI
             catch (Exception ex) { Flash("Ese JSON no se pudo leer: " + ex.Message); }
         }
 
-        /* ------------------------------------------------------------ desfases */
+        /* ------------------------------------------------------------ offsets */
 
         void ApplyOffset(string slot, double deg)
         {
             double v = ((deg % 360) + 360) % 360;
             state.LonOffset.Set(slot, v);
-            state.OffsetTouched = true;            // tu ajuste manda sobre el de maps.json
+            state.OffsetTouched = true;            // your setting takes precedence over maps.json
             SaveSettings();
             slotRows[slot].Offset.SetNumber(v);
             ApplyMapTextures();
             SyncGlobe();
         }
 
-        /* Busca el giro que hace encajar el color con el bioma comparando la silueta de
-           los continentes. Si el mejor encaje no destaca sobre el promedio, no son el
-           mismo planeta (o una no es equirectangular) y no hay nada que girar. */
+        /* Finds the rotation that lines up the color with the biome map by comparing continent
+           silhouettes. If the best fit doesn't stand out over the average, they aren't the same
+           planet (or one isn't equirectangular) and there's nothing to rotate. */
         void AlignColorToBiome()
         {
             if (Img("color") == null || Img("biome") == null)
@@ -366,7 +366,7 @@ namespace KerbinMaps.UI
                   "% (antes del giro, el promedio era " + Geo.F(r.Media, 0) + "%).");
         }
 
-        /* ------------------------------------------------------------ catálogo */
+        /* ------------------------------------------------------------ catalog */
 
         void LoadCatalog()
         {
@@ -397,8 +397,8 @@ namespace KerbinMaps.UI
 
         static Task<ImageData> DecodeFile(string path) => Task.Run(() => ImageData.Decode(File.ReadAllBytes(path)));
 
-        /* El preset con los mapas de la propia instalación de KSP (ver MapasDelJuego): va el
-           primero de la lista y no ocupa nada en data/, se lee del juego cada vez. */
+        /* The preset with the KSP installation's own maps (see MapasDelJuego): it goes first in
+           the list and takes no space in data/, it's read from the game every time. */
         const string PresetJuego = "juego";
 
         void AgregarPresetDelJuego()
@@ -437,7 +437,7 @@ namespace KerbinMaps.UI
                 {
                     var r = await Task.Run(() => MapasDelJuego.Biomas(sa, "Kerbin"));
                     if (r == null) return null;
-                    // los nombres de los biomas del juego, donde no haya uno puesto a mano
+                    // the game's biome names, wherever there isn't one set by hand
                     foreach (var (hex, nombre) in r.Value.Nombres)
                         if (!biomeNames.ContainsKey(hex.ToLowerInvariant())) biomeNames[hex.ToLowerInvariant()] = nombre;
                     return r.Value.Mapa;
@@ -450,7 +450,7 @@ namespace KerbinMaps.UI
                         var rgba = Texture.DescomprimirEnGpu(Texture.BC7, c.Value.Ancho, c.Value.Alto, c.Value.Nivel);
                         if (rgba != null) return await Task.Run(() => MapasDelJuego.DesdeRgbaDeUnity(rgba, c.Value.Ancho, c.Value.Alto));
                     }
-                    // sin BC7 en la GPU: el de Parallax, que es el mismo a la mitad
+                    // without BC7 on the GPU: Parallax's, which is the same at half size
                     if (paquete == null) return null;
                     return await Task.Run(() => MapasDelJuego.DesdeParallax(ParallaxPlanets.Load(paquete, "Kerbin", 8192).Color));
                 }
@@ -460,8 +460,8 @@ namespace KerbinMaps.UI
             }
         }
 
-        /* Carga un preset entero. El bioma va primero a propósito: es la referencia
-           contra la que se mide el giro de los mapas marcados como "auto". */
+        /* Loads a whole preset. The biome map goes first on purpose: it's the reference the
+           rotation of maps marked "auto" is measured against. */
         async Task<bool> LoadPresetAsync(string id, bool silent)
         {
             var p = catalog?.Find(id);
@@ -493,13 +493,13 @@ namespace KerbinMaps.UI
                         metas[slot] = spec.Juego != null
                             ? new SlotMeta { Name = spec.File, W = img.Width, H = img.Height }
                             : new SlotMeta { Name = "data/" + spec.File, W = img.Width, H = img.Height, FromDisk = true };
-                        /* La copia guardada de un mapa cargado a mano se aparta (a slots/anteriores):
-                           si no, al arrancar volvería a ocupar la ranura en lugar del preset. */
+                        /* The saved copy of a map loaded by hand is set aside (to slots/anteriores):
+                           otherwise, at startup it would take the slot back instead of the preset. */
                         try { Store.ArchiveImage(slot); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[preset] " + ex.Message); }
                         if (spec.Auto) autos.Add(slot);
                         else state.LonOffset.Set(slot, ((spec.LonOffset % 360) + 360) % 360);
-                        /* Si el preset sabe a qué metros corresponden el gris 0 y el 255 (los
-                           deslizadores de SCANsat), no hay nada que calibrar. */
+                        /* If the preset knows which meters gray 0 and gray 255 correspond to
+                           (SCANsat's sliders), there's nothing to calibrate. */
                         if (slot == "height" && spec.HMin.HasValue && spec.HMax.HasValue)
                         {
                             state.HMin = spec.HMin.Value; state.HMax = spec.HMax.Value;
@@ -551,7 +551,7 @@ namespace KerbinMaps.UI
             finally { UseWaitCursor = false; }
         }
 
-        /* ------------------------------------------------------------ ranuras */
+        /* ------------------------------------------------------------ slots */
 
         const string ImageFilter = "Imágenes|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|Todos|*.*";
 
@@ -567,8 +567,8 @@ namespace KerbinMaps.UI
             if (dlg.ShowDialog(this) == DialogResult.OK) await LoadImageFile(slot, dlg.FileName);
         }
 
-        /* Adivina la ranura por el nombre del fichero; los exportadores de KSP suelen
-           llamarlos Kerbin_Color / Kerbin_Height / Kerbin_Biome. */
+        /* Guesses the slot from the file name; KSP exporters usually call them Kerbin_Color /
+           Kerbin_Height / Kerbin_Biome. */
         static string GuessSlot(string name)
         {
             string n = name.ToLowerInvariant();
@@ -598,8 +598,8 @@ namespace KerbinMaps.UI
             SetImage(slot, img);
             metas[slot] = new SlotMeta { Name = file, W = img.Width, H = img.Height, Size = bytes.Length, Ext = Path.GetExtension(path) };
 
-            /* El desfase pertenece a la imagen anterior, no a esta: se reinicia, y si hay
-               un bioma con el que comparar se mide el de verdad. */
+            /* The offset belongs to the previous image, not this one: it's reset, and if
+               there's a biome map to compare with, the real one is measured. */
             int previo = (int)state.LonOffset.Get(slot);
             state.LonOffset.Set(slot, 0);
             OffsetMatch? medido = null;
@@ -635,7 +635,7 @@ namespace KerbinMaps.UI
 
             if (slot == "biome")
             {
-                state.BiomeOn = true;             // si acabas de cargarlo, querrás verlo
+                state.BiomeOn = true;             // if you just loaded it, you'll want to see it
                 state.BiomeTouched = true;
                 SyncBiomeLayer();
                 ScanBiomes();
@@ -695,7 +695,7 @@ namespace KerbinMaps.UI
             RenderSlots();
         }
 
-        /* Si dejas los PNG en data/ con uno de estos nombres, se cargan solos. */
+        /* If you leave the PNGs in data/ with one of these names, they load on their own. */
         static readonly Dictionary<string, string[]> DiskCandidates = new()
         {
             ["color"] = new[] { "Kerbin_Color.png", "kerbin_color.png", "color.png" },
@@ -707,7 +707,7 @@ namespace KerbinMaps.UI
         {
             foreach (var (slot, names) in DiskCandidates)
             {
-                if (Img(slot) != null) continue;                 // lo ya cargado manda
+                if (Img(slot) != null) continue;                 // what's already loaded takes precedence
                 foreach (var name in names)
                 {
                     string path = Path.Combine(Store.DataDir, name);
@@ -719,7 +719,7 @@ namespace KerbinMaps.UI
                         metas[slot] = new SlotMeta { Name = "data/" + name, W = img.Width, H = img.Height, FromDisk = true };
                         break;
                     }
-                    catch { /* ilegible: se prueba el siguiente nombre */ }
+                    catch { /* unreadable: try the next name */ }
                 }
             }
             RenderSlots();
@@ -739,7 +739,7 @@ namespace KerbinMaps.UI
             SyncGlobe();
         }
 
-        /* ------------------------------------------------------------ calibración */
+        /* ------------------------------------------------------------ calibration */
 
         void CalibToggle(string which)
         {
@@ -807,10 +807,10 @@ namespace KerbinMaps.UI
             calOut.SetText(RichLabel.Esc(string.Join("\n", lines)));
         }
 
-        /* ------------------------------------------------------------ arranque */
+        /* ------------------------------------------------------------ startup */
 
-        /* Ninguno de estos pasos puede impedir que el mapa llegue a dibujarse: si falta
-           un fichero o falla el almacenamiento, se sigue sin él. */
+        /* None of these steps can keep the map from getting drawn: if a file is missing or
+           storage fails, it carries on without it. */
         async Task StartupAsync()
         {
             if (!glOk) Flash(surface.Error ?? glError ?? "No se pudo arrancar OpenGL.");
@@ -819,16 +819,16 @@ namespace KerbinMaps.UI
             try { await RestoreSlots(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] imágenes: " + ex.Message); }
             try { LoadCatalog(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] catálogo: " + ex.Message); }
 
-            /* Primera vez: se carga el preset predeterminado. Si ya tenías algo guardado,
-               se respeta y no se toca nada. */
+            /* First time: the default preset is loaded. If you already had something saved,
+               it's respected and nothing is touched. */
             if (NoImages && catalog != null)
                 try { await LoadPresetAsync(state.PresetId ?? catalog.Predeterminado, true); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] preset: " + ex.Message); }
             try { await DiscoverDiskMaps(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] data/: " + ex.Message); }
 
-            /* La primera vez que la instalación tiene los mapas del juego, se ponen en lugar de
-               los que haya: son mejores que cualquiera de los que trae el visor. Una sola vez:
-               después manda lo que se elija en «Datos del mapa». */
+            /* The first time the installation has the game's maps, they replace whatever there
+               is: they're better than any of the ones the viewer ships. Only once: after that,
+               whatever is chosen in «Datos del mapa» rules. */
             if (!state.MapasDelJuego && catalog?.Find(PresetJuego) != null)
                 try
                 {
@@ -852,11 +852,11 @@ namespace KerbinMaps.UI
             SetViewMode(state.ViewMode ?? (state.View3D ? "3d" : "2d"));
             restaurandoVista = false;
 
-            // el sistema solar de la instalación de KSP, antes de la partida: sus naves pueden orbitar cuerpos de un pack
+            // the KSP installation's solar system, before the save: its vessels may orbit bodies from a pack
             try { await CargarSistemaSolar(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] sistema solar: " + ex.Message); }
 
-            // los mapas de los demás cuerpos, si hay carpeta elegida
+            // the other bodies' maps, if a folder is chosen
             DibujarObjetivo();
             try { IndexarMapasDeCuerpos(); CalibrarVolcadoSiToca(); await CargarMapasDelCuerpo(); AplicarAltimetria(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] mapas de cuerpos: " + ex.Message); }
@@ -864,7 +864,7 @@ namespace KerbinMaps.UI
             try { await CargarKonstructs(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] kerbal konstructs: " + ex.Message); }
 
-            // la partida de la última vez, salvo que se abra otra desde la línea de órdenes
+            // last time's save, unless another one is opened from the command line
             bool abreSfs = false;
             foreach (var a in startArgs)
                 if (File.Exists(a) && Path.GetExtension(a).ToLowerInvariant() is ".sfs" or ".loadmeta") abreSfs = true;

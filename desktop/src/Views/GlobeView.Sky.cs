@@ -5,13 +5,13 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* Vista del cielo: la cámara de pie en un punto de la superficie, mirando alrededor.
+    /* Sky view: the camera standing at a point on the surface, looking around.
 
-       No se dibuja el planeta como malla: desde unos metros de altura el búfer de
-       profundidad no distingue el suelo de una órbita a cientos de kilómetros, y los
-       triángulos de la esfera se verían en el horizonte. En su lugar, cada píxel lanza
-       un rayo: si corta la esfera es suelo (con la textura del mapa y bruma según la
-       distancia) y si no es cielo. El horizonte sale exacto. */
+       The planet isn't drawn as a mesh: from a few meters up the depth buffer can't tell the
+       ground from an orbit hundreds of kilometers away, and the sphere's triangles would show
+       on the horizon. Instead, each pixel casts a ray: if it hits the sphere it's ground (with
+       the map texture and haze according to distance) and if not it's sky. The horizon comes
+       out exact. */
     public sealed partial class GlobeView
     {
         public double ObsLat = -0.0972, ObsLon = -74.5577, ObsAlt = 70;
@@ -21,14 +21,14 @@ namespace KerbinMaps.Views
         ShaderProgram skyProg;
         uint skyVao;
 
-        /* Posición del observador: la altitud sobre el nivel del mar más dos metros de
-           ojos, en radios de Kerbin. Nunca por debajo del suelo que se pinta: la altitud
-           guardada puede ser de otro mapa de alturas, y la explanada del KSC y el relieve
-           de detalle suben el suelo por encima de ella. */
+        /* Observer position: the altitude above sea level plus two meters of eye height, in
+           Kerbin radii. Never below the painted ground: the stored altitude may come from
+           another height map, and the KSC's leveled area and the detail relief raise the ground
+           above it. */
         public double[] ObserverPos()
         {
             double suelo = Math.Max(Math.Max(ObsAlt, 0), GroundAt?.Invoke(ObsLat, ObsLon) ?? 0);
-            // y si hay un edificio justo ahí, encima de él
+            // and if there's a building right there, on top of it
             if (TechoDeEstaticos(ObsLat, ObsLon, suelo) is double t && t > suelo) suelo = t;
             return Sph(ObsLat, ObsLon, 1 + (suelo + 2) / Body.Radius);
         }
@@ -37,19 +37,20 @@ namespace KerbinMaps.Views
 const vec2 P[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
 void main() { gl_Position = vec4(P[gl_VertexID], 0.0, 1.0); }";
 
-        /* Cada píxel lanza un rayo desde el observador: si toca el suelo, el suelo con su luz
-           y el aire que hay por medio; si no, el cielo que ese aire dispersa, el Sol y las
-           estrellas que deja ver. El paso a espacio al subir sale solo de la física. */
+        /* Each pixel casts a ray from the observer: if it hits the ground, the ground with its
+           light and the air in between; if not, the sky that air scatters, the Sun and the
+           stars it lets through. The transition to space when climbing comes purely from the
+           physics. */
         const string SkyFS = Header + AtmosphereGlsl + StarsGlsl + @"
 uniform vec2 uView;
 uniform vec3 uEye, uF, uR, uU, uUp, uEast, uNorth;
-/* Vista cenital para el mapa 2D: cada píxel mira en vertical a su lat/lon, en la
-   proyección del mapa (uCentro en grados, lon y lat; uPpd píxeles por grado). */
+/* Top-down view for the 2D map: each pixel looks straight down at its lat/lon, in the map's
+   projection (uCentro in degrees, lon and lat; uPpd pixels per degree). */
 uniform int uCenital;
 uniform vec2 uCentro;
 uniform float uPpd, uCenitalR;
-uniform float uDistCenital;     // la distancia a la que el vuelo vería un píxel tan grande
-uniform float uPlano;           // 1: igual que el mapa plano (su color, sin luz); 0: el suelo del vuelo
+uniform float uDistCenital;     // the distance at which flight would see a pixel this big
+uniform float uPlano;           // 1: like the flat map (its color, unlit); 0: the flight ground
 uniform float uTan, uAspect, uPix, uStarShift, uSunRad;
 uniform sampler2D uColor, uBiome, uHeightTex;
 uniform int uHasColor, uHasBiome, uGrid, uHasHeight, uRelief;
@@ -58,21 +59,21 @@ uniform vec2 uHeightSize, uColorSize;
 uniform sampler2D uDetGrass, uDetSand, uDetRock, uDetSnow;
 uniform int uHasDetail;
 uniform float uDetTile, uDetAmt;
-/* Posición del ojo en metros desde el centro del cuerpo, reducida módulo un múltiplo de
-   todos los periodos de las texturas: sumándole la distancia al punto se tienen sus
-   coordenadas en el mundo sin perder precisión, y la textura queda clavada al suelo. */
+/* Eye position in meters from the body's center, reduced modulo a multiple of all the textures'
+   periods: adding the distance to the point gives its world coordinates without losing
+   precision, and the texture stays pinned to the ground. */
 uniform vec3 uEyeMod;
-uniform float uPeriodo;                 // ese módulo, en repeticiones de la textura
-/* Modo Parallax: las cuatro ranuras son baja, media, alta y pendiente, y se mezclan por
-   la altitud del sitio y por la pendiente con los números de Terrain.cfg. */
+uniform float uPeriodo;                 // that modulus, in texture repeats
+/* Parallax mode: the four slots are low, mid, high and slope, and they're blended by the site's
+   altitude and by slope with the numbers from Terrain.cfg. */
 uniform int uModoParallax;
 uniform vec2 uPxLowMid, uPxMidHigh;
-uniform vec3 uPxSteep;                  // potencia, contraste y punto medio
-/* Lo que da variedad al suelo en Parallax: influencia, desplazamiento y oclusión, con un
-   canal por textura (ver ParallaxTerrain). */
+uniform vec3 uPxSteep;                  // strength, contrast and midpoint
+/* What gives the ground variety in Parallax: influence, displacement and occlusion, with one
+   channel per texture (see ParallaxTerrain). */
 uniform sampler2D uPxInf, uPxDisp, uPxOcc;
 uniform int uPxHasInf, uPxHasDisp, uPxHasOcc;
-uniform int uVariacion;                 // romper la repetición del mosaico
+uniform int uVariacion;                 // break up the tiling repetition
 uniform sampler2D uPxBumpL, uPxBumpM, uPxBumpH, uPxBumpS;
 uniform int uPxHasBump;
 uniform int uDebug;
@@ -85,18 +86,18 @@ uniform float uColorOff, uBiomeOff, uBiomeAmt;
 uniform vec3 uSun, uTint, uSeaColor;
 uniform sampler2D uSeaTex;
 uniform int uHasSeaTex;
-/* Profundidad para los scatters, que se pintan después con prueba de profundidad: la
-   distancia a la que choca el rayo, en escala logarítmica (ver GlobeView.Scatters). */
+/* Depth for the scatters, which are painted afterwards with depth testing: the distance at
+   which the ray hits, on a logarithmic scale (see GlobeView.Scatters). */
 uniform int uWriteDepth;
 uniform float uDepthFar;
 out vec4 frag;
 
 float profundidad(float z) { return clamp(log2(1.0 + max(z, 0.0)) / log2(1.0 + uDepthFar), 0.0, 1.0); }
 
-/* El mapa de alturas se sube sin filtrar, porque los biomas se leen por color exacto.
-   Aqui se interpola a mano: sin esto el terreno sale a escalones del tamano de un texel
-   (en Kerbin, mesetas de 460 m). La curva quintica ademas quita las aristas entre
-   texeles, que a ras de suelo se notan. */
+/* The height map is uploaded unfiltered, because biomes are read by exact color. Here it's
+   interpolated by hand: without this the terrain comes out in steps the size of a texel (on
+   Kerbin, 460 m plateaus). The quintic curve also removes the edges between texels, which show
+   at ground level. */
 float texel(ivec2 p) {
   p.x = int(mod(float(p.x), uHeightSize.x));
   p.y = clamp(p.y, 0, int(uHeightSize.y) - 1);
@@ -113,27 +114,27 @@ float grisSuave(vec2 uv) {
   return mix(a, b, f.y);
 }
 
-/* Zonas allanadas (la explanada del KSC): dirección y altura, y radios plano y de fundido. */
+/* Leveled areas (the KSC's): direction and height, and flat and blend radii. */
 uniform int uFlatCount;
 uniform vec4 uFlat[4];
 uniform vec2 uFlatR[4];
 
-/* Tesela de alturas de detalle bajo la cámara (ver TeselaAltura): una ventana del mapa a
-   resolución completa. Rect: primer texel y tamaño de la ventana; Nivel: tamaño del nivel
-   entero y desfase de longitud; Rango: metros del gris 0 y del 255; y el ancho del fundido. */
+/* Detail height tile under the camera (see TeselaAltura): a window of the map at full
+   resolution. Rect: first texel and window size; Nivel: whole level size and longitude offset;
+   Rango: meters of gray 0 and gray 255; and the blend width. */
 uniform int uTesela;
 uniform sampler2D uTeselaTex;
 uniform vec4 uTeselaRect;
 uniform vec3 uTeselaNivel;
 uniform vec3 uTeselaRango;
 
-/* Pesos de Catmull-Rom (ver TeselaAltura.Altura, que hace lo mismo en la CPU). */
+/* Catmull-Rom weights (see TeselaAltura.Altura, which does the same on the CPU). */
 vec4 pesosCatmullRom(float f) {
   float f2 = f * f, f3 = f2 * f;
   return vec4(-f + 2.0 * f2 - f3, 2.0 - 5.0 * f2 + 3.0 * f3, f + 4.0 * f2 - 3.0 * f3, -f2 + f3) * 0.5;
 }
 
-/* Altura de la tesela en metros y su peso (0 fuera, 1 dentro, fundido cerca del borde). */
+/* Tile height in meters and its weight (0 outside, 1 inside, blended near the edge). */
 vec2 alturaTesela(float lat, float lon) {
   float u = fract(lon / (2.0 * PI) + 0.5 + uTeselaNivel.z), v = 0.5 - lat / PI;
   vec2 t = vec2(u * uTeselaNivel.x, v * uTeselaNivel.y) - 0.5 - uTeselaRect.xy;
@@ -155,14 +156,14 @@ vec2 alturaTesela(float lat, float lon) {
   return vec2(h, smoothstep(0.0, 1.0, clamp(borde / uTeselaRango.z, 0.0, 1.0)));
 }
 
-/* Altura del terreno en esa direccion, en metros sobre el nivel del mar. */
+/* Terrain height in that direction, in meters above sea level. */
 float terrainH(vec3 n) {
   float lat = asin(clamp(n.y, -1.0, 1.0));
   float lon = atan(n.x, n.z);
   vec2 uv = vec2(fract(lon / (2.0 * PI) + 0.5 + uHeightOff), 0.5 - lat / PI);
   float h;
   vec2 ht = uTesela != 0 ? alturaTesela(lat, lon) : vec2(0.0);
-  // dentro de la tesela el mapa base ni se lee
+  // inside the tile the base map isn't even read
   if (ht.y >= 1.0) h = ht.x;
   else h = mix(uHMin + grisSuave(uv) * (uHMax - uHMin), ht.x, ht.y);
   for (int i = 0; i < uFlatCount; i++) {
@@ -172,10 +173,10 @@ float terrainH(vec3 n) {
   return h;
 }
 
-/* Profundidad para el color del agua. El mapa de alturas es de 8 bits y el fondo del mar baja a
-   escalones de decenas de metros: visto a través del agua, cada escalón salía como una curva de
-   nivel. Se promedia a texel y medio alrededor; junto a la orilla manda la exacta (la espuma y la
-   arena tienen que casar con la costa). */
+/* Depth for the water color. The height map is 8-bit and the sea floor drops in steps of tens of
+   meters: seen through the water, each step showed up as a contour line. It's averaged over a
+   texel and a half around; next to the shore the exact one rules (the foam and the sand have to
+   match the coast). */
 float profColor(vec3 n, float exacta) {
   float lat = asin(clamp(n.y, -1.0, 1.0)), lon = atan(n.x, n.z);
   vec2 uv = vec2(fract(lon / (2.0 * PI) + 0.5 + uHeightOff), 0.5 - lat / PI);
@@ -186,14 +187,13 @@ float profColor(vec3 n, float exacta) {
   return mix(exacta, suave, smoothstep(2.0, 10.0, exacta));
 }
 
-/* Radio de la superficie en ese punto. Bajo el nivel del mar manda el mar: el agua
-   es una esfera lisa y el rayo no tiene que bajar al fondo. El fondo se deja un metro
-   por debajo del agua y no justo en ella: si no, la ultima muestra del rayo cae sobre la
-   esfera del mar y el redondeo decide al azar si es tierra o agua, y a ras del mar
-   salian franjas de las dos. */
+/* Surface radius at that point. Below sea level the sea rules: the water is a smooth sphere and
+   the ray doesn't have to go down to the bottom. The bottom is left a meter below the water and
+   not right on it: otherwise, the ray's last sample falls on the sea sphere and rounding
+   decides at random whether it's land or water, and at sea level stripes of both appeared. */
 float terrainR(vec3 p) { return 1.0 + max(terrainH(normalize(p)), -1.0) / uRadiusM; }
 
-/* Normal del terreno por diferencias en el mapa de alturas, a unas decenas de metros. */
+/* Terrain normal by differences on the height map, at a few tens of meters. */
 vec3 terrainNormal(vec3 p) {
   vec3 up = normalize(p);
   vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), up));
@@ -206,9 +206,9 @@ vec3 terrainNormal(vec3 p) {
   return normalize(up - east * dx - north * dy);
 }
 
-/* Avanza por el mapa de alturas hasta cruzar la superficie. Los pasos crecen con la
-   distancia (cerca hace falta detalle; lejos, un pixel abarca cientos de metros) y el
-   cruce se afina por biseccion. Devuelve la distancia al choque, o -1 si no hay. */
+/* Steps through the height map until it crosses the surface. Steps grow with distance (up close
+   detail is needed; far away, a pixel spans hundreds of meters) and the crossing is refined by
+   bisection. Returns the distance to the hit, or -1 if there's none. */
 float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
   nOut = vec3(0.0); wasSea = 0.0;
   vec2 tTop = raySphere(o, d, uTopR);
@@ -218,14 +218,14 @@ float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
   float t1 = tSea.x > 0.0 ? tSea.x : tTop.y;
   if (t1 <= t0) return -1.0;
 
-  /* Pasos según la holgura sobre el terreno: con pendientes de hasta unos 60° no se
-     salta nada avanzando la mitad de la altura que queda por encima. Un mínimo que
-     crece con la distancia (lo que abarca un píxel) y otro fijo y pequeño. Con pasos
-     fijos, las crestas finas de lejos se saltaban (escalones en las siluetas), sobre todo
-     con la tesela de detalle. El mínimo fijo era antes (t1 - t0) / 256, que a ras de una
-     montaña son unos 300 m: un rayo rasante saltaba la cima y salían discos planos
-     flotando. Ahora es 1/1500, y para llegar siempre al final (un rayo pegado al suelo
-     gasta los pasos mucho antes) el último tercio del presupuesto reparte lo que quede. */
+  /* Steps according to the clearance above the terrain: with slopes up to about 60° nothing is
+     skipped by advancing half the height left above. A minimum that grows with distance (what a
+     pixel spans) and another fixed, small one. With fixed steps, thin ridges far away were
+     skipped (steps in the silhouettes), especially with the detail tile. The fixed minimum used
+     to be (t1 - t0) / 256, which skimming a mountain is about 300 m: a grazing ray jumped the
+     summit and flat floating discs appeared. Now it's 1/1500, and to always reach the end (a
+     ray hugging the ground uses up its steps much earlier) the last third of the budget spreads
+     out whatever is left. */
   float prevT = t0, tt = t0;
   float pasoMin = (t1 - t0) / 1500.0;
   for (int i = 0; i < 400; i++) {
@@ -251,13 +251,13 @@ float marchTerrain(vec3 o, vec3 d, out vec3 nOut, out float wasSea) {
   return -1.0;
 }
 
-/* Detalle del suelo con las texturas del juego. Cerca, el mapa del cuerpo no da mas de
-   si (un texel son cientos de metros), asi que se le superponen texturas que se repiten
-   cada pocos metros. Se desvanecen con la distancia para que no hagan muare. */
+/* Ground detail with the game's textures. Up close, the body's map has nothing more to give (a
+   texel is hundreds of meters), so textures that repeat every few meters are laid over it. They
+   fade with distance so they don't moiré. */
 
-/* Paso de 0 a 1 entre a y b, lineal, exactamente como GetPercentageAltitudeBetween de
-   Parallax: con el rango al reves (b < a) da 0 por encima de a, que es como la Mun y
-   otros cuerpos dicen «siempre la textura de abajo». */
+/* Linear step from 0 to 1 between a and b, exactly like Parallax's
+   GetPercentageAltitudeBetween: with the range reversed (b < a) it gives 0 above a, which is
+   how the Mun and other bodies say «always the bottom texture». */
 float pct(float a, float b, float x) {
   if (b == a) return x >= a ? 1.0 : 0.0;
   return clamp((x - a) / (b - a), 0.0, 1.0);
@@ -269,8 +269,8 @@ float hash12(vec2 p) {
   return fract((p3.x + p3.y) * p3.z);
 }
 
-/* Ruido de valor periodico: al dar la vuelta el modulo de las coordenadas, el dibujo de
-   la variacion sigue igual. */
+/* Periodic value noise: when the coordinates' modulus wraps around, the variation pattern stays
+   the same. */
 float ruidoP(vec2 p, float per) {
   vec2 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
@@ -279,9 +279,9 @@ float ruidoP(vec2 p, float per) {
   return mix(mix(hash12(i), hash12(vec2(i1.x, i.y)), f.x), mix(hash12(vec2(i.x, i1.y)), hash12(i1), f.x), f.y);
 }
 
-/* Variacion de textura (la tecnica de Inigo Quilez): cada zona lee la textura con un
-   desplazamiento distinto, elegido por un ruido suave, y las zonas se funden donde el
-   dibujo de las dos se parece. El mosaico deja de verse repetido con solo dos lecturas. */
+/* Texture variation (Inigo Quilez's technique): each zone reads the texture with a different
+   offset, chosen by a smooth noise, and zones blend where the patterns of both look alike. The
+   tiling stops looking repeated with only two reads. */
 vec4 variada(sampler2D s, vec2 uv, vec2 gx, vec2 gy, float per) {
   if (uVariacion == 0) return textureGrad(s, uv, gx, gy);
   float k = ruidoP(uv * 0.125, per * 0.125) * 8.0;
@@ -291,8 +291,8 @@ vec4 variada(sampler2D s, vec2 uv, vec2 gx, vec2 gy, float per) {
   return mix(a, b, smoothstep(0.2, 0.8, f - 0.1 * dot(a.rgb - b.rgb, vec3(1.0))));
 }
 
-/* Proyeccion biplanar, como Parallax: la textura se proyecta sobre los dos planos de los
-   ejes del mundo que mas miran hacia la normal, asi no se estira en las laderas. */
+/* Biplanar projection, like Parallax: the texture is projected onto the two world-axis planes
+   that face the normal most, so it doesn't stretch on slopes. */
 ivec2 gEjes;
 vec2 gPesos;
 
@@ -305,14 +305,14 @@ void biplanar(vec3 n) {
   gEjes = ivec2(ma, me);
   vec2 w = pow(vec2(m[ma], m[me]), vec2(8.0));
   w = w / (w.x + w.y);
-  // la segunda solo si pesa algo: casi siempre basta una lectura
+  // the second only if it weighs something: one read is almost always enough
   if (w.y < 0.02) w = vec2(1.0, 0.0);
   gPesos = w / (w.x + w.y);
 }
 
 vec2 plano(vec3 c, int e) { return e == 0 ? c.yz : (e == 1 ? c.zx : c.xy); }
 
-/* Una textura en coordenadas del mundo (metros), a esc metros por repeticion. */
+/* A texture in world coordinates (meters), at esc meters per repeat. */
 vec4 bip(sampler2D s, vec3 c, vec3 dx, vec3 dy, float esc, float per, bool conVar) {
   vec4 acc = vec4(0.0);
   for (int k = 0; k < 2; k++) {
@@ -326,9 +326,9 @@ vec4 bip(sampler2D s, vec3 c, vec3 dx, vec3 dy, float esc, float per, bool conVa
   return acc;
 }
 
-/* Las dos escalas de Parallax: cerca la textura se repite mas a menudo y lejos menos, en
-   potencias de dos segun la distancia, y entre una y otra se funden. Asi el mosaico nunca
-   se ve demasiado pequeno ni demasiado grande en pantalla. */
+/* Parallax's two scales: up close the texture repeats more often and far away less, in powers
+   of two by distance, and they're blended in between. That way the tiling never looks too small
+   or too large on screen. */
 float gLb, gS0, gS1;
 
 vec4 dosEscalas(sampler2D s, vec3 c, vec3 dx, vec3 dy, bool conVar) {
@@ -337,8 +337,8 @@ vec4 dosEscalas(sampler2D s, vec3 c, vec3 dx, vec3 dy, bool conVar) {
   return mix(a, b, gLb);
 }
 
-/* Relieve de un mapa de normales (DXT5nm de Unity: x en alfa, y en verde) proyectado en
-   los mismos planos: cuanto se inclina la normal, en ejes del mundo. */
+/* Relief from a normal map (Unity's DXT5nm: x in alpha, y in green) projected on the same
+   planes: how much the normal tilts, in world axes. */
 vec3 bipRelieve(sampler2D s, vec3 c, vec3 dx, vec3 dy, float esc, float per) {
   vec3 acc = vec3(0.0);
   for (int k = 0; k < 2; k++) {
@@ -360,9 +360,9 @@ vec3 relieveDos(sampler2D s, vec3 c, vec3 dx, vec3 dy) {
   return mix(a, b, gLb);
 }
 
-/* Mezcla por desplazamiento (GetDisplacementLerpFactor de Parallax): en la transicion
-   entre dos texturas gana la que tiene mas relieve en cada punto, asi la hierba asoma
-   entre las piedras en vez de fundirse con ellas. De lejos se suaviza. */
+/* Displacement blend (Parallax's GetDisplacementLerpFactor): in the transition between two
+   textures, the one with more relief at each point wins, so grass peeks out between stones
+   instead of fading into them. From afar it softens. */
 float mezclaDesp(float h, float d1, float d2, float logD) {
   float suave = mix(0.15, 1.0, clamp(logD * 0.15 - 0.5, 0.0, 1.0));
   d2 = clamp(d2 + h, 0.0, 1.0);
@@ -370,21 +370,21 @@ float mezclaDesp(float h, float d1, float d2, float logD) {
   return clamp((d2 - d1) * h / suave, 0.0, 1.0);
 }
 
-/* Influencia: cuanto manda la textura frente al color del planeta. Donde manda poco, se
-   queda el color del mapa con el dibujo (la luminosidad) de la textura. */
+/* Influence: how much the texture dominates over the planet color. Where it dominates little,
+   the map color stays with the texture's pattern (the luminance). */
 vec3 conInfluencia(vec3 t, float inf, vec3 base) {
   float lum = dot(t, vec3(0.21, 0.72, 0.07)) + 0.5;
   return mix(base * lum, t, inf);
 }
 
-/* Devuelve el color del suelo con su detalle y, con los mapas de normales de Parallax,
-   inclina `n` con el relieve fino de las texturas, que es lo que les da luz y sombra. */
+/* Returns the ground color with its detail and, with Parallax's normal maps, tilts `n` with the
+   textures' fine relief, which is what gives them light and shadow. */
 vec3 detalle(vec3 p, inout vec3 n, vec3 base, float dist) {
   if (uHasDetail == 0 || uDetAmt <= 0.0) return base;
   float amt = uDetAmt * (1.0 - smoothstep(1500.0, 9000.0, dist));
   if (amt <= 0.001) return base;
 
-  // coordenadas del punto en el mundo, en metros y sin perder precision
+  // the point's world coordinates, in meters and without losing precision
   vec3 c = uEyeMod + (p - uEye) * uRadiusM;
   vec3 dx = dFdx(c), dy = dFdy(c);
   vec3 up = normalize(p);
@@ -395,7 +395,7 @@ vec3 detalle(vec3 p, inout vec3 n, vec3 base, float dist) {
   gLb = clamp(logD - fl, 0.0, 1.0);
 
   if (uModoParallax != 0) {
-    // mascara de Parallax: baja-media (r), media-alta (g), pendiente (b)
+    // Parallax mask: low-mid (r), mid-high (g), slope (b)
     float alt = uHasHeight != 0 ? max(terrainH(up), 0.0) : 0.0;
     float r = pct(uPxLowMid.x, uPxLowMid.y, alt);
     float g = pct(uPxMidHigh.x, uPxMidHigh.y, alt);
@@ -438,7 +438,7 @@ vec3 detalle(vec3 p, inout vec3 n, vec3 base, float dist) {
     return mix(base, col, amt);
   }
 
-  float pend = 1.0 - clamp(dot(n, up), 0.0, 1.0);          // 0 llano, crece con la pendiente
+  float pend = 1.0 - clamp(dot(n, up), 0.0, 1.0);          // 0 flat, grows with the slope
   float roca = smoothstep(0.02, 0.12, pend);
   float verde = clamp((base.g - max(base.r, base.b)) * 6.0, 0.0, 1.0);
   float blanco = smoothstep(0.62, 0.82, min(min(base.r, base.g), base.b));
@@ -451,7 +451,7 @@ vec3 detalle(vec3 p, inout vec3 n, vec3 base, float dist) {
   d /= suma;
   d = mix(d, dosEscalas(uDetRock, c, dx, dy, true).rgb, roca);
 
-  // el detalle modula, no pinta: mantiene el color del mapa y le pone grano
+  // detail modulates, it doesn't paint: it keeps the map color and adds grain
   float lum = dot(d, vec3(0.2126, 0.7152, 0.0722));
   return base * mix(1.0, clamp(lum / 0.42, 0.45, 1.8), amt);
 }
@@ -459,8 +459,8 @@ vec3 detalle(vec3 p, inout vec3 n, vec3 base, float dist) {
 void main() {
   gl_FragDepth = 1.0;
   vec2 ndc = gl_FragCoord.xy / uView * 2.0 - 1.0;
-  /* Diagnostico: 1 pinta el gris del mapa de alturas donde el rayo cruza el nivel del
-     mar, 2 pinta la altura en metros y 3 la distancia al choque con el terreno. */
+  /* Diagnostics: 1 paints the height map's gray where the ray crosses sea level, 2 paints the
+     height in meters and 3 the distance to the terrain hit. */
   if (uDebug != 0) {
     vec3 dd = normalize(uF + uR * ndc.x * uTan * uAspect + uU * ndc.y * uTan);
     vec2 tgd = raySphere(uEye, dd, 1.0);
@@ -493,10 +493,10 @@ void main() {
   vec2 tg = raySphere(eye, d, 1.0);
 
   vec3 col;
-  vec4 facA = vec4(0.0);           // el mapa político sobre el suelo, ya con su luz
-  float tapaNube = 0.0;            // lo que lo tapan las nubes
-  float tSuelo = -1.0;             // dónde toca el rayo el suelo de verdad (con relieve), o nada
-  vec3 plano = vec3(0.0);          // el color del mapa tal cual, para fundirse con el mapa plano
+  vec4 facA = vec4(0.0);           // the political map over the ground, already lit
+  float tapaNube = 0.0;            // how much the clouds cover it
+  float tSuelo = -1.0;             // where the ray hits the real ground (with relief), or nothing
+  vec3 plano = vec3(0.0);          // the map color as is, to blend with the flat map
   {
     float t = tg.x;
     vec3 nRel = vec3(0.0); float esMar = 0.0;
@@ -509,24 +509,24 @@ void main() {
       float lat = asin(clamp(p.y, -1.0, 1.0));
       float lon = atan(p.x, p.z);
       float u = lon / (2.0 * PI) + 0.5, v = 0.5 - lat / PI;
-      /* En la costura de ±180° la u salta de 1 a 0 y sus derivadas se disparan; se
-         toma la de la u desplazada media vuelta, que allí es continua. */
+      /* At the ±180° seam u jumps from 1 to 0 and its derivatives blow up; the one from u
+         shifted half a turn is taken, which is continuous there. */
       vec2 uv = vec2(u, v);
       vec2 gx = dFdx(uv), gy = dFdy(uv);
       vec2 uv2 = vec2(fract(u + 0.5), v);
       vec2 gx2 = dFdx(uv2), gy2 = dFdy(uv2);
       if (abs(gx2.x) + abs(gy2.x) < abs(gx.x) + abs(gy.x)) { gx = gx2; gy = gy2; }
 
-      /* Con relieve, las derivadas de pantalla no sirven: la distancia al choque cambia
-         de golpe entre pixeles vecinos (siluetas) y encima se calculan dentro de una
-         rama que no todos los pixeles toman, que es justo lo que el lenguaje deja sin
-         definir. El mipmap se iba al nivel mas basto y el suelo salia de un gris plano.
-         Aqui el nivel se calcula del tamano que tiene el pixel sobre el suelo. */
+      /* With relief, screen derivatives are useless: the hit distance changes abruptly between
+         neighboring pixels (silhouettes) and on top of that they're computed inside a branch
+         not all pixels take, which is exactly what the language leaves undefined. The mipmap
+         went to the coarsest level and the ground came out flat gray. Here the level is
+         computed from the size the pixel has on the ground. */
       float lod = 0.0;
       if (relieve) {
         vec3 up0 = normalize(p);
         float cosInc = max(abs(dot(d, up0)), 0.02);
-        float huella = t * uRadiusM * uPix / cosInc;            // metros que abarca el pixel
+        float huella = t * uRadiusM * uPix / cosInc;            // meters the pixel spans
         float texel = 2.0 * PI * uRadiusM / max(uColorSize.x, 1.0);
         lod = clamp(log2(max(huella / texel, 0.0001)), 0.0, 14.0);
       }
@@ -536,36 +536,36 @@ void main() {
         ? textureLod(uColor, vec2(fract(u + uColorOff), v), lod).rgb
         : textureGrad(uColor, vec2(fract(u + uColorOff), v), gx, gy).rgb;
       plano = base;
-      // el mar por el color, antes de mezclar los biomas
+      // the sea by color, before mixing in the biomes
       float water = uHasColor != 0 ? smoothstep(0.03, 0.08, base.b - max(base.r, base.g)) : 0.0;
       if (uHasBiome != 0 && uBiomeAmt > 0.0)
         base = mix(base, relieve
           ? textureLod(uBiome, vec2(fract(u + uBiomeOff), v), 0.0).rgb
           : textureGrad(uBiome, vec2(fract(u + uBiomeOff), v), gx, gy).rgb, uBiomeAmt);
-      // cada punto con su Sol: el suelo lejano puede estar al otro lado del terminador
+      // each point with its own Sun: distant ground may be on the other side of the terminator
       float aguaAmt = water, profA = 300.0;
       vec3 marA = base;
       if (relieve) {
-        /* La costa. El mapa de color es de kilómetros por texel: junto al mar la tierra
-           hereda su azul y, tomada por agua, salía con el brillo del mar y la orilla se
-           perdía. Con relieve manda la geometría: es mar lo que el rayo encuentra en la
-           esfera del mar. En KSP no hay agua por encima del nivel del mar (el agua es
-           siempre esa esfera), así que en tierra el azul del mapa es siempre tierra: arena
-           junto al agua (mojada en la orilla) y, más arriba, el color de la tierra de al
-           lado. El mar se pinta abajo (ver GlobeView.Agua) con su profundidad: el fondo a
-           través del agua donde cubre poco, olas, brillo del Sol y espuma en la orilla. */
+        /* The coast. The color map is kilometers per texel: next to the sea the land inherits
+           its blue and, taken for water, came out with the sea's glint and the shore was lost.
+           With relief the geometry rules: sea is what the ray finds on the sea sphere. In KSP
+           there's no water above sea level (the water is always that sphere), so on land the
+           map's blue is always land: sand next to the water (wet at the shore) and, higher up,
+           the color of the nearby land. The sea is painted below (see GlobeView.Agua) with its
+           depth: the bottom through the water where it's shallow, waves, sun glint and foam on
+           the shore. */
         float hSuelo = terrainH(normalize(p));
         aguaAmt = esMar;
         if (esMar > 0.5) {
           profA = max(-hSuelo, 0.0);
-          // junto a la costa el mapa trae tierra y arena: el color de su mar abierto (ver MapaDelMar)
+          // next to the coast the map has land and sand: the color of its open sea (see MapaDelMar)
           marA = uHasSeaTex != 0 ? textureLod(uSeaTex, vec2(fract(u), v), 0.0).rgb : mix(uSeaColor, base, water);
         } else {
-          /* En KSP no hay lagos por encima del mar: el agua es la esfera del océano. El azul
-             del mapa sobre tierra es un texel de costa (de 4,6 km) que cae dentro: arena
-             junto al agua y hierba más arriba, y encima las texturas del suelo. Tomado por
-             lago, dejaba lagunas de borde recto detrás de la playa. */
-          // el color de la tierra de al lado: los texeles vecinos que no son azules
+          /* In KSP there are no lakes above the sea: the water is the ocean sphere. The map's
+             blue over land is a coastal texel (4.6 km) that falls inside: sand next to the
+             water and grass higher up, with the ground textures on top. Taken for a lake, it
+             left straight-edged lagoons behind the beach. */
+          // the color of the nearby land: the neighboring texels that aren't blue
           vec3 tierra = vec3(0.4, 0.48, 0.26), acc = vec3(0.0);
           float pesoT = 0.0;
           vec2 txl = 1.6 / max(uColorSize, vec2(1.0));
@@ -578,25 +578,25 @@ void main() {
           }
           if (pesoT > 0.2) tierra = acc / pesoT;
           tierra = mix(tierra, vec3(0.8, 0.74, 0.56), 1.0 - smoothstep(10.0, 40.0, hSuelo));
-          // con una detección del azul más sensible que la del agua: el borde bilineal entre un
-          // texel azul y uno verde ya tiñe de azul antes de contar como agua
+          // with a blue detection more sensitive than the water's: the bilinear edge between a
+          // blue texel and a green one already tints blue before counting as water
           base = mix(base, tierra, smoothstep(-0.03, 0.05, base.b - max(base.r, base.g)));
-          base *= mix(0.7, 1.0, smoothstep(0.15, 1.2, hSuelo));  // arena mojada en la orilla
+          base *= mix(0.7, 1.0, smoothstep(0.15, 1.2, hSuelo));  // wet sand on the shore
           water = 0.0;
         }
       }
       else if (water > 0.0 && uHasHeight != 0) profA = max(-terrainH(normalize(p)), 0.0);
       vec3 nSup = relieve ? nRel : normalize(p);
       vec3 L = vec3(0.0);
-      // en el mapa, la distancia del ojo (fijo, muy alto) apagaba el detalle a cualquier zoom:
-      // se usa la que tendría en el vuelo un píxel del mismo tamaño
+      // on the map, the eye's distance (fixed, very high) killed the detail at any zoom:
+      // we use the one a pixel of the same size would have in flight
       if (aguaAmt < 0.999) {
         base = detalle(p, nSup, base, uCenital != 0 ? uDistCenital : t * uRadiusM);
         L = shadeGround(p, nSup, -d, uSun, pow(base, vec3(2.2)), 0.0);
       }
       if (aguaAmt > 0.001) {
         vec3 up0 = normalize(p);
-        // metros por píxel sobre el agua; mirando de refilón, el píxel se alarga hacia el fondo
+        // meters per pixel over the water; at grazing angles the pixel stretches into the distance
         float cosInc = max(abs(dot(d, up0)), 0.02);
         float pxm = t * uRadiusM * uPix;
         float pxOla = pxm / mix(sqrt(cosInc), cosInc, 0.6);
@@ -604,7 +604,7 @@ void main() {
         float sig2 = 0.0, alto = 0.0;
         vec3 nA = uOlas != 0 ? aNormalOlas(c, up0, pxOla, sig2, alto) : up0;
         float s2 = (uOlaCapilar + sig2) * aViento(up0);
-        // el cielo que refleja, con el mismo aire que el cielo de verdad (pocos pasos)
+        // the sky it reflects, with the same air as the real sky (few steps)
         vec3 cielo = vec3(-1.0);
         if (uAtmos != 0 && uCenital == 0) {
           vec3 r = reflect(d, nA);
@@ -615,7 +615,7 @@ void main() {
         float esp = relieve ? aEspuma(c, up0, profA, alto, pxm / mix(1.0, cosInc, 0.5)) : 0.0;
         L = mix(L, aLuz(p, nA, -d, uSun, marA, uHasHeight != 0 ? profColor(up0, profA) : profA, s2, cielo, esp), aguaAmt);
       }
-      // los territorios, recortados por la costa del relieve (ver FaccionesGlsl)
+      // the territories, clipped by the relief's coast (see FaccionesGlsl)
       if (uFacOn != 0 && uCenital == 0) {
         vec3 upF = normalize(p);
         float cosF = max(abs(dot(d, upF)), 0.05);
@@ -630,48 +630,48 @@ void main() {
       vec3 tr = vec3(1.0), ins = vec3(0.0);
       if (uAtmos != 0 && ta.y > 0.0) ins = inscatter(eye, d, max(ta.x, 0.0), ta.y, uSun, jit, tr);
       col = ins;
-      // el Sol, 1,1° de radio visto desde Kerbin, con el color que le deja el aire
+      // the Sun, 1.1° radius seen from Kerbin, with the color the air leaves it
       float ang = acos(clamp(dot(d, uSun), -1.0, 1.0));
       col += uSunI * 10.0 * (1.0 - smoothstep(uSunRad, uSunRad + uPix * 1.5, ang)) * tr;
-      // las estrellas: el brillo del cielo las tapa, como de verdad
+      // the stars: the sky's brightness hides them, as in real life
       float skyLum = dot(ins, vec3(0.2126, 0.7152, 0.0722)) * uExposure;
       col += starField(d, uPix, uStarShift) * tr * exp(-skyLum * 30.0) * smoothstep(-0.02, 0.08, el);
     }
   }
-  /* Nubes: una capa esferica a su altura con el mapa del juego. Se toma el corte que
-     queda por delante de lo que ya se ve (suelo o cielo) y se mezcla con su cobertura.
-     Con la camara por debajo vale el corte de salida; por encima, el de entrada. */
+  /* Clouds: a spherical layer at its height with the game's map. The intersection in front of
+     what's already visible (ground or sky) is taken and blended with its coverage. With the
+     camera below, the exit intersection counts; above, the entry one. */
   if (uHasClouds != 0 && uCloudAmt > 0.0) {
     vec2 tn = raySphere(eye, d, uCloudR);
     float tc = length(eye) < uCloudR ? tn.y : tn.x;
-    /* Con el suelo del relieve, no con la esfera del mar: mirando una ladera casi en
-       horizontal el rayo no llega al mar, y la nube se pintaba encima de la colina. */
+    /* With the relief's ground, not the sea sphere: looking at a slope almost horizontally the
+       ray doesn't reach the sea, and the cloud got painted over the hill. */
     if (tc > 0.0 && (tSuelo <= 0.0 || tc < tSuelo)) {
       vec3 pc = eye + d * tc;
       vec3 nc = normalize(pc);
       float latc = asin(clamp(nc.y, -1.0, 1.0)), lonc = atan(nc.x, nc.z);
       vec2 uvc = nubeUv(nc, vec2(lonc / (2.0 * PI) + 0.5 + uCloudOff, 0.5 - latc / PI));
       uvc.x = fract(uvc.x);
-      // el nivel de mipmap, como en el suelo, por el tamano del pixel sobre la capa
+      // the mipmap level, as on the ground, from the pixel size on the layer
       float huella = tc * uRadiusM * uPix;
       float texel = 2.0 * PI * uRadiusM / 2048.0;
       float lodc = clamp(log2(max(huella / texel, 0.0001)), 0.0, 12.0);
       vec4 nube = textureLod(uCloudTex, uvc, lodc);
       float a = clamp(nube.a * uCloudAmt * nubeVida(nc), 0.0, 1.0);
-      // de cerca, el detalle del mod, que va con la capa
+      // up close, the mod's detail, which moves with the layer
       float lonN = lonc + uCloudOff * 2.0 * PI;
       a = clamp(a * nubeDetalle(vec2(lonN * cos(latc), latc) * uRadiusM, 1.0 - smoothstep(4000.0, 30000.0, tc * uRadiusM)), 0.0, 1.0);
       if (a > 0.002) {
-        // iluminacion sencilla: el Sol por encima de la capa, algo de cielo por debajo
+        // simple lighting: the Sun above the layer, some sky below it
         vec3 luz = uSunI * sunTransmittance(pc, uSun) * max(dot(nc, uSun), 0.0) * 0.55
                  + uSunI * vec3(0.05, 0.07, 0.12) * 0.5;
         vec3 colNube = nube.rgb * luz / PI;
-        // lo que hay detras se atenua con el aire que queda por delante de la nube
+        // whatever is behind is attenuated by the air in front of the cloud
         vec3 trN = vec3(1.0), insN = vec3(0.0);
         if (uAtmos != 0) insN = inscatter(eye, d, max(ta.x, 0.0), tc, uSun, jit, trN);
         col = mix(col, colNube * trN + insN, a);
         tapaNube = a;
-        // una nube espesa tapa lo que haya detrás, también los árboles
+        // a thick cloud hides whatever is behind it, trees included
         if (uWriteDepth != 0 && a > 0.5) gl_FragDepth = min(gl_FragDepth, profundidad(tc * uRadiusM * dot(d, uF)));
       }
     }
@@ -680,8 +680,8 @@ void main() {
   col = toneMap(col);
   if (facA.a > 0.0) col = col * (1.0 - facA.a * (1.0 - tapaNube)) + facA.rgb * (1.0 - tapaNube);
 
-  /* Rejilla de altura y acimut: círculos cada 15° y meridianos cada 30°. El acimut
-     salta en ±180°; su derivada se toma de la versión que no salta. */
+  /* Altitude and azimuth grid: circles every 15° and meridians every 30°. The azimuth jumps at
+     ±180°; its derivative is taken from the version that doesn't jump. */
   if (uGrid != 0) {
     float elDeg = el * 57.29578;
     float az = atan(dot(d, uEast), dot(d, uNorth)) * 57.29578;
@@ -696,8 +696,8 @@ void main() {
     col = mix(col, vec3(0.31, 0.64, 1.0), horizon * 0.6);
   }
 
-  /* En el mapa 2D, al acercarse, se parte del aspecto del mapa plano y la luz y el detalle
-     entran poco a poco: el cambio de uno a otro apenas se nota. */
+  /* On the 2D map, when zooming in, it starts from the flat map's look and the light and detail
+     come in gradually: the change from one to the other is barely noticeable. */
   if (uCenital != 0 && uPlano > 0.0 && tSuelo > 0.0) col = mix(col, plano, uPlano);
 
   frag = vec4(col, 1.0);
@@ -716,7 +716,7 @@ void main() {
             DisposeStars();
         }
 
-        /* Rumbo (0 = norte, 90 = este) y altura sobre el horizonte bajo un píxel. */
+        /* Heading (0 = north, 90 = east) and elevation above the horizon under a pixel. */
         public (double az, double el) SkyDirAt(double px, double py)
         {
             var d = RayDir(px, py);
@@ -726,8 +726,8 @@ void main() {
             return ((az + 360) % 360, el);
         }
 
-        /* Rumbo y altura del Sol para el observador (está tan lejos que da igual la
-           altura a la que se ponga). */
+        /* Heading and elevation of the Sun for the observer (it's so far away that the
+           observer's height doesn't matter). */
         public (double az, double el) SunAltAz()
         {
             LocalBasis(ObserverPos(), out var up, out var east, out var north);
@@ -742,14 +742,14 @@ void main() {
             SkyEl = Math.Clamp(SkyEl + del, -89, 89);
         }
 
-        /* El suelo de cerca para el mapa 2D, visto desde arriba en su proyección: el mismo
-           suelo que el vuelo (relieve de detalle, texturas del juego, costas) y los edificios
-           en planta. El mapa pinta luego encima su retícula, trazas y marcadores. */
+        /* The nearby ground for the 2D map, seen from above in its projection: the same ground
+           as flight (detail relief, game textures, coasts) and the buildings in plan view. The
+           map then paints its grid, tracks and markers on top. */
         bool cenital, cenSolReal;
         double cenPlano;
         double cenLat, cenLon, cenPpd;
-        double CenitalAltM => Math.Max(HMax, 0) + 5000;       // el ojo, por encima de todo
-        public double CercaCenital = 1;                        // exposición: 0 la del globo, 1 la de paisaje
+        double CenitalAltM => Math.Max(HMax, 0) + 5000;       // the eye, above everything
+        public double CercaCenital = 1;                        // exposure: 0 the globe's, 1 the landscape one
 
         public void RenderCenital(Batch2D batch, TextCache tc, double lat, double lon, double ppd, bool solReal, double plano = 0)
         {
@@ -799,43 +799,43 @@ void main() {
                 skyProg.Vec2("uCentro", cenLon, cenLat);
                 skyProg.Float("uPpd", cenPpd);
                 skyProg.Float("uCenitalR", 1 + CenitalAltM / Body.Radius);
-                // lo que abarca un píxel en el suelo es t·R·uPix, con t la altura del ojo
+                // what a pixel spans on the ground is t·R·uPix, with t the eye height
                 double mpp = Body.Radius * D2R / cenPpd;
                 skyProg.Float("uPix", mpp / CenitalAltM);
-                // en el vuelo (70° de campo, 1080 píxeles de alto) un píxel abarca 0,0013 radianes
+                // in flight (70° field, 1080 pixels tall) a pixel spans 0.0013 radians
                 skyProg.Float("uDistCenital", mpp / 0.0013);
                 skyProg.Float("uPlano", cenPlano);
             }
             skyProg.Float("uAlt", Len(eye) - 1);
             skyProg.Float("uStarShift", orbitShift);
             skyProg.Int("uGrid", SkyGrid && Mode == CamMode.Sky && !cenital ? 1 : 0);
-            // sin día y noche, el Sol se queda en lo alto del observador; forzando la noche, apagado
+            // without day and night, the Sun stays overhead the observer; forcing night, off
             var sun = (cenital ? cenSolReal : Light) ? SunDir : up;
-            // sin día y noche, el mapa se ilumina como un sombreado de relieve: desde el
-            // noroeste a 45°, que es de donde se espera la luz al leer un mapa
+            // without day and night, the map is lit like a hillshade: from the
+            // northwest at 45°, which is where you expect the light when reading a map
             if (cenital && !cenSolReal) sun = Norm(Add(Add(Scale(up, 1), north, 0.7071), east, -0.7071));
             skyProg.Vec3("uSun", sun[0], sun[1], sun[2]);
             skyProg.Int("uSinBrillo", cenital ? 1 : 0);
             skyProg.Float("uSunRad", Math.Max(SunAngularRadius, 0.0015));
             AtmosUniforms(skyProg, 24, sunOn: !SkyForceNight);
-            if (cenital) skyProg.Int("uAtmos", 0);           // un mapa: sin la bruma de 10 km de aire
-            // a ras de suelo, el ajuste de exposición para paisaje (ver shadeGround); bajando
-            // desde el globo se funde con el de fuera para que no dé un salto
+            if (cenital) skyProg.Int("uAtmos", 0);           // a map: without the haze of 10 km of air
+            // at ground level, the landscape exposure setting (see shadeGround); coming down
+            // from the globe it blends with the outside one so it doesn't jump
             skyProg.Float("uCerca", cenital ? CercaCenital : Mode == CamMode.Planet ? 1 - SuaveEntre((Len(eye) - 1) * Body.Radius, 3000, 40000) : 1);
             skyProg.Float("uColorOff", ColorOff / 360);
             skyProg.Float("uBiomeOff", BiomeOff / 360);
             skyProg.Float("uBiomeAmt", BiomeTex != null ? BiomeAmt : 0);
             skyProg.Int("uHasColor", ColorTex != null ? 1 : 0);
             skyProg.Vec3("uSeaColor", SeaColor[0], SeaColor[1], SeaColor[2]);
-            // la unidad 16 no la tienen todas las GPU (el mínimo son 16: de la 0 a la 15)
+            // not every GPU has unit 16 (the minimum is 16: from 0 to 15)
             bool marTex = SeaTex != null && GL.MaxTextureUnits > 16;
             skyProg.Int("uHasSeaTex", marTex ? 1 : 0);
             if (marTex) { BindTex(16, SeaTex); skyProg.Int("uSeaTex", 16); }
             skyProg.Int("uHasBiome", BiomeTex != null ? 1 : 0);
-            /* Relieve: solo con mapa de alturas, y en la camara libre siempre; de pie en
-               el suelo tambien, que es lo que hace que se vean las montanas de cerca. Y
-               bajando en la vista 3D, que por debajo de RadioCerca se pinta con esto mismo:
-               tiene que verse igual que el vuelo. */
+            /* Relief: only with a height map, and always in the free camera; standing on the
+               ground too, which is what makes the mountains show up close. And coming down in
+               the 3D view, which below RadioCerca is painted with this very same thing: it has
+               to look the same as flight. */
             bool cerca = cenital || Mode == CamMode.Free || Mode == CamMode.Sky || Mode == CamMode.Planet;
             bool relieve = HeightTex != null && FreeRelief && cerca;
             skyProg.Int("uHasHeight", HeightTex != null ? 1 : 0);
@@ -862,16 +862,16 @@ void main() {
             }
             skyProg.Float("uHMax", HMax);
             skyProg.Float("uRadiusM", Body.Radius);
-            // cascara por encima de la cima mas alta, que es donde empieza a buscarse el suelo
+            // shell above the highest peak, which is where the search for the ground starts
             skyProg.Float("uTopR", 1 + Math.Max(0, HMax) / Body.Radius);
             skyProg.Vec2("uHeightSize", HeightTex?.Width ?? 1, HeightTex?.Height ?? 1);
             skyProg.Vec2("uColorSize", ColorTex?.Width ?? 1, ColorTex?.Height ?? 1);
             BindTex(0, ColorTex); skyProg.Int("uColor", 0);
             BindTex(1, BiomeTex); skyProg.Int("uBiome", 1);
             BindTex(2, HeightTex); skyProg.Int("uHeightTex", 2);
-            /* Detalle del suelo: solo cerca del suelo, que es donde se ve, y con las cuatro
-               texturas cargadas del juego. El origen va en metros ya reducido al tamano
-               del mosaico, para no perder precision al sumarlo en el shader. */
+            /* Ground detail: only near the ground, which is where it shows, and with the game's
+               four textures loaded. The origin is in meters already reduced to the tile size,
+               so precision isn't lost when it's added in the shader. */
             bool det = Detail && HasDetail && cerca;
             skyProg.Int("uDebug", Debug);
             bool nubes = CloudTex != null && Clouds && !cenital;
@@ -891,14 +891,14 @@ void main() {
             double lat0 = Mode == CamMode.Free ? FreeLat : ObsLat, lon0 = Mode == CamMode.Free ? FreeLon : ObsLon;
             if (Mode == CamMode.Planet) { var g = EyeGround(); lat0 = g.Lat; lon0 = g.Lon; }
             if (cenital) { lat0 = cenLat; lon0 = cenLon; }
-            /* El módulo es un múltiplo de todos los periodos de las texturas (4096 repeticiones:
-               la escala más grande que se usa es de 1024) y de su ruido de variación. */
+            /* The modulus is a multiple of all the textures' periods (4096 repeats: the largest
+               scale used is 1024) and of their variation noise. */
             double periodo = DetailTile * 4096;
             double Mod(double v) => ((v % periodo) + periodo) % periodo;
             skyProg.Vec3("uEyeMod", Mod(eye[0] * Body.Radius), Mod(eye[1] * Body.Radius), Mod(eye[2] * Body.Radius));
             skyProg.Float("uPeriodo", 4096);
             AguaUniforms(skyProg, periodo);
-            // el mapa político, solo bajando en la vista del planeta (unidad 18, si la hay)
+            // the political map, only when coming down in the planet view (unit 18, if there is one)
             FacUniforms(skyProg, 18, Mode == CamMode.Planet && !cenital && GL.MaxTextureUnits > 18);
             skyProg.Int("uVariacion", DetailVariation ? 1 : 0);
             skyProg.Int("uPxHasInf", DetailParallax && PxInfluence != null ? 1 : 0);
@@ -917,8 +917,8 @@ void main() {
             BindTex(4, DetSand); skyProg.Int("uDetSand", 4);
             BindTex(5, DetRock); skyProg.Int("uDetRock", 5);
             BindTex(6, DetSnow); skyProg.Int("uDetSnow", 6);
-            /* Con scatters, el cielo deja en el búfer de profundidad dónde está el suelo. Solo
-               se escribe con la prueba activada, así que se activa sin descartar nada. */
+            /* With scatters, the sky leaves in the depth buffer where the ground is. It's only
+               written with the test enabled, so it's enabled without discarding anything. */
             bool scatters = ScattersActive && !cenital;
             bool edificios = cenital ? HasBuildings || HasGroundVessels : StaticsActive;
             bool profundidad = scatters || edificios;
@@ -945,8 +945,8 @@ void main() {
                 {
                     if (cenital)
                     {
-                        // ortográfica en la proyección del mapa: en él un grado de longitud mide
-                        // lo mismo que uno de latitud, así que el este va estirado 1/cos(lat)
+                        // orthographic in the map's projection: on it a degree of longitude measures
+                        // the same as one of latitude, so east is stretched by 1/cos(lat)
                         double pxN = cenPpd / (Body.Radius * D2R);
                         double pxE = pxN / Math.Max(Math.Cos(cenLat * D2R), 0.01);
                         double radio = Math.Sqrt(W * W + H * H) / 2 / pxN;
@@ -959,15 +959,15 @@ void main() {
             else StaticsVisible = 0;
             if (profundidad)
             {
-                // lo que viene después (órbitas, rótulos) no cuenta con esta profundidad
+                // what comes after (orbits, labels) doesn't count on this depth
                 GL.DepthFunc(GL.LESS);
                 GL.Clear(GL.DEPTH_BUFFER_BIT);
                 GL.Disable(GL.DEPTH_TEST);
                 GL.Disable(GL.CULL_FACE);
             }
-            if (cenital) return;                            // lo demás lo pone el mapa encima
+            if (cenital) return;                            // the map puts the rest on top
 
-            // órbitas y trazas, tapadas por el planeta con el corte de rayo del shader
+            // orbits and tracks, hidden by the planet with the shader's ray cut
             DrawOrbits(eye, occlude: true);
             DrawTrack(eye, occlude: true, ground: false);
 
@@ -995,7 +995,7 @@ void main() {
                 if (t == null) continue;
                 b.Text(t, sx - t.TextW / 2.0, sy - t.TextH - 4 * S);
             }
-            // alturas sobre el meridiano del rumbo al que se mira
+            // elevations along the meridian of the heading being looked at
             double azLook = SkyAz * D2R;
             var h = Add(Scale(north, Math.Cos(azLook)), east, Math.Sin(azLook));
             foreach (int e in new[] { 15, 30, 45, 60, 75 })

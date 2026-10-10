@@ -6,7 +6,7 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Vista del cielo: dónde está el observador y qué opciones tiene. */
+    /* Sky view: where the observer is and what options there are. */
     public sealed partial class MainForm
     {
         Section skySection;
@@ -70,7 +70,7 @@ namespace KerbinMaps.UI
             RenderObserver();
         }
 
-        /* Altitud del suelo si hay mapa de alturas; si no, la que se indique. */
+        /* Ground altitude if there's a height map; otherwise, whatever is entered. */
         double GroundAlt(double lat, double lon, double fallback)
         {
             var img = Img("height");
@@ -142,7 +142,7 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Hora solar local con el día del cuerpo: el mediodía cae a la mitad (en Kerbin, a las 3:00). */
+        /* Local solar time with the body's day: noon falls at the middle (on Kerbin, at 3:00). */
         static string FmtSolar(double h)
         {
             int day = Math.Max(1, (int)Math.Round(Body.SolarDay / 60));
@@ -154,8 +154,8 @@ namespace KerbinMaps.UI
 
         double skyHudAz = double.NaN, skyHudEl;
 
-        /* Las filas del Sol cambian con el tiempo aunque no se mueva el ratón (y la partida
-           se carga después de abrir la vista): se repinta con la última dirección mirada. */
+        /* The Sun rows change over time even if the mouse doesn't move (and the save loads
+           after the view opens): it repaints with the last direction looked at. */
         void RefreshSkyHud()
         {
             if (!isSky) return;
@@ -173,7 +173,7 @@ namespace KerbinMaps.UI
                         ("campo", Geo.F(globe.SkyFov, 0) + "°"),
                         ("sol", Signed(sEl) + " " + RumbosHud[(int)Math.Round(sAz / 45) % 8]),
                         ("hora solar", FmtSolar(Sun.LocalHours(state.ObsLon, globe.SunLon))));
-            hud.Location = new Point(mapArea.Width - Theme.S(12) - hud.Width, Theme.S(56));
+            hud.Location = new Point(mapArea.Width - Theme.S(12) - hud.Width, HudTop);
             PlaceOrbitInfo();
         }
     }

@@ -3,15 +3,15 @@ using System.Collections.Generic;
 
 namespace KerbinMaps.Core
 {
-    /* Nombres de los biomas de Kerbin en el juego, por su color en el mapa de biomas de
-       KSP (el mismo que trae el visor, sacado de la wiki).
+    /* Names of Kerbin's biomes in the game, by their color in KSP's biome map (the same one the
+       viewer ships, taken from the wiki).
 
-       Los nombres que el usuario pone a los biomas son suyos y en su idioma; los mods, en
-       cambio, hablan de «Grasslands» o «Deserts». Parallax, por ejemplo, dice en qué biomas
-       no sale cada scatter. Los colores se identificaron por su área y su latitud: el azul
-       que cubre la mitad del planeta es el agua, el blanco de los dos polos los casquetes,
-       el gris claro del sur la plataforma de hielo austral, el morado de latitudes altas la
-       tundra, etc. */
+       The names the user gives biomes are theirs and in their language; mods, on the other
+       hand, talk about «Grasslands» or «Deserts». Parallax, for example, says which biomes each
+       scatter doesn't appear in. The colors were identified by their area and latitude: the
+       blue covering half the planet is the water, the white at both poles the ice caps, the
+       light gray in the south the southern ice shelf, the purple at high latitudes the tundra,
+       etc. */
     public static class StockBiomes
     {
         static readonly Dictionary<string, string> Kerbin = new(StringComparer.OrdinalIgnoreCase)
@@ -29,7 +29,7 @@ namespace KerbinMaps.Core
             ["#d8d8d8"] = "Southern Ice Shelf",
         };
 
-        /* Nombre del juego para ese color en ese cuerpo, o null si no se conoce. */
+        /* The game's name for that color on that body, or null if unknown. */
         public static string Name(string body, string hex) =>
             body == "Kerbin" && hex != null && Kerbin.TryGetValue(hex, out var n) ? n : null;
     }

@@ -4,39 +4,39 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* El mar, compartido por el globo visto desde fuera y por el suelo de cerca (cielo, vuelo,
-       la bajada del globo y el mapa 2D de cerca).
+    /* The sea, shared by the globe seen from outside and by the nearby ground (sky, flight, the
+       globe descent and the close-up 2D map).
 
-       La superficie sigue siendo la esfera del océano; las olas solo inclinan la normal. Son
-       una suma de ocho trenes de onda de 2 a 60 m, con la velocidad de las olas de aguas
-       profundas (ω² = g·k), que se van apagando cuando una longitud de onda ocupa pocos
-       píxeles. Lo que se apaga no se pierde: su pendiente pasa a la rugosidad del brillo del
-       Sol (una distribución de Beckmann con la varianza de Cox y Munk). Así, de cerca se ven
-       las olas y los destellos sueltos, y de lejos el reflejo se ensancha solo hasta la mancha
-       de brillo que se ve desde órbita, con zonas más lisas y más rizadas según el viento.
+       The surface is still the ocean sphere; waves only tilt the normal. They're a sum of eight
+       wave trains from 2 to 60 m, with deep-water wave speed (ω² = g·k), which fade out when a
+       wavelength spans few pixels. What fades isn't lost: its slope goes into the roughness of
+       the sun glint (a Beckmann distribution with the Cox and Munk variance). That way, up close
+       you see the waves and the scattered sparkles, and from afar the reflection widens on its
+       own into the glint patch seen from orbit, with smoother and choppier areas depending on
+       the wind.
 
-       Debajo, el agua deja ver el fondo donde cubre poco: la luz que baja y sube se atenúa por
-       canal (el rojo se pierde enseguida), así que la arena de la orilla pasa a turquesa y luego
-       al color del mar abierto del mapa (que en Eve es morado). En la orilla, espuma que llega
-       en líneas con las olas. */
+       Underneath, the water shows the bottom where it's shallow: the light going down and up is
+       attenuated per channel (red is lost right away), so the sand of the shore turns turquoise
+       and then the color of the open sea from the map (which on Eve is purple). On the shore,
+       foam that arrives in lines with the waves. */
     public sealed partial class GlobeView
     {
-        /* Olas y espuma; sin ellas, el mar liso de siempre con su brillo. */
+        /* Waves and foam; without them, the usual smooth sea with its glint. */
         public bool Olas = true;
-        /* Segundos de reloj real para mover las olas. No van con el tiempo de la simulación:
-           a x1000 serían un hervidero. */
+        /* Real-clock seconds to move the waves. They don't follow simulation time: at x1000
+           they'd be a boiling pot. */
         public double AguaT;
 
-        /* Longitud de onda (m), giro respecto al viento (grados) y pendiente (a·k) de cada tren:
-           dieciséis olas de 80 a 1,6 m, repartidas en escala logarítmica con algo de azar y las
-           direcciones abiertas alrededor del viento, y ocho rizos de 1,4 m a 25 cm que solo se
-           ven a pocos metros (sin ellos, a ras de agua el mar salía liso y borroso). Con pocos
-           trenes y bien ordenados, el mar salía a rayas, como un tejido. Fijos (misma semilla)
-           para que no cambien al abrir. */
+        /* Wavelength (m), rotation relative to the wind (degrees) and steepness (a·k) of each
+           train: sixteen waves from 80 to 1.6 m, spread on a logarithmic scale with some
+           randomness and directions fanned out around the wind, and eight ripples from 1.4 m to
+           25 cm that only show within a few meters (without them, at water level the sea came
+           out smooth and blurry). With few, neatly ordered trains, the sea came out striped,
+           like a fabric. Fixed (same seed) so they don't change on startup. */
         const int NumOlas = 24, NumLargas = 16;
         static readonly (double L, double Giro, double Pend)[] TrenesDeOlas = CrearTrenes();
-        const double RumboViento = 35;            // en el plano de proyección, grados
-        const double CeldaGrupos = 170;           // metros: el tamaño de los grupos de olas
+        const double RumboViento = 35;            // in the projection plane, degrees
+        const double CeldaGrupos = 170;           // meters: the size of the wave groups
 
         static (double, double, double)[] CrearTrenes()
         {
@@ -46,24 +46,24 @@ namespace KerbinMaps.Views
             {
                 if (i >= NumLargas)
                 {
-                    // rizos: de cualquier lado, con más pendiente
+                    // ripples: from any side, steeper
                     double lr = 1.4 * Math.Pow(0.25 / 1.4, (i - NumLargas) / (NumOlas - NumLargas - 1.0)) * (0.9 + 0.2 * r.NextDouble());
                     t[i] = (lr, (r.NextDouble() * 2 - 1) * 95, 0.07);
                     continue;
                 }
                 double l = 80 * Math.Pow(1.6 / 80, i / (NumLargas - 1.0)) * (0.88 + 0.24 * r.NextDouble());
-                // dos dados: más trenes cerca del viento que de lado. El mar de fondo (lo largo)
-                // viene casi todo de un lado; lo corto, de cualquiera
+                // two dice: more trains near the wind than to the side. The swell (the long ones)
+                // comes almost all from one side; the short ones, from anywhere
                 double abierto = i < 4 ? 22 : i < 9 ? 50 : 80;
                 double giro = ((r.NextDouble() + r.NextDouble()) - 1) * abierto;
-                if (i == 6) giro += 63;                                               // algo de mar cruzado
+                if (i == 6) giro += 63;                                               // a bit of cross sea
                 double pend = l > 12 ? 0.062 : l > 4 ? 0.056 : 0.048;
                 t[i] = (l, giro, pend);
             }
             return t;
         }
 
-        /* Lo bastante cerca para que se vean moverse las olas o la espuma. */
+        /* Close enough to see the waves or the foam move. */
         public bool MarAnimating
         {
             get
@@ -74,9 +74,9 @@ namespace KerbinMaps.Views
             }
         }
 
-        /* Los trenes de olas en el plano de proyección: el número de onda es un múltiplo entero
-           de 2π/periodo para que el dibujo no salte cuando uEyeMod da la vuelta, y la fase se
-           calcula aquí en doble precisión. */
+        /* The wave trains in the projection plane: the wavenumber is an integer multiple of
+           2π/period so the pattern doesn't jump when uEyeMod wraps around, and the phase is
+           computed here in double precision. */
         void AguaUniforms(ShaderProgram p, double periodo)
         {
             bool olas = Olas && Body.Current.Ocean;
@@ -96,27 +96,27 @@ namespace KerbinMaps.Views
                 p.Vec4("uOla[" + i + "]", kx, ky, olas ? pend / k : 0, fase);
                 sigma += 0.5 * pend * pend;
             }
-            /* Lo que no se dibuja nunca (las ondas capilares, de centímetros): con lo de las
-               olas suma unos 0,03, lo de Cox y Munk con 6 m/s de viento. */
+            /* What's never drawn (capillary waves, centimeters long): together with the waves
+               it adds up to about 0.03, Cox and Munk's value for a 6 m/s wind. */
             p.Float("uOlaCapilar", olas ? 0.004 : 0.03);
             p.Float("uOlaSigmaTotal", (olas ? sigma : 0) + (olas ? 0.004 : 0.03));
-            // los grupos: un ruido periódico con un número entero de celdas por periodo
+            // the groups: a periodic noise with an integer number of cells per period
             double n = Math.Max(1, Math.Round(periodo / CeldaGrupos));
             p.Vec2("uOlaGrupo", n / periodo, n);
         }
 
-        /* uSinBrillo (el mapa visto desde arriba) quita reflejos; uCerca es 0 desde fuera. */
+        /* uSinBrillo (the map seen from above) removes reflections; uCerca is 0 from outside. */
         const string AguaGlsl = @"
 uniform int uOlas;
 uniform float uAguaT;
-uniform vec4 uOla[24];          // número de onda (rad/m) en el plano de proyección, amplitud (m) y fase
+uniform vec4 uOla[24];          // wavenumber (rad/m) in the projection plane, amplitude (m) and phase
 uniform float uOlaCapilar, uOlaSigmaTotal;
-uniform vec2 uOlaGrupo;         // celdas de los grupos por metro, y por periodo
+uniform vec2 uOlaGrupo;         // group cells per meter, and per period
 
 float aHash(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
 float aHash2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 
-/* Ruido de valor que se repite cada per celdas: con el periodo de uEyeMod, no salta. */
+/* Value noise that repeats every per cells: with uEyeMod's period, it doesn't jump. */
 float aRuidoP(vec2 p, float per) {
   vec2 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
@@ -125,7 +125,7 @@ float aRuidoP(vec2 p, float per) {
   return mix(mix(aHash2(i), aHash2(vec2(i1.x, i.y)), f.x), mix(aHash2(vec2(i.x, i1.y)), aHash2(i1), f.x), f.y);
 }
 
-/* Ruido de valor en 3D, suave, para las zonas de viento (en direcciones: sin problemas de precisión). */
+/* Smooth 3D value noise, for the wind zones (on directions: no precision problems). */
 float aRuido(vec3 x) {
   vec3 i = floor(x), f = fract(x);
   f = f * f * (3.0 - 2.0 * f);
@@ -133,16 +133,16 @@ float aRuido(vec3 x) {
              mix(mix(aHash(i + vec3(0, 0, 1)), aHash(i + vec3(1, 0, 1)), f.x), mix(aHash(i + vec3(0, 1, 1)), aHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }
 
-/* Lo rizado del mar en cada zona: el viento no sopla igual en todas partes, y desde órbita el
-   brillo del Sol sale a manchas (más liso al abrigo de la costa). */
+/* How choppy the sea is in each zone: the wind doesn't blow the same everywhere, and from orbit
+   the sun glint comes out patchy (smoother in the lee of the coast). */
 float aViento(vec3 dir) {
   float n = aRuido(dir * 37.0) * 0.65 + aRuido(dir * 113.0) * 0.35;
   return mix(0.55, 1.45, smoothstep(0.2, 0.8, n));
 }
 
-/* Las olas en un plano: (dh/da, dh/db, h) y, aparte, la varianza de pendiente de los trenes que
-   ya no se pueden dibujar a px metros por píxel. Los trenes van en grupos: dos ruidos lentos
-   suben y bajan su amplitud, como en el mar de verdad, donde las olas llegan en series. */
+/* The waves on a plane: (dh/da, dh/db, h) and, separately, the slope variance of the trains
+   that can no longer be drawn at px meters per pixel. The trains come in groups: two slow
+   noises raise and lower their amplitude, like in the real sea, where waves arrive in sets. */
 vec3 aOlasPlano(vec2 c, float px, out float sig2) {
   vec3 r = vec3(0.0);
   sig2 = 0.0;
@@ -163,8 +163,8 @@ vec3 aOlasPlano(vec2 c, float px, out float sig2) {
   return r;
 }
 
-/* La normal del agua: las olas se proyectan en los dos planos de ejes del mundo más de cara a la
-   vertical (como las texturas del suelo) y se funden donde cambia el plano. c en metros. */
+/* The water normal: the waves are projected on the two world-axis planes that face the vertical
+   most (like the ground textures) and blended where the plane changes. c in meters. */
 vec3 aNormalOlas(vec3 c, vec3 up, float px, out float sig2, out float alto) {
   vec3 m = abs(up);
   int ma = m.x > m.y ? (m.x > m.z ? 0 : 2) : (m.y > m.z ? 1 : 2);
@@ -204,36 +204,36 @@ float aSmith(float NoX, float s2) {
   return c >= 1.6 ? 1.0 : (3.535 * c + 2.181 * c * c) / (1.0 + 2.276 * c + 2.577 * c * c);
 }
 
-/* Albedo del agua (lineal): el fondo visto a través de prof metros, sobre el color del mar abierto
-   del mapa. Arena junto a la orilla y, más hondo, fondo más oscuro. */
+/* Water albedo (linear): the bottom seen through prof meters, over the open-sea color from the
+   map. Sand next to the shore and, deeper, a darker bottom. */
 vec3 aAlbedo(vec3 mar, float prof, float cosV) {
   vec3 hondo = pow(mar, vec3(2.2)) * 0.7;
   vec3 fondo = pow(mix(vec3(0.80, 0.74, 0.56), vec3(0.36, 0.40, 0.30), smoothstep(3.0, 22.0, prof)), vec3(2.2)) * 0.55;
-  // camino de la luz: baja vertical y sube hacia el ojo, refractada (más vertical que la mirada)
+  // light path: down vertically and up toward the eye, refracted (more vertical than the view ray)
   float camino = prof * (1.0 + 1.0 / mix(1.0, max(cosV, 0.05), 0.35));
   vec3 T = exp(-vec3(0.30, 0.065, 0.045) * camino);
   return mix(hondo, fondo, T);
 }
 
-/* Espuma: en la orilla, líneas que llegan con las olas y se deshacen; mar adentro, alguna cresta
-   rota cuando se ven las olas. pxm son metros por píxel. */
+/* Foam: on the shore, lines that arrive with the waves and break up; offshore, the odd broken
+   crest when waves are visible. pxm is meters per pixel. */
 float aEspuma(vec3 c, vec3 dir, float prof, float alto, float pxm) {
   if (uOlas == 0) return (1.0 - smoothstep(0.1, 1.4, prof)) * (1.0 - smoothstep(12.0, 60.0, pxm)) * 0.75;
   float lejos = 1.0 - smoothstep(10.0, 70.0, pxm);
   if (lejos <= 0.0) return 0.0;
   float ruptura = aRuido(c * 0.35) * 0.6 + aRuido(c * 1.3) * 0.4;
-  // líneas que avanzan hacia la orilla: la fase crece con la profundidad y con el tiempo
+  // lines advancing toward the shore: the phase grows with depth and with time
   float linea = sin(prof * 2.2 + uAguaT * 1.1 + ruptura * 5.0);
   float orilla = 1.0 - smoothstep(0.3, 3.2, prof);
   float f = orilla * (0.55 * (1.0 - smoothstep(0.0, 0.9, prof)) + smoothstep(0.35, 0.95, linea) * smoothstep(0.25, 0.6, ruptura));
-  // alguna cresta rota mar adentro, solo donde se dibujan las olas
+  // the odd broken crest offshore, only where the waves are drawn
   float cresta = smoothstep(2.0, 2.9, alto) * smoothstep(0.65, 0.9, ruptura) * (1.0 - smoothstep(0.4, 2.0, pxm)) * 0.35;
   return clamp(max(f, cresta), 0.0, 1.0) * lejos;
 }
 
-/* Luz que sale del agua hacia el ojo. n: normal con las olas; s2: rugosidad del brillo; mar: color
-   del mar abierto (sRGB); cielo: luz del cielo en la dirección reflejada (o negativa para
-   estimarla); espuma: cuánto la tapa. */
+/* Light leaving the water toward the eye. n: normal with the waves; s2: glint roughness; mar:
+   open-sea color (sRGB); cielo: sky light in the reflected direction (or negative to estimate it);
+   espuma: how much it's covered. */
 vec3 aLuz(vec3 p, vec3 n, vec3 v, vec3 s, vec3 mar, float prof, float s2, vec3 cielo, float espuma) {
   vec3 up = normalize(p);
   float alb = mix(0.5, 0.36, uCerca);
@@ -245,7 +245,7 @@ vec3 aLuz(vec3 p, vec3 n, vec3 v, vec3 s, vec3 mar, float prof, float s2, vec3 c
   float cosS = max(dot(up, s), 0.0);
   vec3 albedo = aAlbedo(mar, prof, dot(up, v)) * alb;
 
-  // el mapa visto desde arriba: el agua con su color, la luz como en el suelo y el relieve de las olas
+  // the map seen from above: the water with its color, light as on the ground and the waves' relief
   if (uSinBrillo != 0) {
     vec3 L = albedo / PI * (sun * max(dot(n, s), 0.0) + (skyE * (0.75 + 0.25 * dot(n, up)) + nightE) * comp);
     vec3 E = vec3(0.8) * alb / PI * (sun * max(dot(up, s), 0.0) + (skyE + nightE) * comp);
@@ -253,16 +253,16 @@ vec3 aLuz(vec3 p, vec3 n, vec3 v, vec3 s, vec3 mar, float prof, float s2, vec3 c
   }
 
   float F = 0.02 + 0.98 * pow(1.0 - NoV, 5.0);
-  // lo que sale de dentro del agua
+  // what comes out from inside the water
   vec3 dentro = albedo / PI * (sun * cosS + (skyE + nightE) * comp) * (1.0 - F);
-  // el cielo reflejado
+  // the reflected sky
   if (cielo.x < 0.0) {
     vec3 r = reflect(-v, n);
     float el = clamp(dot(r, up), 0.0, 1.0);
     cielo = skyE / PI * mix(1.9, 0.9, sqrt(el)) + vec3(0.002, 0.003, 0.006);
   }
   vec3 refl = cielo * F;
-  // el Sol: microfacetas de Beckmann con la pendiente que no se ve como ola
+  // the Sun: Beckmann microfacets with the slope that doesn't show as waves
   vec3 h = normalize(s + v);
   float NoL = dot(n, s), NoH = max(dot(n, h), 0.0);
   float spec = 0.0;

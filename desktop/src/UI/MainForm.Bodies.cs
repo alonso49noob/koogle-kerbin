@@ -8,14 +8,14 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.UI
 {
-    /* El cuerpo que se ve: el selector, el cambio en vivo y la lectura del sistema solar de
-       la instalación de KSP (Kopernicus) al arrancar. */
+    /* The body being viewed: the selector, the live switch and reading the KSP installation's
+       solar system (Kopernicus) at startup. */
     public sealed partial class MainForm
     {
         DarkCombo bodyCombo;
         RichLabel bodySource;
 
-        /* Los mapas, biomas, alturas y marcadores que trae el visor son de Kerbin. */
+        /* The maps, biomes, heights and markers the viewer ships are Kerbin's. */
         bool OnMapBody => Body.Current.Name == "Kerbin";
         Texture MapTex(string slot) => OnMapBody ? textures.GetValueOrDefault(slot) : bodyTextures.GetValueOrDefault(slot);
         ImageData MapImg(string slot) => OnMapBody ? Img(slot) : bodyImages.GetValueOrDefault(slot);
@@ -26,7 +26,7 @@ namespace KerbinMaps.UI
             var items = new List<(string, string)>();
             foreach (var (b, depth) in SolarSystem.Tree())
             {
-                // en progresión se marca lo que la partida aún no ha visitado
+                // in progression mode, what the save hasn't visited yet is marked
                 string sufijo = "";
                 if (Progresion && extras != null && !b.IsStar && extras.Hitos(b.Name)?.Visitado != true)
                     sufijo = "  ·  " + Lang.T("sin visitar");
@@ -40,7 +40,7 @@ namespace KerbinMaps.UI
                 : Lang.F("Sistema leído de Kopernicus en tu instalación de KSP: {0} cuerpos ({1} lunas).", SolarSystem.Bodies.Count, moons));
         }
 
-        /* Cambia de cuerpo sin reiniciar: naves, Sol, aire, mapas y herramientas pasan al nuevo. */
+        /* Switches body without restarting: vessels, Sun, air, maps and tools move to the new one. */
         void SetBody(string name)
         {
             var b = SolarSystem.Find(name);
@@ -56,7 +56,7 @@ namespace KerbinMaps.UI
             ClearOrbit();
             ClearModel();
             globe.ExitFocus();
-            // el observador del cielo: la plataforma del KSC en Kerbin, el ecuador en los demás
+            // the sky observer: the KSC pad on Kerbin, the equator on the others
             if (OnMapBody) SetObserver(KscLat, KscLon, null);
             else SetObserver(0, 0, 0);
 
@@ -72,7 +72,7 @@ namespace KerbinMaps.UI
             RenderWaypointInfo();
             RenderDestinos();
             ActualizarEstadosSecciones();
-            // las texturas de suelo de Parallax y las nubes son de cada cuerpo
+            // the Parallax ground textures and the clouds are per body
             if (terrenoDe != null) _ = CargarTexturasDeTerreno();
             if (nubesDe != null) _ = CargarNubes();
             if (scattersDe != null) _ = CargarScatters();
@@ -85,18 +85,18 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* El Sol del instante actual, para el globo, el cielo y el mapa. */
+        /* The Sun at the current time, for the globe, the sky and the map. */
         void ActualizarSol()
         {
             var sol = SunNow();
             globe.SunLat = map.SunLat = sol.Lat;
             globe.SunLon = map.SunLon = sol.Lon;
             globe.SunAngularRadius = sol.AngularRadius;
-            // en la propia estrella no hay día ni noche
+            // on the star itself there's no day or night
             globe.Light = map.DayNight = state.DayNight && sol.Exists;
         }
 
-        /* Lee el sistema solar de la instalación de KSP. Sin Kopernicus se queda el de serie. */
+        /* Reads the solar system of the KSP installation. Without Kopernicus the stock one stays. */
         async Task CargarSistemaSolar()
         {
             string gd = FindGameData();
@@ -105,7 +105,7 @@ namespace KerbinMaps.UI
             if (n > 0)
             {
                 Body.Current = SolarSystem.Find(state.BodyName) ?? SolarSystem.Home;
-                BodyIcon.Clear();                 // otros cuerpos, otros colores
+                BodyIcon.Clear();                 // other bodies, other colors
             }
             RenderBodyList();
             RenderBodyInfo();

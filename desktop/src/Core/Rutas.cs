@@ -7,49 +7,49 @@ namespace KerbinMaps.Core
 {
     public enum Medio { Aire, Mar, Tierra }
 
-    /* Una ruta calculada: el camino y lo que cuesta recorrerlo. */
+    /* A computed route: the path and what it costs to travel it. */
     public sealed class Ruta
     {
         public Medio Medio;
         public bool Ok;
-        public string Motivo;                     // por qué no hay ruta, si no la hay
+        public string Motivo;                     // why there's no route, if there isn't one
         public List<LatLon> Puntos = new();
-        public double Distancia, Tiempo;          // m y s
-        public double Subida, Bajada;             // desnivel acumulado, m
-        public double CotaMax = double.MinValue;  // lo más alto bajo el camino, m
+        public double Distancia, Tiempo;          // m and s
+        public double Subida, Bajada;             // accumulated climb, m
+        public double CotaMax = double.MinValue;  // highest point under the path, m
         public double PendienteMax;               // °
-        public double Salida, Llegada;            // de cada punta al agua (o a tierra) más cercana, m
+        public double Salida, Llegada;            // from each end to the nearest water (or land), m
         public LatLon? PuertoSalida, PuertoLlegada;
     }
 
-    /* Un «Waze» para Kerbin: el camino más rápido entre dos puntos en avión, en barco y en
-       vehículo de tierra.
+    /* A «Waze» for Kerbin: the fastest path between two points by plane, by ship and by ground
+       vehicle.
 
-       El aire va en línea recta por el gran círculo. El mar y la tierra buscan con A* sobre
-       una rejilla de 4096×2048 celdas (algo menos de un kilómetro en Kerbin) con la altura de
-       cada una: el barco solo pisa celdas bajo el nivel del mar y el vehículo solo las de
-       encima, sin subir ni bajar cuestas de más de la pendiente máxima y yendo más despacio
-       cuanto más empinadas. Después el camino se endereza: dos puntos del camino se unen en
-       recta si se puede ir por ella sin tardar más. Si el origen o el destino no están en el
-       medio pedido (un barco que sale de tierra adentro), la ruta empieza en el agua o la
-       tierra más cercana, y se dice a cuánto queda.
+       Air goes in a straight line along the great circle. Sea and land search with A* over a
+       grid of 4096×2048 cells (a bit under a kilometer on Kerbin) with the height of each one:
+       the ship only steps on cells below sea level and the vehicle only on those above, never
+       climbing or descending slopes steeper than the maximum grade and going slower the steeper
+       they are. Then the path is straightened: two points of the path are joined in a straight
+       line if you can go along it without taking longer. If the origin or the destination isn't
+       in the requested medium (a ship leaving from inland), the route starts at the nearest
+       water or land, and says how far away it is.
 
-       La rejilla se hace en segundo plano con los mapas que haya; sin mapa de alturas, la
-       tierra sale del de color y no hay cuestas. */
+       The grid is built in the background with whatever maps there are; without a height map,
+       land comes from the color map and there are no slopes. */
     public sealed class MallaRutas
     {
         public const int Ancho = 4096, Alto = 2048;
-        const int MaxAcercar = 256;               // celdas que se busca el agua o la tierra más cercana
-        const double MaxAcercarM = 100000;        // más lejos que esto, el agua (o la tierra) no cuenta como «cerca»
+        const int MaxAcercar = 256;               // cells searched for the nearest water or land
+        const double MaxAcercarM = 100000;        // farther than this, the water (or land) doesn't count as «near»
 
-        readonly float[] alt;                     // altura de cada celda sobre el mar, m
+        readonly float[] alt;                     // height of each cell above the sea, m
         readonly bool[] tierra;
-        readonly int[] zona;                      // trozo de tierra o de mar al que pertenece cada celda
+        readonly int[] zona;                      // piece of land or sea each cell belongs to
         readonly double radio, dy;
         readonly double[] dx, cosLat, sinLat, cosLon, sinLon;
         public readonly bool HayMar, HayAlturas;
 
-        // para cada búsqueda: se reutilizan, así que las búsquedas van de una en una
+        // for each search: they're reused, so searches go one at a time
         readonly float[] coste = new float[Ancho * Alto];
         readonly byte[] desde = new byte[Ancho * Alto];
         readonly bool[] cerrada = new bool[Ancho * Alto];
@@ -67,8 +67,9 @@ namespace KerbinMaps.Core
             return ((x % Ancho) + Ancho) % Ancho;
         }
 
-        /* `altura` da la altura sobre el mar (null si no hay mapa de alturas); `esTierra`, sin
-           alturas, dice qué es tierra (null: todo). `hayMar` es falso en los cuerpos sin océano. */
+        /* `altura` gives the height above the sea (null if there's no height map); `esTierra`,
+           without heights, says what is land (null: everything). `hayMar` is false on bodies
+           without an ocean. */
         public MallaRutas(Func<double, double, double> altura, Func<double, double, bool> esTierra, bool hayMar, double radio)
         {
             this.radio = radio;
@@ -108,8 +109,8 @@ namespace KerbinMaps.Core
             zona = Zonas();
         }
 
-        /* Trozos conectados de tierra y de mar, para saber al momento si dos puntos se pueden
-           unir sin tener que recorrer todo un océano buscando. */
+        /* Connected pieces of land and sea, to know right away whether two points can be joined
+           without having to cross a whole ocean searching. */
         int[] Zonas()
         {
             var z = new int[Ancho * Alto];
@@ -141,7 +142,7 @@ namespace KerbinMaps.Core
 
         public bool EsTierra(double lat, double lon) => tierra[Fila(lat) * Ancho + Columna(lon)];
 
-        /* Altura interpolada entre los centros de las celdas. */
+        /* Height interpolated between cell centers. */
         public double Altura(double lat, double lon)
         {
             double fx = (Geo.WrapLon(lon) + 180) / 360 * Ancho - 0.5;
@@ -155,7 +156,7 @@ namespace KerbinMaps.Core
             return a * (1 - ty) + b * ty;
         }
 
-        /* ------------------------------------------------------------ aire */
+        /* ------------------------------------------------------------ air */
 
         public Ruta Aire(LatLon a, LatLon b, double v)
         {
@@ -173,9 +174,9 @@ namespace KerbinMaps.Core
             return r;
         }
 
-        /* ------------------------------------------------------------ mar y tierra */
+        /* ------------------------------------------------------------ sea and land */
 
-        /* El factor de velocidad en una cuesta: entero en llano y un 30 % en la pendiente máxima. */
+        /* The speed factor on a slope: full on the flat and 30% at the maximum grade. */
         static double Factor(double pendiente, double max) => 1 - 0.7 * (pendiente / max) * (pendiente / max);
 
         public Ruta Buscar(Medio medio, LatLon a, LatLon b, double v, double pendMax, CancellationToken ct)
@@ -187,15 +188,15 @@ namespace KerbinMaps.Core
             lock (cerrojo)
             {
                 int ia = Fila(a.Lat) * Ancho + Columna(a.Lon), ib = Fila(b.Lat) * Ancho + Columna(b.Lon);
-                // las dos puntas en el medio pedido y en el mismo trozo de tierra o de mar
+                // both ends in the requested medium and in the same piece of land or sea
                 int sa = Cercana(ia, enTierra, 0), sb = Cercana(ib, enTierra, 0);
                 if (sa < 0 || sb < 0)
                 {
                     r.Motivo = enTierra ? "No hay tierra a menos de 100 km del origen o del destino." : "No hay mar a menos de 100 km del origen o del destino.";
                     return r;
                 }
-                /* En tierra no se cruza el mar hasta la costa de enfrente: si la tierra más cercana a
-                   cada punta no es la misma isla o continente, no hay ruta en rover. */
+                /* On land we don't cross the sea to the opposite coast: if the land nearest each end
+                   isn't the same island or continent, there's no rover route. */
                 if (zona[sa] != zona[sb] && enTierra)
                 {
                     r.Motivo = "Origen y destino están en tierras separadas por el mar.";
@@ -224,7 +225,7 @@ namespace KerbinMaps.Core
                     return r;
                 }
 
-                // las puntas exactas si caen en su propia celda; si no, el agua o la tierra más cercana
+                // the exact ends if they fall in their own cell; if not, the nearest water or land
                 var pts = new List<LatLon>(celdas.Count);
                 foreach (int i in celdas) pts.Add(Centro(i));
                 if (sa == ia) pts[0] = a; else { r.PuertoSalida = pts[0]; r.Salida = Geo.Distance(a.Lat, a.Lon, pts[0].Lat, pts[0].Lon); }
@@ -246,7 +247,7 @@ namespace KerbinMaps.Core
             return Geo.Distance(p.Lat, p.Lon, q.Lat, q.Lon);
         }
 
-        /* La celda del medio pedido (y de la zona pedida, si no es 0) más cercana a `i`. */
+        /* The cell of the requested medium (and of the requested zone, if not 0) nearest to `i`. */
         int Cercana(int i, bool enTierra, int enZona)
         {
             bool Vale(int j) => tierra[j] == enTierra && (enZona == 0 || zona[j] == enZona);
@@ -260,7 +261,7 @@ namespace KerbinMaps.Core
                 {
                     int y = y0 + dyy;
                     if (y < 0 || y >= Alto) continue;
-                    int paso = Math.Abs(dyy) == r ? 1 : 2 * r;     // el anillo: filas de arriba y abajo enteras, el resto solo los lados
+                    int paso = Math.Abs(dyy) == r ? 1 : 2 * r;     // the ring: full rows above and below, only the sides for the rest
                     for (int dxx = -r; dxx <= r; dxx += paso)
                     {
                         int j = y * Ancho + (x0 + dxx + Ancho * 4) % Ancho;
@@ -269,7 +270,7 @@ namespace KerbinMaps.Core
                         if (d < dMejor) { dMejor = d; mejor = j; }
                     }
                 }
-                // las celdas se estrechan hacia los polos: se mira un poco más allá del primer hallazgo
+                // cells narrow toward the poles: we look a bit beyond the first hit
                 if (mejor >= 0 && hasta == MaxAcercar) hasta = Math.Min(MaxAcercar, r + r / 2 + 2);
             }
             return dMejor <= MaxAcercarM ? mejor : -1;
@@ -284,7 +285,7 @@ namespace KerbinMaps.Core
             double gs = sinLat[gy], gc = cosLat[gy], gcl = cosLon[gx], gsl = sinLon[gx];
             double tanMax = Math.Tan(pendMax * Geo.D2R);
 
-            // lo que falta, en segundos: el gran círculo a toda velocidad (nunca sobreestima)
+            // what's left, in seconds: the great circle at full speed (never overestimates)
             double H(int i)
             {
                 int x = i % Ancho, y = i / Ancho;
@@ -299,9 +300,9 @@ namespace KerbinMaps.Core
             while (cola.TryDequeue(out int i, out double f))
             {
                 if (i == g) break;
-                /* Cada celda se abre una sola vez. Cerca de los polos la rejilla se aplasta y la
-                   estimación deja de ser exacta; reabrir celdas ahí daría caminos un pelo mejores a
-                   cambio de minutos de búsqueda. */
+                /* Each cell is opened only once. Near the poles the grid gets squashed and the
+                   estimate stops being exact; reopening cells there would give slightly better
+                   paths at the cost of minutes of search. */
                 if (cerrada[i]) continue;
                 cerrada[i] = true;
                 double ci = coste[i];
@@ -346,7 +347,7 @@ namespace KerbinMaps.Core
             return camino;
         }
 
-        /* Un tramo recto de p a q: si se puede ir por él y cuánto se tarda. */
+        /* A straight leg from p to q: whether you can go along it and how long it takes. */
         (bool Ok, double T, double D, double Sube, double Baja, double PendMax, double HMax) Tramo(LatLon p, LatLon q, bool enTierra, double v, double pendMax)
         {
             double d = Geo.Distance(p.Lat, p.Lon, q.Lat, q.Lon);
@@ -374,8 +375,8 @@ namespace KerbinMaps.Core
             return (true, t, d, sube, baja, pmax, hmax);
         }
 
-        /* Une en recta los puntos del camino que se puedan unir sin tardar más, buscando para
-           cada uno el más lejano (a saltos que se doblan y luego a medias). */
+        /* Joins in a straight line the points of the path that can be joined without taking
+           longer, looking for the farthest one for each (in doubling jumps and then by halves). */
         List<LatLon> Enderezar(List<LatLon> pts, bool enTierra, double v, double pendMax)
         {
             if (pts.Count < 3) return pts;
@@ -418,7 +419,7 @@ namespace KerbinMaps.Core
                 var tr = Tramo(pts[k - 1], pts[k], enTierra, v, pendMax);
                 double d = Geo.Distance(pts[k - 1].Lat, pts[k - 1].Lon, pts[k].Lat, pts[k].Lon);
                 r.Distancia += d;
-                // un tramo de celda a celda puede rozar la costa al muestrearlo: cuenta a velocidad llana
+                // a cell-to-cell leg can graze the coast when sampled: it counts at flat speed
                 r.Tiempo += tr.Ok ? tr.T : d / v;
                 r.Subida += tr.Sube; r.Bajada += tr.Baja;
                 r.PendienteMax = Math.Max(r.PendienteMax, tr.PendMax);
@@ -426,9 +427,9 @@ namespace KerbinMaps.Core
             }
         }
 
-        /* ------------------------------------------------------------ geometría */
+        /* ------------------------------------------------------------ geometry */
 
-        /* El punto a una fracción f del gran círculo de p a q. */
+        /* The point at fraction f of the great circle from p to q. */
         static LatLon Interpolar(LatLon p, LatLon q, double f)
         {
             double p1 = p.Lat * Geo.D2R, l1 = p.Lon * Geo.D2R, p2 = q.Lat * Geo.D2R, l2 = q.Lon * Geo.D2R;
@@ -442,8 +443,8 @@ namespace KerbinMaps.Core
             return new LatLon(Math.Atan2(z, Math.Sqrt(x * x + y * y)) * Geo.R2D, Math.Atan2(y, x) * Geo.R2D);
         }
 
-        /* Puntos cada 0,2° como mucho, para que la línea siga el gran círculo en el mapa plano
-           y no atraviese el globo. */
+        /* Points every 0.2° at most, so the line follows the great circle on the flat map and
+           doesn't cut through the globe. */
         static List<LatLon> Densificar(List<LatLon> pts)
         {
             var o = new List<LatLon> { pts[0] };

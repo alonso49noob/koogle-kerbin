@@ -7,18 +7,17 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.UI
 {
-    /* Texturas de suelo del propio juego para la cámara libre.
+    /* The game's own ground textures for the free camera.
 
-       KSP pinta el terreno de cerca con unas cuantas texturas que se repiten (hierba,
-       arena, roca, nieve) mezcladas por pendiente y altura. Aquí se usan las mismas: las
-       del Community Terrain Texture Pack, que es lo que llevan Parallax y compañía, y si
-       no están, las de repuesto que vengan en la instalación. Sin ninguna, el vuelo
-       funciona igual pero de cerca el suelo queda liso: el mapa del cuerpo no da más de
-       sí a esa distancia. */
+       KSP paints nearby terrain with a few repeating textures (grass, sand, rock, snow) blended
+       by slope and height. The same ones are used here: those of the Community Terrain Texture
+       Pack, which is what Parallax and friends carry, and if they aren't there, whatever
+       fallbacks come with the installation. With none, flight works the same but up close the
+       ground looks smooth: the body's map doesn't give more at that distance. */
     public sealed partial class MainForm
     {
 
-        /* Candidatos por ranura, en orden de preferencia y relativos a GameData. */
+        /* Candidates per slot, in order of preference and relative to GameData. */
         static readonly (string Slot, string[] Rutas)[] Detalles =
         {
             ("grass", new[] { @"Parallax_StockScatterTextures\PluginData\grassuv2.dds", @"CTTP\Textures\PluginData\gravel.dds" }),
@@ -27,14 +26,14 @@ namespace KerbinMaps.UI
             ("snow", new[] { @"CTTP\Textures\PluginData\snow.dds", @"CTTP\Textures\PluginData\ice.dds" }),
         };
 
-        /* Las del CTTP sirven para todos los cuerpos: se cargan una vez y se guardan. */
+        /* The CTTP ones work for every body: loaded once and kept. */
         Texture cttpGrass, cttpSand, cttpRock, cttpSnow;
         bool cttpLeido;
 
-        /* Las de Parallax son de cada cuerpo: se cambian al cambiar de cuerpo. */
+        /* The Parallax ones are per body: they change when the body changes. */
         Texture[] parallaxTex;
         string terrenoDe;
-        string terrenoOrigen;                   // para el panel: de dónde salen las texturas
+        string terrenoOrigen;                   // for the panel: where the textures come from
 
         async Task CargarTexturasDeTerreno()
         {
@@ -51,7 +50,7 @@ namespace KerbinMaps.UI
                     try { return ParallaxTerrain.Load(gd, cuerpo); }
                     catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[parallax] " + ex.Message); return null; }
                 });
-            if (cuerpo != Body.Name) return;                    // se cambió de cuerpo mientras tanto
+            if (cuerpo != Body.Name) return;                    // the body was changed in the meantime
 
             if (!glOk || !surface.MakeCurrent()) return;
             if (parallaxTex != null) { foreach (var t in parallaxTex) t?.Dispose(); parallaxTex = null; }
@@ -64,7 +63,7 @@ namespace KerbinMaps.UI
                     ["inf"] = px.Influence, ["disp"] = px.Displacement, ["occ"] = px.Occlusion,
                     ["bl"] = px.BumpLow, ["bm"] = px.BumpMid, ["bh"] = px.BumpHigh, ["bs"] = px.BumpSteep,
                 };
-                // si dos ranuras comparten textura, se sube una sola vez
+                // if two slots share a texture, it's uploaded only once
                 var subidas = new System.Collections.Generic.Dictionary<TextureFile, Texture>();
                 Texture Una(string k) => d[k] == null ? null : subidas.TryGetValue(d[k], out var ya) ? ya : subidas[d[k]] = Subir(d, k);
                 globe.DetGrass = Una("low");
@@ -120,17 +119,17 @@ namespace KerbinMaps.UI
             cttpSand = Subir(leidas, "sand");
             cttpRock = Subir(leidas, "rock");
             cttpSnow = Subir(leidas, "snow");
-            // las ranuras que falten se cubren con otra, para no dejar huecos negros
+            // missing slots are covered with another, so no black holes are left
             cttpGrass ??= cttpSand ?? cttpRock;
             cttpSand ??= cttpGrass ?? cttpRock;
             cttpRock ??= cttpSand ?? cttpGrass;
             cttpSnow ??= cttpRock ?? cttpSand;
         }
 
-        /* Mapa de nubes del cuerpo, de los mods de nubes que haya instalados. Es de
-           16384x8192 y pesa 179 MB con sus mipmaps: se lee desde el nivel de 8192 de ancho
-           (43 MB en la GPU, 5 km por texel), y de cerca lo completa la textura de detalle
-           del mod. La velocidad a la que gira la capa sale de su clouds.cfg. */
+        /* The body's cloud map, from whatever cloud mods are installed. It's 16384x8192 and
+           weighs 179 MB with its mipmaps: it's read from the 8192-wide level (43 MB on the GPU,
+           5 km per texel), and up close the mod's detail texture fills it in. The speed at
+           which the layer rotates comes from its clouds.cfg. */
         string nubesDe;
 
         async Task CargarNubes()
@@ -170,8 +169,8 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* La velocidad de la primera capa del cuerpo en el clouds.cfg del mod de nubes
-           («speed = 0,29.89,0» con speedMode = LinearSurface: m/s en superficie). */
+        /* The speed of the body's first layer in the cloud mod's clouds.cfg («speed =
+           0,29.89,0» with speedMode = LinearSurface: m/s at the surface). */
         static double? VelocidadNubes(string gd, string cuerpo)
         {
             try

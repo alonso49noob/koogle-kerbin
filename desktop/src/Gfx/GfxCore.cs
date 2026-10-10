@@ -15,9 +15,9 @@ namespace KerbinMaps.Gfx
             Id = GL.CreateProgram();
             GL.AttachShader(Id, v);
             GL.AttachShader(Id, f);
-            /* Los índices se fijan a mano en vez de dejar que el enlazador los reparta:
-               varios programas comparten el mismo VAO, y si cada uno los numerase a su
-               manera, alguno leería basura. */
+            /* The indices are set by hand instead of letting the linker assign them: several
+               programs share the same VAO, and if each one numbered them its own way, some
+               would read garbage. */
             foreach (var a in attribs) GL.BindAttribLocation(Id, a.loc, a.name);
             GL.LinkProgram(Id);
             if (GL.GetProgram(Id, GL.LINK_STATUS) == 0)
@@ -95,8 +95,8 @@ namespace KerbinMaps.Gfx
             return new Texture { Id = id, Width = w, Height = h };
         }
 
-        /* Un canal en coma flotante (alturas en metros), sin filtrar y sin repetir: se lee
-           texel a texel con texelFetch. */
+        /* A floating-point channel (heights in meters), unfiltered and non-repeating: read
+           texel by texel with texelFetch. */
         public static Texture FromR32F(float[] data, int w, int h)
         {
             var bytes = new byte[data.Length * 4];
@@ -113,8 +113,8 @@ namespace KerbinMaps.Gfx
             return new Texture { Id = id, Width = w, Height = h };
         }
 
-        /* Un byte por texel (el mapa político: el número de la facción de cada celda), sin
-           filtrar; da la vuelta en horizontal. Se va actualizando por filas mientras se pinta. */
+        /* One byte per texel (the political map: each cell's faction number), unfiltered; wraps
+           horizontally. It's updated row by row while painting. */
         public static Texture FromR8(byte[] data, int w, int h)
         {
             uint id = GL.GenTexture();
@@ -129,7 +129,7 @@ namespace KerbinMaps.Gfx
             return new Texture { Id = id, Width = w, Height = h };
         }
 
-        /* Vuelve a subir las filas y0..y1 (incluidas) de una textura de un byte por texel. */
+        /* Re-uploads rows y0..y1 (inclusive) of a one-byte-per-texel texture. */
         public void SubirFilasR8(byte[] data, int y0, int y1)
         {
             y0 = Math.Max(0, y0); y1 = Math.Min(Height - 1, y1);
@@ -140,11 +140,11 @@ namespace KerbinMaps.Gfx
             GL.BindTexture(GL.TEXTURE_2D, 0);
         }
 
-        /* Textura que ya viene comprimida en DXT con sus mipmaps, como las del juego. Se
-           sube tal cual (la GPU descomprime al leer) y se repite, que es lo que hace falta
-           para las texturas de detalle del terreno. */
-        /* BC7 (formato 25 de Unity): la GPU lo sabe descomprimir aunque aquí no. Se sube un
-           nivel y se lee de vuelta en RGBA. Null si el controlador no tiene BC7 o falla. */
+        /* A texture that already comes DXT-compressed with its mipmaps, like the game's. It's
+           uploaded as is (the GPU decompresses on read) and repeats, which is what the terrain
+           detail textures need. */
+        /* BC7 (Unity format 25): the GPU knows how to decompress it even though we don't. One
+           level is uploaded and read back as RGBA. Null if the driver has no BC7 or it fails. */
         public const uint BC7 = 0x8E8C;                            // GL_COMPRESSED_RGBA_BPTC_UNORM
 
         public static byte[] DescomprimirEnGpu(uint format, int w, int h, byte[] nivel)
@@ -215,7 +215,7 @@ namespace KerbinMaps.Gfx
         public static readonly ColorF White = new ColorF(1, 1, 1, 1);
     }
 
-    /* Matrices 4x4 en columnas, el mismo convenio que usaba la versión WebGL. */
+    /* 4x4 column-major matrices, the same convention the WebGL version used. */
     public static class Mat4
     {
         public static float[] Create() => new float[16];

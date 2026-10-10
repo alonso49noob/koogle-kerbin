@@ -10,9 +10,9 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* Fuente XYZ clásica (teselas ya troceadas), local o por HTTP, en el esquema
-       EPSG:4326: a zoom z el mundo son 2^(z+1) × 2^z teselas. Se descargan y
-       decodifican fuera del hilo de la interfaz; la subida a la GPU va en el render. */
+    /* Classic XYZ source (pre-cut tiles), local or over HTTP, in the EPSG:4326 scheme: at zoom
+       z the world is 2^(z+1) × 2^z tiles. They're downloaded and decoded off the UI thread; the
+       GPU upload happens in the render. */
     public sealed class TileLayer : IDisposable
     {
         sealed class Tile { public Texture Tex; public bool Failed; public long Used; }
@@ -24,8 +24,8 @@ namespace KerbinMaps.Views
         readonly ConcurrentQueue<((int, int, int) key, ImageData img)> ready = new();
         long tick;
 
-        /* Se llama desde otro hilo cuando llega una tesela: quien lo use debe pasar
-           al hilo de la interfaz antes de repintar. */
+        /* Called from another thread when a tile arrives: whoever uses it must switch to the UI
+           thread before repainting. */
         public Action TileArrived;
 
         public TileLayer(string template) { Template = template; }
@@ -63,13 +63,13 @@ namespace KerbinMaps.Views
             }
             catch
             {
-                // tesela que no existe: se queda vacía, como el errorTileUrl de Leaflet
+                // tile that doesn't exist: it stays empty, like Leaflet's errorTileUrl
             }
             ready.Enqueue((key, img));
             TileArrived?.Invoke();
         }
 
-        /* Sube a la GPU lo que haya llegado. Solo desde el hilo con el contexto GL. */
+        /* Uploads to the GPU whatever has arrived. Only from the thread with the GL context. */
         public void Pump()
         {
             while (ready.TryDequeue(out var r))

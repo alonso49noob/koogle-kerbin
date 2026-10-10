@@ -12,8 +12,8 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Naves de una partida: lectura del .sfs, reloj de simulación con aceleración
-       de tiempo, trazas, anillos en el globo y seguir a una nave. */
+    /* Vessels from a save: reading the .sfs, simulation clock with time warp, tracks, rings on
+       the globe and following a vessel. */
     public sealed partial class MainForm
     {
         sealed class Marca
@@ -27,7 +27,7 @@ namespace KerbinMaps.UI
 
         sealed class SvState
         {
-            public SaveData Data;                 // la partida entera: al cambiar de cuerpo se vuelven a filtrar las naves
+            public SaveData Data;                 // the whole save: when the body changes the vessels are filtered again
             public string Nombre;
             public double Ut, Rot, MaxR = 1.2;
             public Calibration Calib;
@@ -49,7 +49,7 @@ namespace KerbinMaps.UI
 
         readonly SvState sv = new();
         readonly SimState sim = new();
-        List<TrackPoint> lastTrack;           // la órbita dibujada a mano en su panel
+        List<TrackPoint> lastTrack;           // the orbit drawn by hand in its panel
 
         OverlayPanel tbar;
         DarkButton tNow, tBack, tPlay, tFwd, tFollow, tOrb;
@@ -64,8 +64,8 @@ namespace KerbinMaps.UI
         };
         static string ColorDe(string t) => t != null && ColorTipo.TryGetValue(t, out var c) ? c : "#8a9bb0";
 
-        /* Los mismos escalones que la aceleración de tiempo de KSP, en los dos sentidos:
-           un único escalafón con signo permite frenar hacia atrás paso a paso. */
+        /* The same steps as KSP's time warp, in both directions: a single signed scale lets you
+           slow down backwards step by step. */
         static readonly double[] Warps = { 1, 5, 10, 50, 100, 1000, 10000, 100000 };
         static readonly double[] Escala = Warps.Reverse().Select(w => -w).Concat(Warps).ToArray();
 
@@ -76,8 +76,8 @@ namespace KerbinMaps.UI
         void SimDirty() { sim.Dirty = true; RequestRender(); }
         double RotBase() => sv.Rot + svRot.NumberOr(0);
 
-        /* Dónde está el Sol en el instante de la barra de tiempo, con la misma rotación que
-           mueve las naves. Sin naves en este cuerpo con las que medirla, la del juego. */
+        /* Where the Sun is at the time on the time bar, with the same rotation that moves the
+           vessels. Without vessels on this body to measure it with, the game's. */
         Sun.Position SunNow()
         {
             var (ut, rot) = InstanteYGiro();
@@ -85,19 +85,19 @@ namespace KerbinMaps.UI
         }
         IEnumerable<GlobePin> VesselPins() => sv.Marcas.Select(m => m.Pin);
 
-        /* ------------------------------------------------------------ barra de tiempo */
+        /* ------------------------------------------------------------ time bar */
 
         void BuildTimeBar()
         {
-            var sym = Theme.Make("Segoe UI Symbol", 11.5f);
+            var sym = Theme.IconSmall;
             tbar = new OverlayPanel { Visible = false };
             tNow = new DarkButton("Guardado", small: true) { Tip = "Volver al instante del guardado" };
-            tBack = new DarkButton("◀◀", small: true) { IconFont = sym, Tip = "Más rápido hacia atrás (,)" };
-            tPlay = new DarkButton("▶", small: true) { IconFont = sym, Tip = "Continuar / pausa (espacio)" };
-            tFwd = new DarkButton("▶▶", small: true) { IconFont = sym, Tip = "Más rápido hacia delante (.)" };
+            tBack = new DarkButton(Theme.Glyph.Rewind, small: true) { IconFont = sym, Tip = "Más rápido hacia atrás (,)" };
+            tPlay = new DarkButton(Theme.Glyph.Play, small: true) { IconFont = sym, Tip = "Continuar / pausa (espacio)" };
+            tFwd = new DarkButton(Theme.Glyph.Forward, small: true) { IconFont = sym, Tip = "Más rápido hacia delante (.)" };
             tFollow = new DarkButton("Seguir", small: true) { Tip = "La cámara sigue a la nave seleccionada (F)", Visible = false };
             tWarp = new TextLabel("▶ ×1") { TextFont = Theme.Make(Theme.MonoFamily, 12), MinWidth = Theme.S(118), Center = true };
-            tFecha = new TextLabel("") { TextFont = Theme.Mono, TextColor = Theme.FgDim };
+            tFecha = new TextLabel("") { TextFont = Theme.Mono, Dim = true };
             tNow.Click += (s, e) => VolverAlGuardado();
             tBack.Click += (s, e) => CambiarWarp(-1);
             tFwd.Click += (s, e) => CambiarWarp(+1);
@@ -109,10 +109,10 @@ namespace KerbinMaps.UI
             orbHud = new HudPanel { Visible = false };
         }
 
-        /* ------------------------------------------------------------ información orbital */
+        /* ------------------------------------------------------------ orbital info */
 
-        /* La órbita de la nave seleccionada en el instante de la barra de tiempo, en un
-           panel bajo el HUD. Se abre y se cierra con «Órbita» o con la tecla I. */
+        /* The selected vessel's orbit at the time on the time bar, in a panel under the HUD. It
+           opens and closes with «Órbita» or the I key. */
         void RenderOrbitInfo()
         {
             if (orbHud == null) return;
@@ -219,7 +219,7 @@ namespace KerbinMaps.UI
             if (i < 0) i = Array.IndexOf(Escala, 1.0);
             sim.Warp = Escala[Math.Clamp(i + paso, 0, Escala.Length - 1)];
             if (!sim.Running) sim.Last = 0;
-            sim.Running = true;             // cambiar la velocidad arranca, como en el juego
+            sim.Running = true;             // changing the speed starts it, as in the game
             RenderReloj();
             RequestRender();
         }
@@ -243,7 +243,7 @@ namespace KerbinMaps.UI
 
         void RenderReloj()
         {
-            tPlay.Text = sim.Running ? "❚❚" : "▶";
+            tPlay.Text = sim.Running ? Theme.Glyph.Pause : Theme.Glyph.Play;
             tWarp.Text = (sim.Warp < 0 ? "◀ ×" : "▶ ×") + Geo.FmtIntEs((long)Math.Abs(sim.Warp)) + (sim.Running ? "" : Lang.T(" · pausa"));
             double dt = sim.T - sv.Ut;
             tFecha.Text = Lang.F("{0}  ({1}{2} desde el guardado)", Geo.FechaKerbal(sim.T), dt < 0 ? "−" : "+", Geo.FmtTime(Math.Abs(dt)));
@@ -254,14 +254,14 @@ namespace KerbinMaps.UI
             LayoutTimeBar();
         }
 
-        /* ------------------------------------------------------------ bucle */
+        /* ------------------------------------------------------------ loop */
 
-        /* Si la ventana deja de pintar un rato (minimizada, arrastrando), al volver no
-           debe saltar horas de golpe; pero el tope no puede ser por fotograma, o con
-           pocos fotogramas por segundo el ×1 dejaría de ser tiempo real. */
+        /* If the window stops painting for a while (minimized, being dragged), it shouldn't
+           jump hours at once when it comes back; but the cap can't be per frame, or with few
+           frames per second ×1 would stop being real time. */
         void SimTick(double now)
         {
-            // el tiempo corre aunque en este cuerpo no haya naves: el Sol se sigue moviendo
+            // time runs even if this body has no vessels: the Sun keeps moving
             if (sv.Data == null) return;
             double dt = sim.Last > 0 ? Math.Min(2, now - sim.Last) : 0;
             sim.Last = now;
@@ -273,8 +273,8 @@ namespace KerbinMaps.UI
             if (sim.Running || sim.Dirty) Fotograma(now);
         }
 
-        /* Lo barato va siempre: mover marcadores, girar anillos, seguir a la nave. Lo
-           caro (rehacer trazas, textos) unas pocas veces por segundo. */
+        /* The cheap stuff always runs: moving markers, rotating rings, following the vessel.
+           The expensive stuff (rebuilding tracks, texts) a few times per second. */
         void Fotograma(double now)
         {
             double rot = RotBase(), R = Body.Radius;
@@ -283,7 +283,7 @@ namespace KerbinMaps.UI
             {
                 var p = SaveFile.PosicionEn(m.V.Orbit, sim.T, sv.Ut, rot);
                 m.P = p;
-                // Kepler no frena: una órbita que corta el suelo lo atraviesa, así que se oculta
+                // Kepler doesn't brake: an orbit that cuts the ground goes through it, so it's hidden
                 m.Oculto = p.Alt < 0;
                 m.Dot.Lat = p.Lat; m.Dot.Lon = p.Lon; m.Dot.Hidden = m.Oculto;
                 m.Pin.Lat = p.Lat; m.Pin.Lon = p.Lon; m.Pin.R = (R + p.Alt) / R; m.Pin.Hidden = m.Oculto;
@@ -294,7 +294,7 @@ namespace KerbinMaps.UI
             if (sim.Follow && posSel.HasValue)
             {
                 var p = posSel.Value;
-                // con el foco en la nave, la cámara la acompaña girando a su alrededor
+                // with the focus on the vessel, the camera goes along with it rotating around it
                 if (is3D) globe.FocusTarget = GlobeView.Sph(p.Lat, p.Lon, (R + p.Alt) / R);
                 else if (!isSky) map.CenterOn(p.Lat, p.Lon);
             }
@@ -312,20 +312,20 @@ namespace KerbinMaps.UI
             sim.Dirty = false;
         }
 
-        /* ------------------------------------------------------------ partida */
+        /* ------------------------------------------------------------ save */
 
         async Task PickSaveFile()
         {
             using var dlg = new OpenFileDialog { Filter = "Partidas de KSP (*.sfs)|*.sfs;*.loadmeta|Todos|*.*" };
-            // la carpeta de partidas de la instalación de KSP que se encuentre (ver FindGameData)
+            // the saves folder of whichever KSP installation is found (see FindGameData)
             string gd = FindGameData();
             string saves = gd == null ? null : Path.Combine(Path.GetDirectoryName(gd) ?? "", "saves");
             if (saves != null && Directory.Exists(saves)) dlg.InitialDirectory = saves;
             if (dlg.ShowDialog(this) == DialogResult.OK) await CargarSave(dlg.FileName);
         }
 
-        /* La partida cargada se copia a la carpeta local del visor: al volver a abrirlo se
-           recupera sola, aunque el juego la haya sobrescrito o la carpeta ya no esté. */
+        /* The loaded save is copied to the viewer's local folder: when reopened it comes back
+           on its own, even if the game overwrote it or the folder is gone. */
         void GuardarCopia(string original, string texto)
         {
             try
@@ -344,8 +344,8 @@ namespace KerbinMaps.UI
             }
         }
 
-        /* restoring: se lee la copia guardada al arrancar, que no se vuelve a copiar y
-           conserva el instante de la barra de tiempo en que se cerró. */
+        /* restoring: the saved copy is read at startup, which isn't copied again and keeps the
+           time on the time bar when it was closed. */
         async Task CargarSave(string path, bool restoring = false)
         {
             SaveData d;
@@ -379,8 +379,8 @@ namespace KerbinMaps.UI
             sim.T = sv.Ut; sim.Warp = 1; sim.Running = false; sim.Follow = false; sim.Dirty = true; sim.Last = 0;
             if (restoring && state.SimT is double tCierre && tCierre >= 0) sim.T = tCierre;
             else if (!restoring) GuardarCopia(path, texto);
-            // las naves de otra partida son otros objetos: los modelos montados ya no valen
-            // (con la copia, KSP se busca junto al original)
+            // another save's vessels are other objects: the assembled models are no longer valid
+            // (with the copy, KSP is looked for next to the original)
             loadedSavePath = restoring ? state.SavePath : path;
             vesselModels.Clear();
             navesCargando.Clear();
@@ -396,9 +396,9 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Las naves de la partida que orbitan el cuerpo que se está viendo; las demás se
-           cuentan pero no se dibujan, porque su latitud y longitud son de otro sitio. La
-           rotación del cuerpo se mide con ellas; sin ninguna, la del juego. */
+        /* The save's vessels orbiting the body being viewed; the rest are counted but not
+           drawn, because their latitude and longitude belong elsewhere. The body's rotation is
+           measured with them; with none, the game's. */
         void FiltrarNavesDelCuerpo()
         {
             var d = sv.Data;
@@ -413,7 +413,7 @@ namespace KerbinMaps.UI
             sv.Sel = null;
             sim.Follow = false;
             globe.ExitFocus();
-            // hasta dónde debe dejar alejarse la cámara: la órbita más lejana de la partida
+            // how far the camera should be allowed to move away: the save's farthest orbit
             sv.MaxR = deAqui.Aggregate(1.2, (mx, v) => Math.Max(mx, v.Orbit.Sma * (1 + v.Orbit.Ecc) / Body.Radius));
 
             sv.Tipos.Clear();
@@ -443,8 +443,8 @@ namespace KerbinMaps.UI
             };
             if (c != null && c.N >= 3)
             {
-                /* Dispersión mediana y no desviación típica: la típica se infla con la
-                   única nave rara que se cuele y da una idea falsa de la fiabilidad. */
+                /* Median spread and not standard deviation: the standard one gets inflated by
+                   the single odd vessel that slips in and gives a false idea of reliability. */
                 lineas.Add(Lang.F("Rotación medida con {0} naves: {1}°  (dispersión mediana {2}°{3})",
                     c.N, Geo.F(c.Rot, 2), Geo.F(c.Mad, 2),
                     c.Descartadas > 0 ? Lang.F(", {0} descartadas por incoherentes", c.Descartadas) : ""));
@@ -460,16 +460,17 @@ namespace KerbinMaps.UI
         {
             string t = (string)item;
             bool on = sv.Tipos.GetValueOrDefault(t);
-            int box = Theme.S(15), y = r.Y + (r.Height - box) / 2, x = r.X + Theme.S(2);
-            var br = new RectangleF(x + 0.5f, y + 0.5f, box - 1, box - 1);
+            int box = Theme.S(16), y = r.Y + (r.Height - box) / 2, x = r.X + Theme.S(2);
+            var br = new RectangleF(x, y, box, box);
+            // the same checkbox as DarkCheck
             if (on)
             {
                 Theme.FillRound(g, Theme.Accent, Theme.Accent, br, Theme.Sf(3));
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                using var pen = new Pen(Color.White, Theme.Sf(2)) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
-                g.DrawLines(pen, new[] { new PointF(x + box * 0.25f, y + box * 0.52f), new PointF(x + box * 0.43f, y + box * 0.7f), new PointF(x + box * 0.76f, y + box * 0.32f) });
+                using var pen = new Pen(Theme.OnAccent, Theme.Sf(1.6)) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
+                g.DrawLines(pen, new[] { new PointF(x + box * 0.27f, y + box * 0.52f), new PointF(x + box * 0.44f, y + box * 0.68f), new PointF(x + box * 0.74f, y + box * 0.34f) });
             }
-            else Theme.FillRound(g, Theme.Bg, hover ? Theme.Accent : Theme.FgDim, br, Theme.Sf(3));
+            else Theme.FillRound(g, Theme.Well, hover ? Theme.Mix(Theme.Current.LineStrong, Theme.Fg, 0.35f) : Theme.Current.LineStrong, br, Theme.Sf(3));
             x += box + Theme.S(8);
             DrawDot(g, Theme.Hex(ColorDe(t)), x, r.Y + r.Height / 2, Theme.S(8));
             x += Theme.S(14);
@@ -514,36 +515,36 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* ------------------------------------------------------------ naves en el suelo */
+        /* ------------------------------------------------------------ vessels on the ground */
 
         readonly HashSet<Vessel> navesCargando = new();
 
-        /* Las naves posadas o amerizadas del cuerpo que se ve, con sus piezas, para pintarlas
-           en el vuelo y en el cielo igual que los edificios de Kerbal Konstructs (ver
-           GlobeView.Statics.cs). Solo las de los tipos marcados en la lista. */
+        /* The landed or splashed-down vessels of the viewed body, with their parts, to paint
+           them in flight and sky views like the Kerbal Konstructs buildings (see
+           GlobeView.Statics.cs). Only those of the types checked in the list. */
         void ColocarNavesEnSuelo()
         {
             globe.GroundVessels.Clear();
             if (sv.Data == null || !state.ShowVesselModels) { RequestRender(); return; }
             double R = Body.Radius;
-            /* De la partida entera, no de sv.Naves: ahí solo entran las que tienen órbita, y
-               a las posadas se les descarta la suya (radial degenerada) al leerla. */
+            /* From the whole save, not from sv.Naves: only those with an orbit go in there, and
+               landed ones get theirs (degenerate radial) discarded when read. */
             foreach (var v in sv.Data.Vessels)
             {
                 if (v.Sit != "LANDED" && v.Sit != "SPLASHED" && v.Sit != "PRELAUNCH") continue;
                 if (v.Lat == null || v.Lon == null || SolarSystem.Find(v.BodyName) != Body.Current) continue;
-                // los tipos apagados en la lista; uno que no esté en ella (porque ninguna nave
-                // de ese tipo orbita) se ve
+                // the types switched off in the list; one that isn't in it (because no vessel
+                // of that type orbits) is shown
                 if (sv.Tipos.TryGetValue(v.Type, out bool tipoOn) && !tipoOn) continue;
 
-                /* La altitud: amerizada, al nivel del mar; en una plataforma o pista conocida
-                   (su propio «landedAt», o prelanzamiento, que siempre lo está), la del juego,
-                   que ahí es exacta; posada en cualquier otro sitio, el terreno propio del
-                   mapa más la altura sobre el suelo que guardó la partida, para que se apoye
-                   en el suelo que de verdad se ve aquí y no en el que tenía el juego. */
-                // amerizada, la del juego: el mar está a la misma altura aquí que allí, y con
-                // 0 el centro de masas quedaba bajo el agua. Un «hgt» de −1 es que el juego
-                // no la sabía: entonces vale su altitud.
+                /* The altitude: splashed down, at sea level; on a known pad or runway (its own
+                   «landedAt», or prelaunch, which always is), the game's, which is exact there;
+                   landed anywhere else, this map's own terrain plus the height above the ground
+                   the save stored, so it rests on the ground that's really shown here and not
+                   on the one the game had. */
+                // splashed down, the game's: the sea is at the same height here as there, and with
+                // 0 the center of mass ended up underwater. An «hgt» of −1 means the game
+                // didn't know it: then its altitude is used.
                 double alt;
                 if (v.Sit == "SPLASHED") alt = v.Alt ?? 0;
                 else if (v.Sit == "PRELAUNCH" || !string.IsNullOrEmpty(v.LandedAt) || v.Hgt is not double hg || hg < 0) alt = v.Alt ?? 0;
@@ -558,8 +559,8 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* El modelo montado de una nave posada: igual que ModeloKK, pedido en segundo plano
-           la primera vez (null hasta entonces) y compartido con el de la nave enfocada. */
+        /* The assembled model of a landed vessel: like ModeloKK, requested in the background
+           the first time (null until then) and shared with the focused vessel's. */
         AssembledVessel ModeloNave(Vessel v)
         {
             if (vesselModels.TryGetValue(v, out var a)) return a;
@@ -593,7 +594,7 @@ namespace KerbinMaps.UI
                 {
                     BeginInvoke((Action)(() =>
                     {
-                        if (!navesCargando.Remove(v)) return;   // se descartó entretanto
+                        if (!navesCargando.Remove(v)) return;   // it was discarded in the meantime
                         vesselModels[v] = t.Result;
                         ColocarNavesEnSuelo();
                     }));
@@ -616,8 +617,8 @@ namespace KerbinMaps.UI
             TextRenderer.DrawText(g, alt, Theme.MonoSmall, new Rectangle(r.Right - aw - Theme.S(7), r.Y, aw, r.Height), Theme.FgDim, flags | TextFormatFlags.Right);
         }
 
-        /* Pinchar una nave la selecciona y la sigue desde ya; pincharla otra vez la
-           suelta. */
+        /* Clicking a vessel selects it and follows it right away; clicking it again releases
+           it. */
         void SeleccionarNave(Vessel v)
         {
             bool nueva = sv.Sel != v;
@@ -641,17 +642,16 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Posición de la nave seleccionada en el marco del globo, en radios de Kerbin. */
+        /* Position of the selected vessel in the globe's frame, in Kerbin radii. */
         double[] SelPos()
         {
             var p = SaveFile.PosicionEn(sv.Sel.Orbit, sim.T, sv.Ut, RotBase());
             return GlobeView.Sph(p.Lat, p.Lon, (Body.Radius + p.Alt) / Body.Radius);
         }
 
-        /* Seguir a la nave. En el globo el foco de la cámara pasa del centro de Kerbin a
-           la nave: arrastrar gira alrededor de ella y la rueda se acerca o se aleja de
-           ella. En el mapa plano el mapa se recentra sobre la nave y arrastrar lo
-           cancela. */
+        /* Follow the vessel. On the globe the camera focus moves from Kerbin's center to the
+           vessel: dragging rotates around it and the wheel moves toward or away from it. On the
+           flat map the map recenters on the vessel and dragging cancels it. */
         void Seguir(bool on)
         {
             sim.Follow = on && sv.Sel != null;
@@ -687,20 +687,20 @@ namespace KerbinMaps.UI
             if (HasVessels) RenderNaves();
         }
 
-        /* ------------------------------------------------------------ trazas */
+        /* ------------------------------------------------------------ tracks */
 
-        /* El globo tiene un único hueco de traza y lo quieren dos: la órbita dibujada a
-           mano y la de la nave pinchada. Manda la última que se pidió. */
+        /* The globe has a single track slot and two things want it: the orbit drawn by hand and
+           the clicked vessel's. The last one requested wins. */
         void PushTrack()
         {
             if (!glOk || !surface.MakeCurrent()) return;
-            // la nave ya tiene su anillo: de su traza solo se pinta la huella en el suelo
+            // the vessel already has its ring: of its track only the ground footprint is painted
             if (sv.TrackPts != null) globe.SetTrack(sv.TrackPts, space: false);
             else globe.SetTrack(lastTrack);
             RequestRender();
         }
 
-        /* En 2D, «todas las órbitas» son trazas terrestres desde el instante simulado. */
+        /* In 2D, «all orbits» are ground tracks from the simulated time. */
         void DibujarTodas()
         {
             allLayer.Lines.Clear();
@@ -725,7 +725,7 @@ namespace KerbinMaps.UI
             var t = SaveFile.TrazaDesde(sv.Sel.Orbit, sim.T, sv.Ut, rot, svOrbits.Value);
             trackLayer.Lines.Add(MapLine.FromTrack(t, ColorF.Hex(ColorDe(sv.Sel.Type), 0.9f), 2));
             sv.TrackPts = t;
-            // pinchar una nave sustituye a la órbita manual
+            // clicking a vessel replaces the manual orbit
             lastTrack = null;
             orbitLayer.Clear();
             PushTrack();
@@ -740,8 +740,8 @@ namespace KerbinMaps.UI
                 "Periodo      <b>" + Geo.FmtTime(SaveFile.Periodo(e)) + "</b>"));
         }
 
-        /* En 3D las órbitas son anillos cerrados: todas si se ha pedido, y siempre la de
-           la nave seleccionada, más opaca y dibujada la última para que quede encima. */
+        /* In 3D orbits are closed rings: all of them if requested, and always the selected
+           vessel's, more opaque and drawn last so it stays on top. */
         void ConstruirAnillos()
         {
             if (!glOk || !surface.MakeCurrent()) return;

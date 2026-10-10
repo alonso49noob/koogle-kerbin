@@ -6,25 +6,25 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.Ksp
 {
-    /* Los mapas de Kerbin que trae la propia instalación, mejores que los del visor:
+    /* The Kerbin maps the installation itself ships, better than the viewer's:
 
-       - Color: la textura de Kerbin visto de lejos del juego (KerbinScaledSpace300 en
-         sharedassets2.assets), de 8192×4096 en BC7. Aquí no se descomprime BC7: lo hace la
-         GPU (ver Texture.DescomprimirEnGpu), así que esto solo da los bytes del nivel.
-       - Biomas: el mapa de atributos del juego («kerbin_biome», un MonoBehaviour de
-         sharedassets9.assets con el script de CBAttributeMapSO): 4096×2048 en RGB, con los
-         nombres y colores de cada bioma. Los colores son los mismos que los de los mapas de
-         biomas de siempre, así que los nombres casan.
-       - Altura: la del paquete de Parallax, de 8192×4096 y con toda la escala de grises.
+       - Color: the game's texture of Kerbin seen from afar (KerbinScaledSpace300 in
+         sharedassets2.assets), 8192×4096 in BC7. BC7 isn't decompressed here: the GPU does it
+         (see Texture.DescomprimirEnGpu), so this only gives the level's bytes.
+       - Biomes: the game's attribute map («kerbin_biome», a MonoBehaviour in
+         sharedassets9.assets with the CBAttributeMapSO script): 4096×2048 in RGB, with the
+         names and colors of each biome. The colors are the same as in the usual biome maps, so
+         the names match.
+       - Height: the one from the Parallax bundle, 8192×4096 and with the full gray scale.
 
-       Los tres vienen en la convención de Unity y de Parallax: la primera fila abajo, la
-       longitud al revés y girada 90°. Aquí se dejan como los mapas del visor (lat 90 arriba,
-       lon −180 a la izquierda), con el giro en 0. Medido contra el mapa de biomas de 1800:
-       98 % de coincidencia en los biomas y 95 % en el color. */
+       All three come in Unity's and Parallax's convention: first row at the bottom, longitude
+       reversed and rotated 90°. Here they're left like the viewer's maps (lat 90 at the top,
+       lon −180 on the left), with rotation at 0. Measured against the 1800 biome map: 98% match
+       on biomes and 95% on color. */
     public static class MapasDelJuego
     {
-        /* El color de Kerbin del juego, sin descomprimir: formato de Unity, tamaño y bytes
-           del nivel de no más de `maxAncho`. Null si no está. */
+        /* Kerbin's color from the game, not decompressed: Unity format, size and bytes of the
+           level no wider than `maxAncho`. Null if it isn't there. */
         public static (int Formato, int Ancho, int Alto, byte[] Nivel)? ColorCrudo(StockAssets sa, string cuerpo, int maxAncho = 8192)
         {
             if (sa == null || cuerpo != "Kerbin") return null;
@@ -48,7 +48,7 @@ namespace KerbinMaps.Ksp
             return null;
         }
 
-        /* El mapa de biomas del cuerpo y el nombre de cada color («#3762ab» → «Water»). */
+        /* The body's biome map and the name of each color («#3762ab» → «Water»). */
         public static (ImageData Mapa, Dictionary<string, string> Nombres)? Biomas(StockAssets sa, string cuerpo)
         {
             if (sa == null) return null;
@@ -60,7 +60,7 @@ namespace KerbinMaps.Ksp
                 foreach (var kv in s.Objetos)
                 {
                     if (kv.Value.ClassId != 114 || kv.Value.Size < 100000) continue;
-                    // m_GameObject (12), m_Enabled (4), m_Script (12) y el nombre
+                    // m_GameObject (12), m_Enabled (4), m_Script (12) and the name
                     var cab = s.LeerInicio(kv.Key, 96);
                     if (cab.Length < 40) continue;
                     int n = BitConverter.ToInt32(cab, 28);
@@ -75,8 +75,8 @@ namespace KerbinMaps.Ksp
 
         static (ImageData, Dictionary<string, string>) Leer(byte[] d)
         {
-            // tras el nombre, el ancho, el alto, los bytes por píxel y el tamaño de los datos,
-            // que tienen que cuadrar entre sí (entre medias hay otro nombre y un entero)
+            // after the name, the width, the height, the bytes per pixel and the data size,
+            // which have to agree with each other (in between there's another name and an integer)
             int p = -1;
             for (int i = 32; i + 16 <= Math.Min(d.Length, 200); i += 4)
             {
@@ -92,7 +92,7 @@ namespace KerbinMaps.Ksp
                 return (d[i], d[i + 1], d[i + 2]);
             }, ancho, alto, filaCeroAbajo: true);
 
-            // los atributos: un entero, cuántos, y cada uno con su color, nombre, etiqueta y valor
+            // the attributes: an integer, how many, and each one with its color, name, tag and value
             var nombres = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             try
             {
@@ -104,8 +104,8 @@ namespace KerbinMaps.Ksp
                     float r = BitConverter.ToSingle(d, q), g = BitConverter.ToSingle(d, q + 4), b = BitConverter.ToSingle(d, q + 8);
                     q += 16;
                     string nombre = Cadena(d, ref q);
-                    Cadena(d, ref q);                                  // etiqueta de traducción
-                    q += 12;                                           // valor y marcas
+                    Cadena(d, ref q);                                  // translation tag
+                    q += 12;                                           // value and flags
                     string hex = "#" + ((int)Math.Round(r * 255)).ToString("x2") + ((int)Math.Round(g * 255)).ToString("x2") + ((int)Math.Round(b * 255)).ToString("x2");
                     if (!string.IsNullOrWhiteSpace(nombre)) nombres[hex] = nombre;
                 }
@@ -123,8 +123,8 @@ namespace KerbinMaps.Ksp
             return s;
         }
 
-        /* RGBA de un nivel ya descomprimido (primera fila abajo, como lo da la GPU con los
-           datos de Unity), a la convención del visor. */
+        /* RGBA of an already-decompressed level (first row at the bottom, as the GPU gives it
+           with Unity's data), to the viewer's convention. */
         public static ImageData DesdeRgbaDeUnity(byte[] rgba, int ancho, int alto) =>
             ImageData.FromRgba(Alinear((x, y) =>
             {
@@ -132,7 +132,7 @@ namespace KerbinMaps.Ksp
                 return (rgba[i], rgba[i + 1], rgba[i + 2]);
             }, ancho, alto, filaCeroAbajo: true), ancho, alto);
 
-        /* Un mapa de Parallax ya con la primera fila arriba (ParallaxPlanets.Load). */
+        /* A Parallax map already with the first row at the top (ParallaxPlanets.Load). */
         public static ImageData DesdeParallax(ImageData img) =>
             img == null ? null : ImageData.FromRgba(Alinear((x, y) =>
             {
@@ -140,8 +140,8 @@ namespace KerbinMaps.Ksp
                 return (img.Rgba[i], img.Rgba[i + 1], img.Rgba[i + 2]);
             }, img.Width, img.Height, filaCeroAbajo: false), img.Width, img.Height);
 
-        /* Columna x del visor = columna ancho−1−((x − 3/4·ancho) mod ancho) del original:
-           longitud al revés y girada 90°. */
+        /* Viewer column x = original column width−1−((x − 3/4·width) mod width): longitude
+           reversed and rotated 90°. */
         static byte[] Alinear(Func<int, int, (byte R, byte G, byte B)> leer, int ancho, int alto, bool filaCeroAbajo)
         {
             var o = new byte[(long)ancho * alto * 4];

@@ -6,16 +6,16 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.UI
 {
-    /* Icono de un cuerpo para las listas: un disco de su color iluminado desde arriba a la
-       izquierda, con halo del color de su aire si tiene atmósfera y corona si es la estrella.
-       No se usa su mapa porque el visor solo trae texturas de Kerbin; el color es el mismo
-       que usa el globo cuando no hay imagen (BodyDef.Tint), así que el icono y el planeta
-       que sale al elegirlo se parecen. */
+    /* Icon of a body for lists: a disc of its color lit from the upper left, with a halo the
+       color of its air if it has an atmosphere and a corona if it's the star. Its map isn't
+       used because the viewer only ships Kerbin textures; the color is the same one the globe
+       uses when there's no image (BodyDef.Tint), so the icon and the planet that shows up when
+       you pick it look alike. */
     public static class BodyIcon
     {
         static readonly Dictionary<string, Bitmap> cache = new();
 
-        /* Al cambiar de sistema (Kopernicus) los colores son otros. */
+        /* When the system changes (Kopernicus) the colors are different. */
         public static void Clear()
         {
             foreach (var b in cache.Values) b.Dispose();
@@ -36,7 +36,7 @@ namespace KerbinMaps.UI
         static Color Rgb(float[] t, double k, int alpha = 255) => Color.FromArgb(alpha,
             (int)Math.Clamp(t[0] * 255 * k, 0, 255), (int)Math.Clamp(t[1] * 255 * k, 0, 255), (int)Math.Clamp(t[2] * 255 * k, 0, 255));
 
-        /* El color del cielo: el Rayleigh del cuerpo normalizado a su componente más fuerte. */
+        /* The sky color: the body's Rayleigh normalized to its strongest component. */
         static Color Air(double[] beta, int alpha)
         {
             double m = Math.Max(beta[0], Math.Max(beta[1], beta[2]));
@@ -46,21 +46,21 @@ namespace KerbinMaps.UI
 
         static Bitmap Draw(BodyDef b, int size)
         {
-            // se dibuja al triple y se reduce: a 16 px el limbo de un círculo con solo
-            // antialias de GDI queda con escalones que se ven mucho en una lista
+            // drawn at triple size and scaled down: at 16 px the rim of a circle with only
+            // GDI antialiasing is left with steps that stand out a lot in a list
             const int ss = 3;
             int n = size * ss;
             var big = new Bitmap(n, n);
             using (var g = Graphics.FromImage(big))
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
-                float margin = b.IsStar ? n * 0.22f : n * 0.11f;    // la estrella deja sitio a la corona
+                float margin = b.IsStar ? n * 0.22f : n * 0.11f;    // the star leaves room for the corona
                 var disc = new RectangleF(margin, margin, n - 2 * margin, n - 2 * margin);
                 float r = disc.Width / 2, cx = disc.X + r, cy = disc.Y + r;
 
                 if (b.IsStar)
                 {
-                    // corona: tres anillos cada vez más tenues
+                    // corona: three rings, each fainter
                     for (int i = 3; i >= 1; i--)
                     {
                         float k = 1 + i * 0.28f;
@@ -71,8 +71,8 @@ namespace KerbinMaps.UI
                 }
                 else if (b.HasAir)
                 {
-                    // el aire, como un resplandor tenue alrededor: un anillo opaco se lee como
-                    // un borde de selección, no como atmósfera
+                    // the air, as a faint glow around it: an opaque ring reads as
+                    // a selection border, not as an atmosphere
                     for (int i = 3; i >= 1; i--)
                     {
                         using var pen = new Pen(Air(b.AirColor, 26 + 14 * (3 - i)), n * 0.03f * i);

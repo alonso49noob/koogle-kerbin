@@ -6,25 +6,25 @@ using System.Text;
 
 namespace KerbinMaps.Ksp
 {
-    /* Lector de paquetes de Unity (UnityFS), lo justo para sacar texturas.
+    /* Unity bundle reader (UnityFS), just enough to get textures out.
 
-       Algunos mods (Parallax, por ejemplo) no dejan sus texturas sueltas en GameData sino
-       dentro de un paquete de Unity de varios gigas. El paquete es una lista de bloques
-       comprimidos con LZ4 de unos 128 KB; dentro van un fichero serializado de Unity (con
-       la tabla de objetos) y un fichero de recursos con los bytes de las imágenes. Como los
-       bloques se pueden descomprimir por separado, aquí solo se lee lo que hace falta: la
-       cabecera, la tabla de objetos y las texturas que se piden, no los 2 GB.
+       Some mods (Parallax, for example) don't leave their textures loose in GameData but inside
+       a Unity bundle of several gigabytes. The bundle is a list of LZ4-compressed blocks of
+       about 128 KB; inside there's a Unity serialized file (with the object table) and a
+       resource file with the bytes of the images. Since blocks can be decompressed separately,
+       only what's needed is read here: the header, the object table and the requested textures,
+       not the 2 GB.
 
-       Formatos que se entienden: UnityFS versiones 6 y 7, ficheros serializados de la 17 a
-       la 22 (Unity 2017 a 2020), bloques sin comprimir o con LZ4/LZ4HC. */
-    /* De dónde salen los bytes de un fichero serializado: un paquete (descomprimiendo sus
-       bloques) o un fichero suelto de los datos del juego. */
+       Supported formats: UnityFS versions 6 and 7, serialized files from 17 to 22 (Unity 2017
+       to 2020), uncompressed or LZ4/LZ4HC blocks. */
+    /* Where a serialized file's bytes come from: a bundle (decompressing its blocks) or a loose
+       file in the game's data. */
     public interface IUnityData
     {
         byte[] Read(long pos, int n);
     }
 
-    /* Un fichero suelto de KSP_x64_Data (sharedassets9.assets, su .resS...), leído a trozos. */
+    /* A loose file in KSP_x64_Data (sharedassets9.assets, its .resS...), read in pieces. */
     public sealed class UnityFile : IUnityData, IDisposable
     {
         readonly FileStream f;
@@ -74,7 +74,7 @@ namespace KerbinMaps.Ksp
             var r = new BinaryReader(f);
             if (CString(r) != "UnityFS") throw new InvalidDataException("no es un paquete UnityFS");
             int version = BE32(r);
-            CString(r); CString(r);                         // «5.x.x» y la versión de Unity
+            CString(r); CString(r);                         // «5.x.x» and the Unity version
             long total = BE64(r);
             int infoComp = BE32(r), infoUncomp = BE32(r), flags = BE32(r);
             if (version >= 7) Alinear(16);
@@ -83,7 +83,7 @@ namespace KerbinMaps.Ksp
             long datos;
             if ((flags & 0x80) != 0)
             {
-                // la tabla de bloques va al final del fichero
+                // the block table is at the end of the file
                 long pos = f.Position;
                 f.Seek(total - infoComp, SeekOrigin.Begin);
                 infoRaw = r.ReadBytes(infoComp);
@@ -94,13 +94,13 @@ namespace KerbinMaps.Ksp
             {
                 infoRaw = r.ReadBytes(infoComp);
                 datos = f.Position;
-                // con el bit 0x200 los datos empiezan en el siguiente múltiplo de 16
+                // with bit 0x200 the data starts at the next multiple of 16
                 if ((flags & 0x200) != 0) datos = (datos + 15) & ~15L;
             }
             byte[] info = Descomprimir(infoRaw, infoUncomp, flags & 0x3F);
 
             var ir = new BinaryReader(new MemoryStream(info));
-            ir.ReadBytes(16);                               // hash de los datos sin comprimir
+            ir.ReadBytes(16);                               // hash of the uncompressed data
             int nBloques = BE32(ir);
             long comp = datos, uncomp = 0;
             for (int i = 0; i < nBloques; i++)
@@ -114,14 +114,14 @@ namespace KerbinMaps.Ksp
             for (int i = 0; i < nNodos; i++)
             {
                 long off = BE64(ir), size = BE64(ir);
-                BE32(ir);                                   // flags del nodo
+                BE32(ir);                                   // node flags
                 nodos.Add((off, size, CString(ir)));
             }
         }
 
         public void Dispose() => f.Dispose();
 
-        /* Lee `n` bytes de la secuencia descomprimida a partir de `pos`. */
+        /* Reads `n` bytes of the decompressed stream starting at `pos`. */
         public byte[] Read(long pos, int n)
         {
             var o = new byte[n];
@@ -182,8 +182,8 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* LZ4 por bloques (no el formato de marco): cada secuencia es un token con la
-           longitud de los literales y la de la copia, los literales y un desplazamiento. */
+        /* Block LZ4 (not the frame format): each sequence is a token with the literal length
+           and the match length, the literals and an offset. */
         public static byte[] Lz4(byte[] src, int tam)
         {
             var dst = new byte[tam];
@@ -195,7 +195,7 @@ namespace KerbinMaps.Ksp
                 if (lit == 15) { int b; do { b = src[ip++]; lit += b; } while (b == 255); }
                 Buffer.BlockCopy(src, ip, dst, op, lit);
                 ip += lit; op += lit;
-                if (ip >= src.Length) break;                // la última secuencia no tiene copia
+                if (ip >= src.Length) break;                // the last sequence has no match
                 int off = src[ip] | (src[ip + 1] << 8);
                 ip += 2;
                 int len = token & 15;
@@ -203,7 +203,7 @@ namespace KerbinMaps.Ksp
                 len += 4;
                 int from = op - off;
                 if (off >= len) { Buffer.BlockCopy(dst, from, dst, op, len); op += len; }
-                else for (int i = 0; i < len; i++) dst[op++] = dst[from + i];     // copia solapada
+                else for (int i = 0; i < len; i++) dst[op++] = dst[from + i];     // overlapping copy
             }
             return dst;
         }
@@ -223,8 +223,8 @@ namespace KerbinMaps.Ksp
         static long BE64(BinaryReader r) { long hi = (uint)BE32(r), lo = (uint)BE32(r); return (hi << 32) | lo; }
     }
 
-    /* Un fichero serializado de Unity dentro del paquete: la tabla de objetos y lo justo
-       para leer el índice del paquete (qué ruta es cada objeto) y las texturas. */
+    /* A Unity serialized file inside the bundle: the object table and just enough to read the
+       bundle's index (which path each object is) and the textures. */
     public sealed class UnitySerialized
     {
         readonly IUnityData b;
@@ -238,39 +238,39 @@ namespace KerbinMaps.Ksp
         {
             b = bundle; baseOff = offset;
             var h = new Reader(b.Read(baseOff, (int)Math.Min(size, 64)), bigEndian: true);
-            h.I32(); h.I32();                               // tamaño de metadatos y del fichero (viejos)
+            h.I32(); h.I32();                               // metadata and file size (old versions)
             version = h.I32();
             int dataOff32 = h.I32();
             if (version >= 22)
             {
-                h.Pos += 4;                                 // endianness y reservados
-                h.I32();                                    // tamaño de metadatos
-                h.I64();                                    // tamaño del fichero
+                h.Pos += 4;                                 // endianness and reserved
+                h.I32();                                    // metadata size
+                h.I64();                                    // file size
                 dataOffset = h.I64();
                 h.I64();
             }
             else
             {
                 dataOffset = dataOff32;
-                h.Pos += 4;                                 // endianness y reservados
+                h.Pos += 4;                                 // endianness and reserved
             }
             int cab = h.Pos;
 
-            // los metadatos caben de sobra en los primeros megas
+            // the metadata fits easily in the first few megabytes
             int meta = (int)Math.Min(size - cab, Math.Max(dataOffset - cab, 1 << 20));
             var r = new Reader(b.Read(baseOff + cab, meta), bigEndian: false);
-            r.CString();                                    // versión de Unity
-            r.I32();                                        // plataforma
+            r.CString();                                    // Unity version
+            r.I32();                                        // platform
             bool arbol = r.U8() != 0;
             var clases = new List<int>();
             int nTipos = r.I32();
             for (int i = 0; i < nTipos; i++)
             {
                 int classId = r.I32();
-                r.U8();                                     // tipo recortado
+                r.U8();                                     // stripped type
                 short script = r.I16();
                 if (classId == 114 || script >= 0) r.Pos += 16;
-                r.Pos += 16;                                // hash del tipo
+                r.Pos += 16;                                // type hash
                 if (arbol)
                 {
                     int nodos = r.I32(), cadenas = r.I32();
@@ -289,7 +289,7 @@ namespace KerbinMaps.Ksp
                 int t = r.I32();
                 Objetos[pathId] = (start, sz, t >= 0 && t < clases.Count ? clases[t] : -1);
             }
-            // los scripts y los ficheros externos: a qué fichero apunta cada fileID de un PPtr
+            // scripts and external files: which file each PPtr fileID points to
             try
             {
                 int nScripts = r.I32();
@@ -302,8 +302,8 @@ namespace KerbinMaps.Ksp
                 int nExt = r.I32();
                 for (int i = 0; i < nExt; i++)
                 {
-                    r.CString();                            // vacío
-                    r.Pos += 16 + 4;                        // guid y tipo
+                    r.CString();                            // empty
+                    r.Pos += 16 + 4;                        // guid and type
                     Externos.Add(r.CString());
                 }
             }
@@ -311,17 +311,17 @@ namespace KerbinMaps.Ksp
             LeerContenedor();
         }
 
-        /* Los ficheros a los que apuntan los PPtr con fileID > 0, en orden (fileID 1 es el
-           primero). Rutas como «sharedassets0.assets» o «library/unity default resources». */
+        /* The files pointed to by PPtrs with fileID > 0, in order (fileID 1 is the first).
+           Paths like «sharedassets0.assets» or «library/unity default resources». */
         public readonly List<string> Externos = new();
 
         public int Version => version;
         public long DataOffset => dataOffset;
 
-        /* Los bytes de un objeto, para leerlo según su clase. */
+        /* An object's bytes, to read it according to its class. */
         public byte[] Leer(long pathId) => Objeto(pathId);
 
-        /* Solo el principio de un objeto: para mirar el nombre de uno grande sin leerlo entero. */
+        /* Only the start of an object: to look at the name of a large one without reading it whole. */
         public byte[] LeerInicio(long pathId, int n)
         {
             var o = Objetos[pathId];
@@ -334,7 +334,7 @@ namespace KerbinMaps.Ksp
             return b.Read(baseOff + dataOffset + o.Start, (int)o.Size);
         }
 
-        /* El nombre de un objeto con nombre (textura, malla, material...): va al principio. */
+        /* The name of a named object (texture, mesh, material...): it comes first. */
         public string Nombre(long pathId)
         {
             var o = Objetos[pathId];
@@ -345,21 +345,21 @@ namespace KerbinMaps.Ksp
             return Encoding.UTF8.GetString(b.Read(baseOff + dataOffset + o.Start + 4, n));
         }
 
-        /* El objeto AssetBundle (clase 142) lleva el índice: ruta de cada recurso -> objeto. */
+        /* The AssetBundle object (class 142) carries the index: path of each resource -> object. */
         void LeerContenedor()
         {
             foreach (var kv in Objetos)
             {
                 if (kv.Value.ClassId != 142) continue;
                 var r = new Reader(Objeto(kv.Key), false);
-                r.Str();                                    // nombre
+                r.Str();                                    // name
                 int pre = r.I32();
-                r.Pos += pre * 12;                          // tabla de precarga: PPtr (int32 + int64)
+                r.Pos += pre * 12;                          // preload table: PPtr (int32 + int64)
                 int n = r.I32();
                 for (int i = 0; i < n; i++)
                 {
                     string ruta = r.Str();
-                    r.I32(); r.I32();                       // índice y tamaño de precarga
+                    r.I32(); r.I32();                       // preload index and size
                     r.I32();                                // fileID
                     long pathId = r.I64();
                     Contenedor[ruta] = pathId;
@@ -368,8 +368,8 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* Busca un recurso por el final de su ruta, sin distinguir mayúsculas ni extensión
-           (el índice suele guardar «assets/...» en minúsculas). */
+        /* Finds a resource by the end of its path, ignoring case and extension (the index
+           usually stores «assets/...» in lowercase). */
         public long? Buscar(string ruta)
         {
             string clave = Normalizar(ruta);
@@ -389,8 +389,8 @@ namespace KerbinMaps.Ksp
             return s;
         }
 
-        /* Una textura: formato de Unity, tamaño, mipmaps y los bytes, que pueden venir en el
-           propio objeto o en el fichero de recursos del paquete (.resS). */
+        /* A texture: Unity format, size, mipmaps and the bytes, which can come in the object
+           itself or in the bundle's resource file (.resS). */
         public sealed class Textura
         {
             public string Nombre;
@@ -401,13 +401,13 @@ namespace KerbinMaps.Ksp
         public Textura LeerTextura(long pathId, Func<string, (long Offset, long Size)?> recurso) =>
             LeerTextura(pathId, (path, off, size) => recurso(path) is var res && res != null ? b.Read(res.Value.Offset + off, size) : null);
 
-        /* Lo mismo con una función que lee los bytes del fichero de recursos: en un fichero
-           suelto del juego el .resS es otro fichero. */
+        /* Same thing with a function that reads bytes from the resource file: in a loose game
+           file the .resS is another file. */
         public Textura LeerTextura(long pathId, Func<string, long, int, byte[]> recurso)
         {
             var datos = Objeto(pathId);
-            // tras la cabecera fija hay un grupo de booleanos cuyo número cambia entre
-            // versiones; se prueba cada posibilidad y se valida con lo que tiene que cumplir
+            // after the fixed header there's a group of booleans whose count changes between
+            // versions; each possibility is tried and validated against what has to hold
             foreach (int bools in new[] { 4, 5, 3, 6 })
             {
                 try
@@ -424,19 +424,19 @@ namespace KerbinMaps.Ksp
         {
             var r = new Reader(d, false);
             var t = new Textura { Nombre = r.Str() };
-            r.I32();                                        // formato de reserva
-            r.U8(); r.Pos = (r.Pos + 3) & ~3;               // reducción de reserva
+            r.I32();                                        // fallback format
+            r.U8(); r.Pos = (r.Pos + 3) & ~3;               // fallback reduction
             t.Ancho = r.I32(); t.Alto = r.I32();
             int completo = r.I32();
             t.Formato = r.I32();
             t.Mips = r.I32();
             r.Pos += bools; r.Pos = (r.Pos + 3) & ~3;
-            r.I32();                                        // prioridad de streaming
+            r.I32();                                        // streaming priority
             int imagenes = r.I32(), dimension = r.I32();
             if (t.Ancho <= 0 || t.Alto <= 0 || t.Ancho > 16384 || t.Alto > 16384) return null;
             if (imagenes != 1 || dimension != 2 || t.Mips < 1 || t.Mips > 15) return null;
-            r.Pos += 6 * 4;                                 // ajustes de filtrado y repetición
-            r.I32(); r.I32();                               // lightmap y espacio de color
+            r.Pos += 6 * 4;                                 // filtering and wrap settings
+            r.I32(); r.I32();                               // lightmap and color space
             int n = r.I32();
             if (n > 0)
             {
@@ -455,7 +455,7 @@ namespace KerbinMaps.Ksp
             return t;
         }
 
-        /* Lectura de bytes con la endianness que toque. */
+        /* Byte reading with the appropriate endianness. */
         sealed class Reader
         {
             readonly byte[] d; readonly bool be;

@@ -6,40 +6,79 @@ using System.Linq;
 
 namespace KerbinMaps.Ksp
 {
-    /* Edificios de Kerbal Konstructs: los modelos (nodos STATIC con su .mu), los centros de
-       grupo (KK_GroupCenter) y las instancias (nodos Instances), leídos de los .cfg de
-       GameData tal como los deja KK, y colocados con sus mismas cuentas.
+    /* Kerbal Konstructs buildings: the models (STATIC nodes with their .mu), the group centers
+       (KK_GroupCenter) and the instances (Instances nodes), read from the GameData .cfg files
+       as KK leaves them, and placed with its same math.
 
-       Cómo coloca KK cada cosa (GroupCenter.cs y StaticInstance.cs en su código):
-       - Un centro de grupo va a su latitud y longitud, a RadiusOffset metros sobre el
-         terreno (o sobre el nivel del mar con SeaLevelAsReference). Su giro es
-         LookRotation(vertical) · Euler(0, 0, Heading) · Euler(-90, -90, -90); en los
-         antiguos, sin Heading, el de PQSCity: de «arriba» a la vertical y RotationAngle
-         grados alrededor de «arriba».
-       - Una instancia es hija de su grupo: localPosition = RelativePosition,
-         localEulerAngles = Orientation, localScale = ModelScale.
-       - Las antiguas, sin RelativePosition, van por su cuenta: RadialPosition, a
-         RadiusOffset sobre el nivel del mar (o sobre el terreno si IsRelativeToTerrain = 2),
-         con el giro de PQSCity.
-       - Los grupos «KSC_Builtin» y compañía son los sitios del juego (PQSCity de Kerbin):
-         no están en ningún .cfg y aquí van con los valores del juego sin mods.
+       How KK places each thing (GroupCenter.cs and StaticInstance.cs in its code):
+       - A group center goes to its latitude and longitude, RadiusOffset meters above the
+         terrain (or above sea level with SeaLevelAsReference). Its rotation is
+         LookRotation(vertical) · Euler(0, 0, Heading) · Euler(-90, -90, -90); in old ones,
+         without Heading, PQSCity's: from «up» to the vertical and RotationAngle degrees around
+         «up».
+       - An instance is a child of its group: localPosition = RelativePosition, localEulerAngles
+         = Orientation, localScale = ModelScale.
+       - Old ones, without RelativePosition, go on their own: RadialPosition, RadiusOffset above
+         sea level (or above the terrain if IsRelativeToTerrain = 2), with PQSCity's rotation.
+       - The «KSC_Builtin» groups and the like are the game's sites (Kerbin's PQSCity): they
+         aren't in any .cfg and here they go with the unmodded game's values.
 
-       Todo se calcula en el marco del cuerpo de KSP (Unity, mano izquierda, Y hacia el polo
-       norte, x = cos lat cos lon, z = cos lat sin lon) y en metros. Para pasar al del visor
-       basta cambiar X por Z, como con las naves. */
+       Everything is computed in KSP's body frame (Unity, left-handed, Y toward the north pole,
+       x = cos lat cos lon, z = cos lat sin lon) and in meters. To go to the viewer's frame it's
+       enough to swap X and Z, as with vessels. */
     public sealed class KkModel
     {
         public string Name, Title, Category, Author;
-        public string Mesh;                       // ruta completa del .mu, o null
+        public string Mesh;                       // full path of the .mu, or null
         public string CfgPath;
-        public long StockRoot;                    // edificio de serie: su prefab en los datos del juego
-        // módulos AdvancedTextures: a qué objetos del modelo («Any»: todos) les cambia la textura
+        public long StockRoot;                    // stock building: its prefab in the game data
+        // AdvancedTextures modules: which objects of the model («Any»: all) get their texture changed
         public readonly List<(HashSet<string> Transforms, string MainTex)> TexSwaps = new();
         public bool Stock => StockRoot != 0;
         public bool HasMesh => Stock || (Mesh != null && File.Exists(Mesh));
 
-        /* El modelo montado, con las texturas que le cambia KK. `_MainTex` es una ruta de
-           GameData sin extensión o «BUILTIN:/nombre», una textura del propio juego. */
+        // launch site defaults from the STATIC node: the spawn transform and the pad size
+        public string DefaultLaunchPadTransform;
+        public double DefaultSiteLength, DefaultSiteWidth;
+
+        List<string> spawnTransforms;
+
+        /* Transforms of the model a vessel can spawn on, best first: the declared default and
+           then any whose name says spawn or launch. KK looks the transform up by name and, if
+           it isn't in the model, the site is never registered («Launch pad transform … missing»),
+           so only names that really exist in the .mu are offered. Empty: this model can't be a
+           launch site. */
+        public IReadOnlyList<string> SpawnTransforms()
+        {
+            if (spawnTransforms != null) return spawnTransforms;
+            var nombres = new List<string>();
+            try
+            {
+                if (!Stock && HasMesh)
+                {
+                    var pila = new Stack<MuNode>();
+                    pila.Push(MuFile.Load(Mesh).Root);
+                    while (pila.Count > 0)
+                    {
+                        var n = pila.Pop();
+                        if (n == null) continue;
+                        if (!string.IsNullOrEmpty(n.Name)) nombres.Add(n.Name);
+                        foreach (var h in n.Children) pila.Push(h);
+                    }
+                }
+            }
+            catch { }
+            var res = new List<string>();
+            if (!string.IsNullOrWhiteSpace(DefaultLaunchPadTransform) && nombres.Contains(DefaultLaunchPadTransform.Trim()))
+                res.Add(DefaultLaunchPadTransform.Trim());
+            foreach (var n in nombres)
+                if (!res.Contains(n) && (n.Contains("spawn", StringComparison.OrdinalIgnoreCase) || n.Contains("launch", StringComparison.OrdinalIgnoreCase)))
+                    res.Add(n);
+            return spawnTransforms = res;
+        }
+
+        /* The assembled model, with the textures KK changes on it. `_MainTex` is a GameData
+           path without extension or «BUILTIN:/name», a texture from the game itself. */
         public AssembledVessel Build(string gameData, StockAssets stock)
         {
             if (Stock) return StockPrefabs.For(gameData)?.Build(StockRoot) ?? new AssembledVessel();
@@ -61,39 +100,54 @@ namespace KerbinMaps.Ksp
     {
         public string Name, Body, CfgPath;
         public double Lat, Lon, RadiusOffset, Heading = 361, RotationAngle, Scale = 1;
-        public bool Nuevo, Cambiado;              // creado o tocado en el editor, sin guardar
+        public bool Nuevo, Cambiado;              // created or touched in the editor, unsaved
         public double[] Up = { 0, 1, 0 };
         public bool SeaLevel, Builtin, Implicit;
         public ConfigNode Node;
 
-        // calculado por Place
-        public double Alt;                        // m sobre el nivel del mar
-        public double[] M;                        // 4x4 por columnas, en el marco del cuerpo de KSP
+        // computed by Place
+        public double Alt;                        // m above sea level
+        public double[] M;                        // 4x4 column-major, in KSP's body frame
         public int Count;
 
         public string Key => Body + "_" + Name;
     }
 
+    /* A KK launch site: the LaunchSite node inside an instance. With it, the building shows
+       up in KK's launch site selector in the VAB and SPH and vessels spawn on its transform. */
+    public sealed class KkLaunchSite
+    {
+        public string Name = "", Transform = "", Type = "VAB", Category = "RocketPad", Description = "", Author = "";
+        public double Length = 30, Width = 30, Height = 50, MaxMass, MaxParts, OpenCost, CloseValue, CameraRotation = 90;
+        public string State = "Open";
+        public bool Hidden;
+        public bool Legacy;                       // flat LaunchSite* keys in the instance (old KK): read only
+
+        public KkLaunchSite Clone() => (KkLaunchSite)MemberwiseClone();
+    }
+
     public sealed class KkInstance
     {
         public string Model, Body, Group = "Ungrouped", Uuid, CfgPath, LaunchSite;
-        public int FileIndex = -1;                // qué nodo Instances es dentro de su fichero
-        public bool DelJuego;                     // una instalación del KSC de serie: no está en ningún .cfg
-        public string Instalacion;                // la del KSC que es («SpaceCenter/LaunchPad»)
-        public string[] ModelosNivel;             // sus modelos, del nivel 1 al último
-        public bool Nuevo, Cambiado, Borrado;     // estado en el editor, sin guardar
+        public KkLaunchSite Sitio;
+        public bool SitioCambiado;                // the launch site was added, edited or removed in the editor
+        public int FileIndex = -1;                // which Instances node it is within its file
+        public bool DelJuego;                     // a stock KSC facility: it isn't in any .cfg
+        public string Instalacion;                // which KSC facility it is («SpaceCenter/LaunchPad»)
+        public string[] ModelosNivel;             // its models, from level 1 to the last
+        public bool Nuevo, Cambiado, Borrado;     // state in the editor, unsaved
         public double[] Rel = { 0, 0, 0 }, Euler = { 0, 0, 0 };
         public double Scale = 1, Visibility = 25000;
-        // formato antiguo
+        // old format
         public double[] Radial = { 0, 0, 0 }, OrientUp = { 0, 1, 0 };
         public double RadiusOffset, RotationAngle;
         public int HeightRef;
         public ConfigNode Node;
 
-        // calculado por Place
+        // computed by Place
         public KkGroup GroupRef;
         public KkModel ModelRef;
-        public double[] M;                        // modelo → marco del cuerpo de KSP, en metros
+        public double[] M;                        // model → KSP body frame, in meters
         public double Lat, Lon, Alt;
         public bool Placed;
 
@@ -111,8 +165,8 @@ namespace KerbinMaps.Ksp
 
         static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        /* Los sitios del juego que KK usa como centros de grupo (BuiltinCenters.cs), con los
-           valores de los PQSCity de Kerbin: posición radial, giro final y altura sobre el mar. */
+        /* The game's sites that KK uses as group centers (BuiltinCenters.cs), with the values of
+           Kerbin's PQSCity: radial position, final rotation and height above the sea. */
         static readonly (string Name, double[] Radial, double Angle, double Offset)[] Builtins =
         {
             ("KSC", new double[] { 157000, -1000, -570000 }, -15, 42.7000007629395),
@@ -120,7 +174,7 @@ namespace KerbinMaps.Ksp
             ("Pyramids", new double[] { -468635.094, -68111.1016, -370297.094 }, 0, 98),
             ("IslandAirfield", new double[] { 186253.594, -16135.6797, -570176.813 }, 150, 28),
         };
-        // los PQSCity2 del DLC Making History: latitud, longitud, giro y altura
+        // the PQSCity2 of the Making History DLC: latitude, longitude, rotation and height
         static readonly (string Name, double Lat, double Lon, double Angle, double Alt)[] Builtins2 =
         {
             ("Desert_Airfield", -6.51999963320189, -144.039999478851, -125, 822.840140053537),
@@ -157,7 +211,7 @@ namespace KerbinMaps.Ksp
                 string text;
                 try { text = File.ReadAllText(path); }
                 catch { continue; }
-                // la mayoría de los .cfg no tienen nada de KK: se descartan sin analizarlos
+                // most .cfg files have nothing to do with KK: they're discarded without parsing
                 if (!text.Contains("STATIC", StringComparison.Ordinal) && !text.Contains("KK_GroupCenter", StringComparison.Ordinal)) continue;
                 ConfigNode root;
                 try { root = ConfigNode.Parse(text.Split('\n')); }
@@ -165,13 +219,13 @@ namespace KerbinMaps.Ksp
                 bool alguno = false;
                 foreach (var n in root.Nodes)
                 {
-                    // «@STATIC», «+STATIC:NEEDS[...]»... son parches de ModuleManager, no definiciones
+                    // «@STATIC», «+STATIC:NEEDS[...]»... are ModuleManager patches, not definitions
                     if (n.Name == "STATIC") { pendientes.Add((n, path)); alguno = true; }
                     else if (n.Name == "KK_GroupCenter") { db.AddGroup(n, path); alguno = true; }
                 }
                 if (alguno) db.Files++;
             }
-            // primero todos los modelos, porque una instancia puede ir en otro fichero
+            // all the models first, because an instance can be in another file
             foreach (var (n, path) in pendientes)
                 if (n.Get("mesh") != null) db.AddModel(n, path);
             var porFichero = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -198,9 +252,9 @@ namespace KerbinMaps.Ksp
             return db;
         }
 
-        /* Los edificios de serie: los modelos con el nombre que les da KK (para las instancias
-           que los usan y para ponerlos desde el editor) y el propio KSC, con cada instalación
-           a su nivel más alto, dentro del grupo KSC_Builtin como en el juego. */
+        /* The stock buildings: the models with the name KK gives them (for the instances that
+           use them and to place them from the editor) and the KSC itself, with each facility at
+           its highest level, inside the KSC_Builtin group as in the game. */
         void AddStock(string homeWorld)
         {
             var sp = StockPrefabs.For(GameData);
@@ -215,7 +269,7 @@ namespace KerbinMaps.Ksp
             if (!Groups.ContainsKey(grupo)) return;
             foreach (var f in sp.Ksc)
             {
-                bool camino = !sp.PorNombreKK.ContainsKey("KSC_" + f.Name + "_level_1");   // los de Grounds
+                bool camino = !sp.PorNombreKK.ContainsKey("KSC_" + f.Name + "_level_1");   // the Grounds ones
                 string prefijo = camino ? "KSC_Grounds_" + f.Name : "KSC_" + f.Name;
                 var modelos = new string[f.Niveles.Length];
                 for (int n = 0; n < modelos.Length; n++)
@@ -234,9 +288,9 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* El nivel de cada instalación del KSC según la partida (0 a 1, como lo guarda el
-           juego: con tres niveles, 0, 0,5 y 1). Sin dato, el más alto, como en sandbox. Dice
-           si ha cambiado algo. */
+        /* The level of each KSC facility according to the save (0 to 1, as the game stores it:
+           with three levels, 0, 0.5 and 1). Without data, the highest, as in sandbox. Says
+           whether anything changed. */
         public bool NivelesKsc(Func<string, double?> nivel)
         {
             bool cambio = false;
@@ -254,7 +308,7 @@ namespace KerbinMaps.Ksp
             return cambio;
         }
 
-        /* Los ángulos de Euler de Unity (Z, luego X, luego Y) de una matriz de giro. */
+        /* Unity Euler angles (Z, then X, then Y) of a rotation matrix. */
         public static double[] EulerDe(double[] m)
         {
             double sx = Math.Sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
@@ -270,7 +324,7 @@ namespace KerbinMaps.Ksp
             }
             else
             {
-                // bloqueo: con X a ±90° solo cuenta la suma de Y y Z
+                // gimbal lock: with X at ±90° only the sum of Y and Z counts
                 y = Math.Atan2(-m[2] / sx, m[0] / sx);
                 z = 0;
             }
@@ -292,6 +346,9 @@ namespace KerbinMaps.Ksp
                 Author = n.Get("author"),
                 Mesh = Path.Combine(Path.GetDirectoryName(path), mesh.Replace('/', Path.DirectorySeparatorChar) + ".mu"),
                 CfgPath = path,
+                DefaultLaunchPadTransform = n.Get("DefaultLaunchPadTransform"),
+                DefaultSiteLength = D(n.Get("DefaultLaunchSiteLength"), 0),
+                DefaultSiteWidth = D(n.Get("DefaultLaunchSiteWidth"), 0),
             };
             foreach (var mod in n.Children("MODULE"))
             {
@@ -349,16 +406,47 @@ namespace KerbinMaps.Ksp
                 RotationAngle = D(n.Get("RotationAngle"), 0),
                 HeightRef = (int)D(n.Get("IsRelativeToTerrain"), 0),
             };
-            // en el formato antiguo «Orientation» es el vector «arriba» del modelo
+            // in the old format «Orientation» is the model's «up» vector
             if (i.Legacy) i.OrientUp = Len(i.Euler) > 0 ? (double[])i.Euler.Clone() : new double[] { 0, 1, 0 };
-            if (n.Children("LaunchSite").FirstOrDefault() is ConfigNode ls) i.LaunchSite = ls.Get("LaunchSiteName");
-            i.LaunchSite ??= n.Get("LaunchSiteName");
+            if (n.Children("LaunchSite").FirstOrDefault() is ConfigNode ls) i.Sitio = ParseSitio(ls, false);
+            else if (!string.IsNullOrEmpty(n.Get("LaunchSiteName"))) i.Sitio = ParseSitio(n, true);
+            i.LaunchSite = i.Sitio?.Name;
             return i;
         }
 
-        /* Coloca los grupos y las instancias de un cuerpo. `ground` da la altura del
-           terreno (m) en una latitud y longitud: la del mapa de alturas que pinta el visor,
-           para que los edificios queden sobre el mismo suelo que se ve. */
+        static KkLaunchSite ParseSitio(ConfigNode n, bool legacy) => new()
+        {
+            Name = n.Get("LaunchSiteName") ?? "",
+            Transform = n.Get("LaunchPadTransform") ?? "",
+            Type = n.Get("LaunchSiteType") is string t && t.Length > 0 ? t : "Any",
+            Category = n.Get("Category") is string c && c.Length > 0 ? c : "Other",
+            Description = n.Get("LaunchSiteDescription") ?? "",
+            Author = n.Get("LaunchSiteAuthor") ?? "",
+            Length = D(n.Get("LaunchSiteLength"), 0),
+            Width = D(n.Get("LaunchSiteWidth"), 0),
+            Height = D(n.Get("LaunchSiteHeight"), 0),
+            MaxMass = D(n.Get("MaxCraftMass"), 0),
+            MaxParts = D(n.Get("MaxCraftParts"), 0),
+            OpenCost = D(n.Get("OpenCost"), 0),
+            CloseValue = D(n.Get("CloseValue"), 0),
+            CameraRotation = D(n.Get("InitialCameraRotation"), 90),
+            State = n.Get("OpenCloseState") is string s && s.Length > 0 ? s : "Closed",
+            Hidden = Bool(n.Get("LaunchSiteIsHidden")),
+            Legacy = legacy,
+        };
+
+        /* Launch site names already in use on any body (KK needs them unique), plus the stock ones. */
+        public HashSet<string> NombresDeSitios(KkInstance salvo = null)
+        {
+            var res = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "KSC", "LaunchPad", "Runway", "KSC LaunchPad", "KSC Runway" };
+            foreach (var i in Instances)
+                if (i != salvo && !i.Borrado && !string.IsNullOrEmpty(i.Sitio?.Name)) res.Add(i.Sitio.Name);
+            return res;
+        }
+
+        /* Places the groups and instances of a body. `ground` gives the terrain height (m) at a
+           latitude and longitude: that of the height map the viewer paints, so buildings sit on
+           the same ground you see. */
         public void Place(string body, double radius, Func<double, double, double> ground)
         {
             foreach (var g in Groups.Values.Where(g => g.Body == body && g.Implicit).ToList()) Groups.Remove(g.Key);
@@ -388,7 +476,7 @@ namespace KerbinMaps.Ksp
                 {
                     if (!Groups.TryGetValue(body + "_" + i.Group, out var g))
                     {
-                        // KK crea el centro donde diga RadialPosition, si lo hay
+                        // KK creates the center wherever RadialPosition says, if there is one
                         if (Len(i.Radial) == 0) continue;
                         var n = Norm(i.Radial);
                         g = new KkGroup
@@ -426,9 +514,9 @@ namespace KerbinMaps.Ksp
             g.M = Mat.Mul(Mat.Translate(Scale(n, radius + g.Alt)), Mat.Mul(rot, Mat.Scale(g.Scale, g.Scale, g.Scale)));
         }
 
-        /* ------------------------------------------------ edición */
+        /* ------------------------------------------------ editing */
 
-        /* Este, norte y vertical de un punto, en el marco de KSP. */
+        /* East, north and vertical of a point, in KSP's frame. */
         public static (double[] E, double[] N, double[] U) Enu(double lat, double lon)
         {
             double la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
@@ -437,8 +525,8 @@ namespace KerbinMaps.Ksp
                     NVec(lat, lon));
         }
 
-        /* Mueve una instancia unos metros hacia el este, el norte y arriba (en su sitio).
-           Lo que cambia es su posición dentro del grupo. */
+        /* Moves an instance a few meters east, north and up (from where it is). What changes is
+           its position within the group. */
         public static bool Move(KkInstance i, double dE, double dN, double dU)
         {
             var g = i.GroupRef;
@@ -452,15 +540,15 @@ namespace KerbinMaps.Ksp
             return true;
         }
 
-        /* Gira alrededor de la vertical del grupo (su eje Y), que es lo que hace el ángulo Y
-           de Orientation. Positivo: en el sentido de las agujas del reloj visto desde arriba. */
+        /* Rotates around the group's vertical (its Y axis), which is what Orientation's Y angle
+           does. Positive: clockwise seen from above. */
         public static void Rotate(KkInstance i, double deg)
         {
             i.Euler[1] = ((i.Euler[1] + deg) % 360 + 360) % 360;
             i.Cambiado = true;
         }
 
-        /* Rumbo al que mira el modelo (su eje Z), en grados desde el norte. */
+        /* Heading the model faces (its Z axis), in degrees from north. */
         public static double Heading(KkInstance i)
         {
             if (i.M == null) return 0;
@@ -470,10 +558,10 @@ namespace KerbinMaps.Ksp
             return (h + 360) % 360;
         }
 
-        /* Un vector del marco de KSP al de dentro del grupo (sin traslación). */
+        /* A vector from KSP's frame to the group's inner frame (no translation). */
         static double[] ToLocal(KkGroup g, double[] d)
         {
-            // las columnas de la matriz del grupo son sus ejes, con su escala
+            // the columns of the group matrix are its axes, with their scale
             var r = new double[3];
             for (int c = 0; c < 3; c++)
             {
@@ -484,8 +572,8 @@ namespace KerbinMaps.Ksp
             return r;
         }
 
-        /* Un edificio nuevo en un punto: va al grupo más cercano (a menos de 25 km, como
-           los de KK) o a uno nuevo, mirando al rumbo dado. */
+        /* A new building at a point: it goes to the nearest group (within 25 km, like KK's) or
+           to a new one, facing the given heading. */
         public KkInstance Add(KkModel model, string body, double radius, double lat, double lon, double alt, double heading,
                               Func<double, double, double> ground, string grupoNuevo)
         {
@@ -515,17 +603,17 @@ namespace KerbinMaps.Ksp
             };
             Instances.Add(i);
             PlaceOne(i, radius);
-            // que mire al rumbo pedido
+            // make it face the requested heading
             Rotate(i, heading - Heading(i));
             PlaceOne(i, radius);
             g.Count++;
             return i;
         }
 
-        /* Copia de una instancia unos metros al este, para moverla después. */
+        /* Copy of an instance a few meters to the east, to move it afterwards. */
         public KkInstance Duplicate(KkInstance src, double radius)
         {
-            // una copia de un edificio de serie es una instancia normal de KK con ese modelo
+            // a copy of a stock building is a normal KK instance with that model
             var i = new KkInstance
             {
                 Model = src.Model, ModelRef = src.ModelRef, Body = src.Body, Group = src.Group, GroupRef = src.GroupRef,
@@ -540,7 +628,7 @@ namespace KerbinMaps.Ksp
             return i;
         }
 
-        /* Recoloca una sola instancia con su grupo ya colocado (tras editarla). */
+        /* Repositions a single instance with its group already placed (after editing it). */
         public void PlaceOne(KkInstance i, double radius)
         {
             var g = i.GroupRef;
@@ -556,7 +644,7 @@ namespace KerbinMaps.Ksp
             i.Placed = true;
         }
 
-        /* ------------------------------------------------ cuentas de Unity */
+        /* ------------------------------------------------ Unity math */
 
         public static double[] NVec(double lat, double lon)
         {
@@ -564,7 +652,7 @@ namespace KerbinMaps.Ksp
             return new[] { Math.Cos(la) * Math.Cos(lo), Math.Sin(la), Math.Cos(la) * Math.Sin(lo) };
         }
 
-        // Quaternion.LookRotation(f) con «arriba» el eje Y: columnas derecha, arriba, delante
+        // Quaternion.LookRotation(f) with «up» as the Y axis: columns right, up, forward
         static double[] LookRotation(double[] f)
         {
             var r = Norm(Cross(new double[] { 0, 1, 0 }, f));
@@ -579,7 +667,7 @@ namespace KerbinMaps.Ksp
             return new[] { a[0] * s, a[1] * s, a[2] * s, Math.Cos(h) };
         }
 
-        // Quaternion.FromToRotation: el giro más corto que lleva «a» a «b»
+        // Quaternion.FromToRotation: the shortest rotation taking «a» to «b»
         static double[] FromTo(double[] a, double[] b)
         {
             a = Norm(a); b = Norm(b);
@@ -602,7 +690,7 @@ namespace KerbinMaps.Ksp
         static double[] Norm(double[] v) { double l = Len(v); return l < 1e-12 ? new double[] { 0, 1, 0 } : new[] { v[0] / l, v[1] / l, v[2] / l }; }
         static double[] Scale(double[] v, double k) => new[] { v[0] * k, v[1] * k, v[2] * k };
 
-        /* ------------------------------------------------ lectura de valores */
+        /* ------------------------------------------------ reading values */
 
         public static double D(string s, double def) =>
             double.TryParse(s?.Trim(), NumberStyles.Float, Inv, out double v) && double.IsFinite(v) ? v : def;

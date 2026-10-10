@@ -12,9 +12,9 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Ventana principal: el panel lateral a la izquierda y la vista (mapa, globo o
-       cielo) con sus controles flotantes a la derecha. La lógica va repartida en
-       partes: Sidebar, Maps, Vessels, Tools y Sky, igual que estaba en app.js. */
+    /* Main window: the sidebar on the left and the view (map, globe or sky) with its floating
+       controls on the right. The logic is split into parts: Sidebar, Maps, Vessels, Tools and
+       Sky, the same as it was in app.js. */
     public sealed partial class MainForm : Form
     {
         [StructLayout(LayoutKind.Sequential)]
@@ -37,7 +37,10 @@ namespace KerbinMaps.UI
 
         readonly MapLayer allLayer = new(), orbitLayer = new(), trackLayer = new(), toolLayer = new(), vesselLayer = new(), markerLayer = new();
 
-        Panel mapArea;
+        Panel mapArea, viewCol;
+        Toolbar toolbar;
+        SegmentGroup viewGroup;
+        DarkButton btnTema;
         ScrollHost sideScroll;
         SidebarPanel sidebar;
         StackPanel sideStack;
@@ -70,12 +73,13 @@ namespace KerbinMaps.UI
             startArgs = args ?? Array.Empty<string>();
             state = Store.Load("settings.json", new AppState());
             state.LonOffset ??= new LonOffsets();
-            // el idioma se resuelve antes de montar la interfaz: los textos se traducen al crearse
+            // the language is resolved before building the interface: texts are translated when created
             Lang.Use(Lang.Detect(state.Lang), Store.DataDir);
-            // el cuerpo de la última vez; si es de un pack, se recupera al leer Kopernicus
+            // last time's body; if it's from a pack, it's recovered when Kopernicus is read
             Body.Current = SolarSystem.Find(state.BodyName) ?? SolarSystem.Home;
 
             Theme.Init(DeviceDpi);
+            Theme.Use(state.Theme);
             AutoScaleMode = AutoScaleMode.None;
             Text = "Koogle Kerbin";
             BackColor = Theme.Bg;
@@ -108,21 +112,41 @@ namespace KerbinMaps.UI
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            int on = 1;
-            try { DwmSetWindowAttribute(Handle, 20, ref on, 4); } catch { }   // barra de título oscura
+            TintTitleBar(Handle);
         }
 
-        /* ------------------------------------------------------------ maqueta */
+        /* The system title bar in the theme's colors: dark or light and, on Windows 11, the
+           same color as the sidebar header. On Windows 10 the color attributes don't exist and
+           have no effect. */
+        public static void TintTitleBar(IntPtr hwnd)
+        {
+            static int Ref(Color c) => c.R | (c.G << 8) | (c.B << 16);
+            try
+            {
+                int dark = Theme.Dark ? 1 : 0, caption = Ref(Theme.Bg2), texto = Ref(Theme.Fg), borde = Ref(Theme.Line);
+                DwmSetWindowAttribute(hwnd, 20, ref dark, 4);
+                DwmSetWindowAttribute(hwnd, 35, ref caption, 4);
+                DwmSetWindowAttribute(hwnd, 36, ref texto, 4);
+                DwmSetWindowAttribute(hwnd, 34, ref borde, 4);
+            }
+            catch { }
+        }
+
+        /* ------------------------------------------------------------ layout */
 
         void BuildLayout()
         {
             mapArea = new Panel { Dock = DockStyle.Fill, BackColor = Theme.MapBg };
+            toolbar = new Toolbar { Dock = DockStyle.Top };
+            viewCol = new Panel { Dock = DockStyle.Fill, BackColor = Theme.MapBg };
+            viewCol.Controls.Add(mapArea);
+            viewCol.Controls.Add(toolbar);
             sidebar = new SidebarPanel { Dock = DockStyle.Left, Width = Theme.S(320), BackColor = Theme.Bg2 };
             sideStack = new StackPanel(0) { BackColor = Theme.Bg2, Padding = new Padding(0, 0, 0, Theme.S(32)) };
             sideScroll = new ScrollHost(sideStack) { Dock = DockStyle.Fill, BackColor = Theme.Bg2 };
             sidebar.Controls.Add(sideScroll);
             sidebar.Controls.Add(new SidebarHeader { Dock = DockStyle.Top });
-            Controls.Add(mapArea);
+            Controls.Add(viewCol);
             Controls.Add(sidebar);
             Vis.Set(sidebar, !state.SidebarHidden);
 
@@ -140,7 +164,7 @@ namespace KerbinMaps.UI
                 map.Hover = null;
                 facCursor = null;
                 FacPrevia();
-                // en el cielo el HUD es el del cielo, no el de la posición bajo el cursor
+                // in the sky the HUD is the sky's, not the one for the position under the cursor
                 if (isSky) RefreshSkyHud(); else UpdateHud(null);
                 RequestRender();
             };
@@ -155,19 +179,23 @@ namespace KerbinMaps.UI
             map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, landLayer, rutaLayer, toolLayer, observerLayer, anomalyLayer, kkLayer, vesselLayer, markerLayer });
             map.SetView(state.CenterLat, state.CenterLon, state.Zoom);
 
-            // barra superior
-            sbToggle = new DarkButton("☰") { IconFont = Theme.Icon, Tip = "Ocultar panel" };
+            // top bar
+            sbToggle = new DarkButton(Theme.Glyph.Menu, ButtonVariant.Ghost) { IconFont = Theme.Icon, Tip = "Ocultar panel" };
             sbToggle.Click += (s, e) => ToggleSidebar();
-            btn2D = new DarkButton("2D") { Tip = "Mapa plano" };
-            btn3D = new DarkButton("3D") { Tip = "Globo" };
-            btnSky = new DarkButton("Cielo") { Tip = "El cielo visto desde un punto de la superficie" };
-            btnFree = new DarkButton("Vuelo") { Tip = "Cámara libre a ras de suelo" };
+            btn2D = new DarkButton("2D", ButtonVariant.Segment) { Tip = "Mapa plano" };
+            btn3D = new DarkButton("3D", ButtonVariant.Segment) { Tip = "Globo" };
+            btnSky = new DarkButton("Cielo", ButtonVariant.Segment) { Tip = "El cielo visto desde un punto de la superficie" };
+            btnFree = new DarkButton("Vuelo", ButtonVariant.Segment) { Tip = "Cámara libre a ras de suelo" };
+            viewGroup = new SegmentGroup();
+            viewGroup.Controls.AddRange(new Control[] { btn2D, btn3D, btnSky, btnFree });
+            btnTema = new DarkButton(Theme.Glyph.Theme, ButtonVariant.Ghost) { IconFont = Theme.Icon, Tip = "Tema" };
+            btnTema.Click += (s, e) => MenuTema();
             btn2D.Click += (s, e) => SetViewMode("2d");
             btn3D.Click += (s, e) => SetViewMode("3d");
             btnSky.Click += (s, e) => SetViewMode("sky");
             btnFree.Click += (s, e) => SetViewMode("free");
             btn2D.Active = true;
-            search = new DarkTextBox { Placeholder = "Buscar: KSC, o -0.097, -74.557" };
+            search = new DarkTextBox { Placeholder = "Buscar: KSC, o -0.097, -74.557", Icon = Theme.Glyph.Search };
             search.Edited += (s, e) => DoSearch(search.Text);
             search.Inner.KeyDown += (s, e) =>
             {
@@ -179,7 +207,7 @@ namespace KerbinMaps.UI
             searchBox.Controls.Add(searchList);
 
             hud = new HudPanel();
-            banner = new OverlayPanel { BorderColor = Theme.Warn, Visible = false };
+            banner = new OverlayPanel { Warning = true, Visible = false };
             bannerText = new RichLabel(RichMode.Banner) { HideWhenEmpty = false, BackColor = Theme.Bg2 };
             bannerClose = new DarkButton("Ocultar", ButtonVariant.Ghost, small: true);
             bannerClose.Click += (s, e) =>
@@ -195,32 +223,39 @@ namespace KerbinMaps.UI
 
             BuildTimeBar();
 
-            foreach (Control c in new Control[] { sbToggle, btn2D, btn3D, btnSky, btnFree, search, searchBox, hud, orbHud, banner, tbar, popup })
+            toolbar.Controls.AddRange(new Control[] { sbToggle, viewGroup, search, btnTema });
+            foreach (Control c in new Control[] { searchBox, hud, orbHud, banner, tbar, popup })
             {
                 mapArea.Controls.Add(c);
                 c.BringToFront();
             }
             mapArea.Resize += (s, e) => LayoutOverlays();
+            toolbar.Resize += (s, e) => LayoutOverlays();
             UpdateHud(null);
             LayoutOverlays();
         }
 
         void LayoutOverlays()
         {
-            int m = Theme.S(12), h = Theme.S(34), gap = Theme.S(8), seg = Theme.S(3);
-            sbToggle.SetBounds(m, m, h, h);
-            int x = sbToggle.Right + gap;
+            int m = Theme.S(12), h = Theme.S(32), gap = Theme.S(8), pad = Theme.S(3);
+            int y = (toolbar.Height - 1 - h) / 2;
+            sbToggle.SetBounds(Theme.S(8), y, h, h);
+            int x = pad, sh = h - pad * 2;
             foreach (var b in new[] { btn2D, btn3D, btnSky, btnFree })
             {
-                int w = Math.Max(Theme.S(44), b.PreferredWidth + Theme.S(4));
-                b.SetBounds(x, m, w, h);
-                x += w + seg;
+                int w = Math.Max(Theme.S(48), b.PreferredWidth + Theme.S(8));
+                b.SetBounds(x, pad, w, sh);
+                x += w + Theme.S(2);
             }
-            int sw = Math.Min(Theme.S(360), (int)(mapArea.Width * 0.5));
-            search.SetBounds(x - seg + gap, m, sw, h);
-            searchBox.SetBounds(search.Left, search.Bottom + Theme.S(4), sw, searchList.HeightFor(sw) + 2);
+            viewGroup.SetBounds(sbToggle.Right + gap, y, x - Theme.S(2) + pad, h);
+            btnTema.SetBounds(toolbar.Width - Theme.S(8) - h, y, h, h);
+            int sx = viewGroup.Right + Theme.S(12);
+            int sw = Math.Max(Theme.S(120), Math.Min(Theme.S(380), btnTema.Left - gap - sx));
+            search.SetBounds(sx, y, sw, h);
+            // the results list hangs from the bar, already inside the view
+            searchBox.SetBounds(search.Left, Theme.S(4), sw, searchList.HeightFor(sw) + 2);
             searchList.SetBounds(1, 1, sw - 2, searchBox.Height - 2);
-            hud.Location = new Point(mapArea.Width - m - hud.Width, Theme.S(56));
+            hud.Location = new Point(mapArea.Width - m - hud.Width, HudTop);
             PlaceOrbitInfo();
 
             LayoutTimeBar();
@@ -244,7 +279,7 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* ------------------------------------------------------------ bucle */
+        /* ------------------------------------------------------------ loop */
 
         void InitGl()
         {
@@ -260,8 +295,8 @@ namespace KerbinMaps.UI
             {
                 glError = ex.Message;
                 Debug.WriteLine("[gl] " + ex);
-                /* Un fallo aquí deja la aplicación sin 3D y el mensaje solo se ve de
-                   pasada: se guarda para poder mirarlo después. */
+                /* A failure here leaves the application without 3D and the message is only seen
+                   in passing: it's saved so it can be looked at later. */
                 try
                 {
                     System.IO.Directory.CreateDirectory(Store.LocalDir);
@@ -289,8 +324,8 @@ namespace KerbinMaps.UI
                 Frame();
         }
 
-        /* Un fotograma: avanza la simulación, anima el zoom y pinta. Con la
-           sincronía vertical activa, SwapBuffers marca el ritmo de la pantalla. */
+        /* One frame: advances the simulation, animates the zoom and paints. With vertical sync
+           on, SwapBuffers sets the screen's pace. */
         void Frame()
         {
             needsFrame = false;
@@ -299,14 +334,14 @@ namespace KerbinMaps.UI
             double dt = lastFrame > 0 ? Math.Min(0.1, now - lastFrame) : 0;
             lastFrame = now;
 
-            // el Sol antes de avanzar (lo lee el HUD que se repinta dentro) y con el instante nuevo
+            // the Sun before advancing (the HUD repainted inside reads it) and with the new time
             ActualizarSol();
             SimTick(now);
             ActualizarSol();
             if (map.Animating) { map.Animate(dt); saveViewTimer.Stop(); saveViewTimer.Start(); }
             PasoDeVuelo(now);
             globe.GroundAt ??= AlturaDelSuelo;
-            // las nubes van con el tiempo de la simulación y, además, con el reloj real
+            // clouds follow simulation time and, on top of that, the real clock
             globe.CloudTime = sim.T + now;
             globe.AguaT = now;
             ActualizarTesela();
@@ -338,7 +373,7 @@ namespace KerbinMaps.UI
 
         void SaveSettings() => Store.Save("settings.json", state);
 
-        /* El idioma se aplica al montar la interfaz, así que cambiarlo reinicia el visor. */
+        /* The language is applied when building the interface, so changing it restarts the viewer. */
         void CambiarIdioma(string code)
         {
             if (string.IsNullOrEmpty(code) || code == Lang.Code) return;
@@ -377,7 +412,7 @@ namespace KerbinMaps.UI
             }
             state.WinMax = WindowState == FormWindowState.Maximized;
             if (WindowState == FormWindowState.Normal) { state.WinX = Left; state.WinY = Top; state.WinW = Width; state.WinH = Height; }
-            // la partida ya está copiada desde que se cargó; falta en qué instante se dejó
+            // the save has been copied since it was loaded; what's missing is the time it was left at
             state.SimT = HasVessels ? sim.T : null;
             SaveView();
             GuardarFacciones();
@@ -396,7 +431,7 @@ namespace KerbinMaps.UI
             base.OnFormClosing(e);
         }
 
-        /* ------------------------------------------------------------ entrada */
+        /* ------------------------------------------------------------ input */
 
         bool Picking => ToolMode != null || calibTarget != null || skyPicking || FacPuedePintar;
 
@@ -418,8 +453,8 @@ namespace KerbinMaps.UI
             {
                 if (globe.Dragging)
                 {
-                    /* Arrastrar ya no suelta a la nave seguida: con el foco en ella, el
-                       arrastre gira la cámara a su alrededor. */
+                    /* Dragging no longer releases the followed vessel: with the focus on it,
+                       dragging rotates the camera around it. */
                     if (globe.Drag(e.X, e.Y)) moved = true;
                     if (moved) { saveViewTimer.Stop(); saveViewTimer.Start(); }
                     RequestRender();
@@ -498,13 +533,13 @@ namespace KerbinMaps.UI
 
         void SurfaceDoubleClick(object sender, MouseEventArgs e)
         {
-            // pintando territorios, el doble clic cierra el polígono (y no acerca)
+            // while painting territories, double click closes the polygon (and doesn't zoom)
             if (FacPuedePintar)
             {
                 if (facTool == "poligono" && e.Button == MouseButtons.Left) { CerrarPoligono(); RequestRender(); }
                 return;
             }
-            // siguiendo una nave con su modelo, doble clic se acerca a verla
+            // following a vessel with its model, double click zooms in to see it
             if (is3D && e.Button == MouseButtons.Left && globe.ZoomToFocusModel()) { RequestRender(); return; }
             if (GlobeVisible || e.Button != MouseButtons.Left || ToolMode != null) return;
             map.ZoomAt(+1, e.X, e.Y);
@@ -555,7 +590,7 @@ namespace KerbinMaps.UI
             }
             if (is3D)
             {
-                // en la vista 3D: el rumbo con las flechas (se nota al bajar, con la cámara inclinada)
+                // in the 3D view: heading with the arrows (noticeable when going down, with the camera tilted)
                 switch (e.KeyCode)
                 {
                     case Keys.Left: globe.GirarRumbo(-10); break;
@@ -587,7 +622,7 @@ namespace KerbinMaps.UI
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            // deshacer y rehacer los territorios pintados
+            // undo and redo the painted territories
             if (e.Control && !FocusInText() && politico != null && (e.KeyCode == Keys.Z || e.KeyCode == Keys.Y))
             {
                 if (e.KeyCode == Keys.Z) FacDeshacer(); else FacRehacer();
@@ -609,8 +644,8 @@ namespace KerbinMaps.UI
             base.OnKeyDown(e);
         }
 
-        /* Atajos como en KSP: «.» acelera, «,» frena o va hacia atrás, espacio pausa,
-           F sigue a la nave. No actúan mientras se escribe en un campo. */
+        /* Shortcuts as in KSP: «.» speeds up, «,» slows down or goes backwards, space pauses, F
+           follows the vessel. They don't act while typing in a field. */
         protected override void OnKeyPress(KeyPressEventArgs e)
         {
             base.OnKeyPress(e);
@@ -638,11 +673,11 @@ namespace KerbinMaps.UI
             }
         }
 
-        /* ------------------------------------------------------------ HUD y avisos */
+        /* ------------------------------------------------------------ HUD and notices */
 
         void UpdateHud(LatLon? p)
         {
-            // volando manda el HUD del vuelo, que trae altura, rumbo y velocidad
+            // while flying the flight HUD rules, which has height, heading and speed
             if (isFree) { UpdateFreeHud(); return; }
             var rows = new System.Collections.Generic.List<(string, string)>
             {
@@ -664,9 +699,11 @@ namespace KerbinMaps.UI
                 rows.Add(("facción", f?.Nombre ?? "—"));
             }
             hud.SetRows(rows.ToArray());
-            hud.Location = new Point(mapArea.Width - Theme.S(12) - hud.Width, Theme.S(56));
+            hud.Location = new Point(mapArea.Width - Theme.S(12) - hud.Width, HudTop);
             PlaceOrbitInfo();
         }
+
+        static int HudTop => Theme.S(12);
 
         public void Flash(string msg)
         {
@@ -701,9 +738,9 @@ namespace KerbinMaps.UI
                 if (!globe.ToScreen(p, out x, out y)) { popup.Left = -10000; return; }
             }
             else (x, y) = map.ProjectNear(popup.AnchorLatLon.Lat, popup.AnchorLatLon.Lon);
-            /* Encima del punto; si ahí no cabe (un punto muy al norte, bajo la barra de
-               arriba), debajo. Y sin salirse por los lados. */
-            int gap = Theme.S(12), top = Theme.S(56), m = Theme.S(8);
+            /* Above the point; if it doesn't fit there (a point far north, under the top bar),
+               below. And without spilling over the sides. */
+            int gap = Theme.S(12), top = Theme.S(8), m = Theme.S(8);
             int py = (int)Math.Round(y - popup.Height - gap);
             if (py < top) py = (int)Math.Round(y + gap);
             py = Math.Max(top, Math.Min(py, mapArea.Height - popup.Height - m));
@@ -712,10 +749,10 @@ namespace KerbinMaps.UI
             popup.Location = new Point(px, py);
         }
 
-        /* ------------------------------------------------------------ vistas */
+        /* ------------------------------------------------------------ views */
 
-        /* El zoom del mapa plano y la distancia de cámara miden cosas distintas; esto
-           las empareja para que al cambiar de vista se siga mirando lo mismo. */
+        /* The flat map's zoom and the camera distance measure different things; this pairs them
+           so that switching views keeps looking at the same thing. */
         static double ZoomToDist(double z) => Math.Max(1.05, Math.Min(12, 1.05 + 7 / Math.Pow(1.9, z)));
 
         static double DistToZoom(double d)
@@ -760,7 +797,7 @@ namespace KerbinMaps.UI
                         map.SetView(c.Lat, c.Lon, DistToZoom(globe.EyeDistance));
                     }
                     if (globe.Mode == CamMode.Sky) globe.ExitSky(ZoomToDist(map.Zoom));
-                    SimDirty();                 // las trazas 2D no se rehacen mientras se ve el globo
+                    SimDirty();                 // 2D tracks aren't rebuilt while the globe is shown
                     break;
                 case "free":
                     SyncGlobe();
@@ -781,7 +818,7 @@ namespace KerbinMaps.UI
                     else globe.ExitFocus();
                     break;
                 default:
-                    // del vuelo al cielo: te quedas de pie donde estabas volando
+                    // from flight to sky: you stay standing where you were flying
                     if (prev == "free") SetObserver(globe.FreeLat, globe.FreeLon, null);
                     ApplyObserverToGlobe();
                     SyncGlobe();

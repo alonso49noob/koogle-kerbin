@@ -8,67 +8,68 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.Views
 {
-    /* Dónde va cada hierba, arbusto, árbol o roca de los scatters de Parallax.
+    /* Where each grass tuft, bush, tree or rock of the Parallax scatters goes.
 
-       Parallax los reparte por triángulo del terreno de KSP en la GPU (TerrainScatters.compute
-       en su código): por cada triángulo, `populationMultiplier` candidatos al azar, y cada uno
-       sale o no según una probabilidad que baja con la pendiente y cerca de los límites de
-       altitud, y según un ruido fractal sobre la esfera por encima de un umbral. El mismo
-       ruido decide el tamaño. Aquí se hace igual, con estas diferencias:
+       Parallax distributes them per triangle of KSP's terrain on the GPU
+       (TerrainScatters.compute in its code): for each triangle, `populationMultiplier` random
+       candidates, and each one appears or not according to a probability that drops with slope
+       and near the altitude limits, and according to a fractal noise on the sphere above a
+       threshold. The same noise decides the size. Here it's done the same way, with these
+       differences:
 
-       - Aquí no hay triángulos: se reparte por celdas de latitud y longitud, con tantos
-         candidatos como triángulos de ~2150 m² cabrían (los del nivel más fino del terreno de
-         Kerbin: celdas de 66 m partidas en dos).
-       - El terreno de KSP se hace más basto lejos de la cámara, y Parallax pone el mismo
-         número de candidatos por triángulo, así que lejos hay menos. Eso se imita con una
-         densidad que baja con la distancia.
-       - Todo es determinista (cada candidato sale de un hash de su celda y su número), así
-         que al volver a un sitio están los mismos árboles.
+       - There are no triangles here: it's distributed over latitude and longitude cells, with
+         as many candidates as triangles of ~2150 m² would fit (those of the finest level of
+         Kerbin's terrain: 66 m cells split in two).
+       - KSP's terrain gets coarser away from the camera, and Parallax places the same number of
+         candidates per triangle, so there are fewer far away. That's imitated with a density
+         that drops with distance.
+       - Everything is deterministic (each candidate comes from a hash of its cell and its
+         number), so when you come back to a place the same trees are there.
 
-       Las celdas se generan en segundo plano, de la más cercana a la más lejana, y se tiran
-       las que se quedan fuera de alcance. */
+       Cells are generated in the background, from the nearest to the farthest, and those left
+       out of range are dropped. */
     public sealed class ScatterField
     {
         public struct Inst
         {
-            public double X, Y, Z;                     // en metros, desde el centro del cuerpo
-            public float Ux, Uy, Uz;                   // eje vertical del modelo
-            public float Yaw, S;                       // giro en grados y tamaño (0 = mínimo, 1 = máximo)
-            public float R, G, B;                      // color del terreno (si el scatter lo usa)
-            public float Rank;                         // para aclarar de forma estable
+            public double X, Y, Z;                     // in meters, from the body's center
+            public float Ux, Uy, Uz;                   // the model's vertical axis
+            public float Yaw, S;                       // rotation in degrees and size (0 = minimum, 1 = maximum)
+            public float R, G, B;                      // terrain color (if the scatter uses it)
+            public float Rank;                         // for thinning in a stable way
         }
 
         public sealed class Cell
         {
             public Inst[] Items;
-            public double Density;                     // fracción de candidatos con la que se generó
-            public double Cx, Cy, Cz;                  // centro, en metros
+            public double Density;                     // fraction of candidates it was generated with
+            public double Cx, Cy, Cz;                  // center, in meters
         }
 
         public sealed class Layer
         {
             public ScatterDef Def;
-            public Layer Parent;                       // los compartidos usan las celdas del padre
+            public Layer Parent;                       // shared ones use the parent's cells
             public double CellM;
             public readonly ConcurrentDictionary<(int, int), Cell> Cells = new();
         }
 
-        /* Área de un triángulo del nivel más fino del terreno (ver arriba). */
+        /* Area of a triangle of the terrain's finest level (see above). */
         const double AreaTriangulo = 2158;
-        /* Hasta esta distancia, densidad completa; luego baja como 1/d. */
+        /* Up to this distance, full density; then it drops as 1/d. */
         const double DistanciaPlena = 1500;
 
         public readonly double R;
         public readonly List<Layer> Layers = new();
-        public Func<double, double, double> Altura;              // lat, lon → metros (fondo marino incluido)
-        public Func<double, double, string> Bioma;               // nombre del bioma, o null
+        public Func<double, double, double> Altura;              // lat, lon → meters (sea floor included)
+        public Func<double, double, string> Bioma;               // biome name, or null
         public Func<double, double, (float, float, float)> Color;
-        public Func<double, double, bool> Excluir;               // zonas sin scatters (la explanada del KSC)
-        public Action Changed;                                   // hay celdas nuevas: pintar otra vez
+        public Func<double, double, bool> Excluir;               // areas without scatters (the KSC's leveled area)
+        public Action Changed;                                   // there are new cells: paint again
 
         volatile bool vivo = true;
         double objLat, objLon, objAgl;
-        int trabajando;                                          // 1 mientras hay un hilo generando
+        int trabajando;                                          // 1 while a thread is generating
 
         public ScatterField(double radius, IEnumerable<ScatterDef> defs)
         {
@@ -76,7 +77,7 @@ namespace KerbinMaps.Views
             var propias = new Dictionary<string, Layer>();
             foreach (var d in defs.Where(d => !d.Shared))
             {
-                // lo que va bajo el agua no se ve: el mar aquí es opaco
+                // what's underwater isn't visible: the sea is opaque here
                 if (d.MaxAltitude <= 0 && d.PlacementAltitude == null) continue;
                 var l = new Layer { Def = d, CellM = Math.Clamp(d.Range / 12, 32, 1024) };
                 Layers.Add(l);
@@ -88,9 +89,9 @@ namespace KerbinMaps.Views
 
         public void Stop() => vivo = false;
 
-        /* La cámara está aquí (`agl`: metros sobre el suelo): si faltan celdas, se ponen a
-           generar en otro hilo. Las distancias se miden desde el ojo, así que desde arriba
-           se piden menos y más ralas, y por encima del alcance de una capa, ninguna. */
+        /* The camera is here (`agl`: meters above the ground): if cells are missing, they start
+           generating on another thread. Distances are measured from the eye, so from above
+           fewer and sparser ones are requested, and above a layer's reach, none. */
         public void Request(double lat, double lon, double agl = 0)
         {
             objLat = lat; objLon = lon; objAgl = agl;
@@ -103,8 +104,8 @@ namespace KerbinMaps.Views
             });
         }
 
-        /* Una tanda: las celdas que faltan alrededor de la posición pedida, de la más cercana
-           a la más lejana, durante unas decenas de milisegundos. Devuelve si queda trabajo. */
+        /* One batch: the missing cells around the requested position, nearest first, for a few
+           tens of milliseconds. Returns whether work remains. */
         bool Generar()
         {
             double lat = objLat, lon = objLon;
@@ -124,7 +125,7 @@ namespace KerbinMaps.Views
                     double f = DensidadCelda(d - l.CellM * 0.75);
                     if (!l.Cells.TryGetValue((j, i), out var ya) || ya.Density < f - 1e-9) faltan.Add((l, j, i, d, f));
                 }
-                // se tiran las que ya no hacen falta
+                // those no longer needed are dropped
                 foreach (var k in l.Cells.Keys)
                     if (!vistas.Contains(k)) l.Cells.TryRemove(k, out _);
             }
@@ -141,21 +142,21 @@ namespace KerbinMaps.Views
             return true;
         }
 
-        /* Densidad con la que se generan las celdas a esa distancia, en potencias de dos para
-           no rehacerlas a cada paso de la cámara. */
+        /* Density the cells are generated with at that distance, in powers of two so they
+           aren't rebuilt at every camera step. */
         static double DensidadCelda(double d)
         {
             double f = DensidadEn(d);
             return Math.Max(1.0 / 64, Math.Pow(2, Math.Ceiling(Math.Log2(f))));
         }
 
-        /* Fracción de candidatos que se ven a esa distancia. */
+        /* Fraction of candidates visible at that distance. */
         public static double DensidadEn(double d) => d <= DistanciaPlena ? 1 : DistanciaPlena / d;
 
-        /* ------------------------------------------------------------ celdas */
+        /* ------------------------------------------------------------ cells */
 
-        /* Filas de latitud de alto CellM; cada fila partida en tantas celdas de longitud como
-           quepan, así todas miden lo mismo aunque se acerquen al polo. */
+        /* Latitude rows CellM tall; each row split into as many longitude cells as fit, so they
+           all measure the same even near the pole. */
         double DLat(Layer l) => l.CellM / R;
 
         int Columnas(Layer l, int j)
@@ -201,7 +202,7 @@ namespace KerbinMaps.Views
             double area = R * R * dl * dlon * Math.Cos(Math.Clamp((j + 0.5) * dl, -Math.PI / 2, Math.PI / 2));
             double esperados = d.Population * area / AreaTriangulo;
             ulong semilla = Hash((ulong)BitConverter.DoubleToInt64Bits(d.Seed) ^ Fnv(d.Name), (ulong)(uint)j, (ulong)(uint)i);
-            // el número de candidatos se redondea al azar, para que celdas pequeñas no se queden a cero
+            // the number of candidates is rounded at random, so small cells don't end up at zero
             int total = (int)Math.Floor(esperados + U(Hash(semilla, 0xABCD)));
 
             var res = new List<Inst>();
@@ -209,9 +210,9 @@ namespace KerbinMaps.Views
             {
                 ulong h = Hash(semilla, (ulong)k);
                 double rank = U(h);
-                if (rank >= f) continue;                                  // aún no hace falta a esta distancia
+                if (rank >= f) continue;                                  // not needed yet at this distance
                 double r4 = U(Hash(h, 4));
-                if (r4 >= d.SpawnChance) continue;                        // la probabilidad nunca pasará de esto
+                if (r4 >= d.SpawnChance) continue;                        // the probability will never go above this
 
                 double lat = (lat0 + U(Hash(h, 1)) * dl) * 180 / Math.PI;
                 double lon = (lon0 + U(Hash(h, 2)) * dlon) * 180 / Math.PI;
@@ -225,7 +226,7 @@ namespace KerbinMaps.Views
                 double alt = Altura(lat, lon);
                 double escalarAlt = EscalarAltitud(d, alt);
                 if (escalarAlt <= 0) continue;
-                if (d.PlacementAltitude == null && alt < 0) continue;     // bajo el agua
+                if (d.PlacementAltitude == null && alt < 0) continue;     // underwater
 
                 var nrm = Normal(lat, lon, dir);
                 double cosUp = Math.Abs(nrm[0] * dir[0] + nrm[1] * dir[1] + nrm[2] * dir[2]);
@@ -258,8 +259,8 @@ namespace KerbinMaps.Views
             return new Cell { Items = res.ToArray(), Density = f, Cx = c[0], Cy = c[1], Cz = c[2] };
         }
 
-        /* Como GetAltitudeScalar de Parallax: 1 dentro del rango de altitudes y bajando a 0
-           en una franja de altitudeFadeRange centrada en cada límite. */
+        /* Like Parallax's GetAltitudeScalar: 1 inside the altitude range and dropping to 0 over
+           an altitudeFadeRange band centered on each limit. */
         static double EscalarAltitud(ScatterDef d, double alt)
         {
             double f = Math.Max(d.AltitudeFadeRange, 1e-6);
@@ -270,8 +271,8 @@ namespace KerbinMaps.Views
             return alt < (min + max) / 2 ? bajo : alto;
         }
 
-        /* Normal del terreno por diferencias, a 40 m (los triángulos del terreno de KSP en su
-           nivel más fino rondan los 66). */
+        /* Terrain normal by finite differences, at 40 m (KSP's terrain triangles at their
+           finest level are around 66). */
         double[] Normal(double lat, double lon, double[] up)
         {
             const double e = 40;
@@ -280,7 +281,7 @@ namespace KerbinMaps.Views
             double hN = Altura(lat + dLat, lon), hS = Altura(lat - dLat, lon);
             double hE = Altura(lat, lon + dLon), hW = Altura(lat, lon - dLon);
             double dx = (Math.Max(hE, 0) - Math.Max(hW, 0)) / (2 * e), dy = (Math.Max(hN, 0) - Math.Max(hS, 0)) / (2 * e);
-            // este y norte locales
+            // local east and north
             var east = Norm(new[] { up[2], 0, -up[0] });
             if (double.IsNaN(east[0])) east = new double[] { 1, 0, 0 };
             var north = new[] { up[1] * east[2] - up[2] * east[1], up[2] * east[0] - up[0] * east[2], up[0] * east[1] - up[1] * east[0] };
@@ -292,11 +293,12 @@ namespace KerbinMaps.Views
             });
         }
 
-        /* ------------------------------------------------------------ ruido */
+        /* ------------------------------------------------------------ noise */
 
-        /* El ruido de Parallax: fBm sobre la dirección desde el centro, con el primer octavo
-           ya a frecuencia × lacunaridad, un desfase por semilla y otro por octavo. Invertido es
-           1 - |n|, que deja franjas estrechas (los bosques en bandas); normal va de 0 a 1. */
+        /* Parallax's noise: fBm over the direction from the center, with the first octave
+           already at frequency × lacunarity, an offset per seed and another per octave.
+           Inverted it's 1 - |n|, which leaves narrow strips (forests in bands); normal goes
+           from 0 to 1. */
         static double Ruido(ScatterDef d, double[] dir)
         {
             double x = dir[0] - d.NoiseSeed * 3, y = dir[1] - d.NoiseSeed * 3, z = dir[2] - d.NoiseSeed * 3;
@@ -329,7 +331,7 @@ namespace KerbinMaps.Views
             { 1, 0, -1 }, { -1, 0, -1 }, { 0, 1, 1 }, { 0, -1, 1 }, { 0, 1, -1 }, { 0, -1, -1 },
         };
 
-        /* Ruido simplex 3D (Gustavson), de -1 a 1. */
+        /* 3D simplex noise (Gustavson), from -1 to 1. */
         static double Simplex(double xin, double yin, double zin)
         {
             const double F3 = 1.0 / 3, G3 = 1.0 / 6;
@@ -370,8 +372,8 @@ namespace KerbinMaps.Views
             return t * t * (Grad3[g, 0] * x + Grad3[g, 1] * y + Grad3[g, 2] * z);
         }
 
-        /* Ruido celular (distancia al punto más cercano de una rejilla con un punto por
-           celda), de 0 a ~1. */
+        /* Cellular noise (distance to the nearest point of a grid with one point per cell),
+           from 0 to ~1. */
         static double Celular(double x, double y, double z)
         {
             int xi = (int)Math.Floor(x), yi = (int)Math.Floor(y), zi = (int)Math.Floor(z);
@@ -387,7 +389,7 @@ namespace KerbinMaps.Views
             return Math.Min(1, Math.Sqrt(best));
         }
 
-        /* ------------------------------------------------------------ utilidades */
+        /* ------------------------------------------------------------ utilities */
 
         static ulong Mix(ulong z)
         {
@@ -396,7 +398,7 @@ namespace KerbinMaps.Views
             return z ^ (z >> 31);
         }
 
-        // el hash de string de .NET cambia en cada ejecución: los árboles se moverían de sitio
+        // .NET's string hash changes on every run: the trees would move around
         static ulong Fnv(string s)
         {
             ulong h = 14695981039346656037UL;

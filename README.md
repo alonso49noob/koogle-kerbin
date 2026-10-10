@@ -68,8 +68,9 @@ What it does:
   with KK's own maths, shown as markers on the map and globe and as textured models in
   the flight and sky views (the stock KSC textures they reuse come straight from the
   game's `sharedassets` files). An editor moves, rotates, scales, duplicates, deletes and
-  adds buildings, and saves back to the `.cfg` files by changing only the lines involved,
-  after backing each file up.
+  adds buildings (WASD while one is selected), turns any building with a spawn point into
+  a working KK launch site for the VAB or SPH, and saves back to the `.cfg` files by
+  changing only the lines involved, after backing each file up.
 - **Countries and factions.** A political-map maker: create countries or factions, give
   them a name and a colour, and paint them on the 2D map or the globe with a brush, a fill
   (a whole island, or the gap left by borders), a polygon or an eraser. Only land gets
@@ -131,6 +132,7 @@ What it does:
   drawn on the map and the globe with the fastest one highlighted.
 - **Automatic updates.** On startup the app checks the latest GitHub release and offers to update; it verifies the installer's SHA-256 and reinstalls in place. Can be turned off in the panel.
 - **English and Spanish**, both in the app and in the installer.
+- **Six interface themes**: Classic, Light, Sepia, Dark, Deep Dark and Solarized Dark, switched live from the top bar or the *Appearance* section.
 
 The detailed documentation is in **[desktop/README.md](desktop/README.md)**
 (Spanish). The installer asks for .NET 10 and installs per user; no admin rights.

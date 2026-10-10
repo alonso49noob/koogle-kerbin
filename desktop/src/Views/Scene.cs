@@ -7,21 +7,21 @@ namespace KerbinMaps.Views
 {
     public enum DotStyle { Pin, Vessel, Point, LabelOnly }
 
-    /* Un punto del mapa 2D: sitio de referencia, nave o vértice de una herramienta. */
+    /* A point on the 2D map: reference site, vessel or tool vertex. */
     public sealed class MapDot
     {
         public double Lat, Lon;
         public DotStyle Style = DotStyle.Point;
         public ColorF Fill = ColorF.White;
-        public string Tooltip;          // se enseña al pasar por encima
-        public string Label;            // rótulo fijo, siempre visible
-        public object Tag;              // lo que representa (Marker, Vessel...)
+        public string Tooltip;          // shown on hover
+        public string Label;            // fixed label, always visible
+        public object Tag;              // what it represents (Marker, Vessel...)
         public bool Hidden;
     }
 
-    /* Polilínea en lat/lon. Se guarda desenvuelta en longitud (sin saltos de ±360°)
-       para pintarla continua en cada copia del mundo, en vez de trocearla por el
-       antimeridiano como hacía Leaflet. */
+    /* Polyline in lat/lon. It's stored unwrapped in longitude (no ±360° jumps) to paint it
+       continuous on each copy of the world, instead of splitting it at the antimeridian as
+       Leaflet did. */
     public sealed class MapLine
     {
         public ColorF Color;
@@ -53,12 +53,12 @@ namespace KerbinMaps.Views
         }
     }
 
-    /* Rótulo grande sobre un territorio (el nombre de una facción): se ve si el territorio
-       mide en pantalla lo bastante para que quepa. */
+    /* Large label over a territory (a faction's name): shown if the territory is big enough on
+       screen for it to fit. */
     public sealed class MapEtiqueta
     {
         public double Lat, Lon;
-        public double RadioM;                   // lo que mide el territorio alrededor del punto
+        public double RadioM;                   // how big the territory is around the point
         public string Texto;
         public ColorF Color;
     }

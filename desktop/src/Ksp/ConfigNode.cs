@@ -4,9 +4,8 @@ using System.IO;
 
 namespace KerbinMaps.Ksp
 {
-    /* Formato ConfigNode de KSP (los .cfg y la caché de ModuleManager): nombres,
-       llaves y pares clave = valor. Se aceptan llaves en la misma línea que el nombre
-       y comentarios con //. */
+    /* KSP's ConfigNode format (the .cfg files and the ModuleManager cache): names, braces and
+       key = value pairs. Braces on the same line as the name and // comments are accepted. */
     public sealed class ConfigNode
     {
         public string Name;

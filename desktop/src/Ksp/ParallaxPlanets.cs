@@ -6,22 +6,22 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.Ksp
 {
-    /* Mapas de color y alturas de los cuerpos sacados de Parallax - Stock Planet Textures.
+    /* Color and height maps of the bodies taken from Parallax - Stock Planet Textures.
 
-       Son las mismas texturas que se pueden volcar a PNG con un extractor de assets, pero
-       leídas directamente del paquete de Unity del mod: no hace falta volcar nada. Vienen
-       como las guarda Unity, con la primera fila abajo; tras darles la vuelta quedan
-       idénticas a un volcado (comprobado byte a byte en Kerbin) y a partir de ahí siguen
-       el mismo camino: espejo y 90° de giro (ver BodyMaps).
+       They're the same textures that can be dumped to PNG with an asset extractor, but read
+       straight from the mod's Unity bundle: nothing needs dumping. They come as Unity stores
+       them, with the first row at the bottom; once flipped they're identical to a dump (checked
+       byte by byte on Kerbin) and from there they follow the same path: mirror and 90° rotation
+       (see BodyMaps).
 
-       El color va en DXT1/DXT5 y las alturas en R8, un gris de 8 bits con la escala de
-       Parallax (tope en el gris 145). */
+       Color is DXT1/DXT5 and heights are R8, an 8-bit gray on Parallax's scale (top at gray
+       145). */
     public static class ParallaxPlanets
     {
         public const string Carpeta = "Parallax_StockPlanetTextures";
 
-        /* Carpetas GameData donde buscar: la de KSP y la de las texturas descargadas por el
-           instalador, para quien no tenga Parallax en el juego. */
+        /* GameData folders to search: KSP's and the one with the textures downloaded by the
+           installer, for those who don't have Parallax in the game. */
         public static IEnumerable<string> GameDatas(string gameData)
         {
             if (!string.IsNullOrEmpty(gameData)) yield return gameData;
@@ -41,7 +41,7 @@ namespace KerbinMaps.Ksp
             return null;
         }
 
-        /* Qué cuerpos tienen mapa en el paquete, sin leer ninguna textura. */
+        /* Which bodies have a map in the bundle, without reading any texture. */
         public static HashSet<string> Cuerpos(string bundle)
         {
             var r = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -62,8 +62,8 @@ namespace KerbinMaps.Ksp
             return r;
         }
 
-        /* Color y alturas de un cuerpo, ya con la primera fila arriba. `maxAncho` limita el
-           nivel de mipmap que se lee: el de alturas de Kerbin es de 8192 de ancho. */
+        /* Color and heights of a body, already with the first row at the top. `maxAncho` limits
+           the mipmap level that's read: Kerbin's height map is 8192 wide. */
         public static (ImageData Color, ImageData Height) Load(string bundle, string body, int maxAncho = 4096)
         {
             using var ub = new UnityBundle(bundle);
@@ -86,9 +86,9 @@ namespace KerbinMaps.Ksp
             return (Leer("Color"), Leer("Height"));
         }
 
-        /* El mapa de alturas tal cual viene en el paquete: R8 con todos sus niveles de
-           mipmap seguidos, la primera fila abajo. Para las teselas de detalle, que leen a
-           resolución completa solo la zona bajo la cámara. Null si no es R8. */
+        /* The height map just as it comes in the bundle: R8 with all its mipmap levels one
+           after another, first row at the bottom. For the detail tiles, which read at full
+           resolution only the area under the camera. Null if it isn't R8. */
         public static (byte[] Datos, int Ancho, int Alto, int Mips)? CargarAlturasCrudas(string bundle, string body)
         {
             using var ub = new UnityBundle(bundle);
@@ -113,10 +113,10 @@ namespace KerbinMaps.Ksp
             return new UnitySerialized(ub, cab.Offset, cab.Size);
         }
 
-        /* Elige el primer nivel de mipmap que quepa en `maxAncho` y lo pasa a RGBA. */
+        /* Picks the first mipmap level that fits in `maxAncho` and converts it to RGBA. */
         internal static ImageData Decodificar(UnitySerialized.Textura t, int maxAncho)
         {
-            int bpp;           // en bloques de 4×4 para DXT, en bytes por píxel para R8
+            int bpp;           // in 4×4 blocks for DXT, in bytes per pixel for R8
             bool dxt = t.Formato == 10 || t.Formato == 12;
             switch (t.Formato)
             {

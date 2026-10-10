@@ -6,12 +6,12 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.Views
 {
-    /* Pinta el modelo de una nave montado con las piezas de KSP.
+    /* Paints a vessel's model assembled from KSP parts.
 
-       Todo se hace relativo a la cámara y en metros: en radios de Kerbin y con la cámara
-       en su sitio, una nave de 10 m son 1,7e-5 unidades a una distancia de ~1 del origen,
-       y la precisión de un float (unos 8 cm ahí) haría temblar los vértices. Tiene su
-       propio plano cercano y su propio búfer de profundidad, que se limpia antes. */
+       Everything is done relative to the camera and in meters: in Kerbin radii and with the
+       camera in its place, a 10 m vessel is 1.7e-5 units at a distance of ~1 from the origin,
+       and float precision (about 8 cm there) would make the vertices jitter. It has its own
+       near plane and its own depth buffer, which is cleared first. */
     public sealed class VesselModelRenderer : IDisposable
     {
         const string VS = @"#version 330 core
@@ -44,15 +44,15 @@ out vec4 frag;
 void main() {
   vec4 c = (uHasTex != 0 ? texture(uTex, vUv) : vec4(0.75, 0.75, 0.75, 1.0)) * uColor;
   if (uCutout != 0 && c.a < 0.5) discard;
-  /* Iluminación de dos caras: el cambio de marco de Unity (mano izquierda) al del
-     visor invierte el sentido de los triángulos, y así da igual hacia dónde miren.
-     Además del «sol» fijo del globo, una luz desde la cámara: sin ella, la cara de la
-     nave que queda en sombra se ve negra justo cuando uno se acerca a mirarla. */
+  /* Two-sided lighting: the change from Unity's frame (left-handed) to the viewer's reverses
+     the triangles' winding, and this way it doesn't matter which way they face. Besides the
+     globe's fixed «sun», a light from the camera: without it, the side of the vessel in shadow
+     looks black right when you get close to look at it. */
   vec3 n = normalize(vN);
   float sun = abs(dot(n, uLight));
   float head = abs(dot(n, normalize(-vW)));
-  /* En la sombra del planeta no hay Sol: queda la luz de la cámara, más tenue y fría,
-     para que la nave no desaparezca del todo en la cara de noche. */
+  /* In the planet's shadow there's no Sun: the camera light remains, dimmer and colder, so the
+     vessel doesn't disappear completely on the night side. */
   vec3 dayAmt = vec3(uAmbient + (1.0 - uAmbient) * (0.6 * sun + 0.4 * head));
   vec3 nightAmt = vec3(0.16, 0.18, 0.24) + vec3(0.30, 0.33, 0.40) * head;
   vec3 lightAmt = uAmbient >= 1.0 ? vec3(1.0) : mix(nightAmt, dayAmt, uSunlight);
@@ -74,8 +74,9 @@ void main() {
             return f;
         }
 
-        /* Cofactores del bloque 3x3: la inversa traspuesta sin dividir por el
-           determinante, que da igual porque el shader normaliza y usa el valor absoluto. */
+        /* Cofactors of the 3x3 block: the inverse transpose without dividing by the
+           determinant, which doesn't matter because the shader normalizes and uses the absolute
+           value. */
         internal static float[] NormalMatrix(double[] m)
         {
             double a = m[0], b = m[4], c = m[8], d = m[1], e = m[5], f = m[9], g = m[2], h = m[6], i = m[10];
@@ -87,8 +88,8 @@ void main() {
             return r;
         }
 
-        /* offsetM: posición del centro de masas respecto a la cámara, en metros y en el
-           marco del visor. fwd/up: la orientación de la cámara. */
+        /* offsetM: position of the center of mass relative to the camera, in meters and in the
+           viewer's frame. fwd/up: the camera's orientation. */
         public void Draw(AssembledVessel a, double[] offsetM, double[] fwd, double[] up, double fovDeg, int w, int h, double[] light, bool lit, double sunlight = 1)
         {
             double dist = Math.Sqrt(offsetM[0] * offsetM[0] + offsetM[1] * offsetM[1] + offsetM[2] * offsetM[2]);
@@ -99,10 +100,10 @@ void main() {
             var view = new float[16];
             Mat4.LookAt(view, new double[] { 0, 0, 0 }, fwd, up);
 
-            /* De la nave (Unity, mano izquierda, relativa a la raíz) al visor: se quita el
-               centro de masas, se aplica el giro guardado respecto al planeta, se cambian
-               los ejes X y Z (así se pasa del marco del cuerpo en KSP al del globo) y se
-               coloca respecto a la cámara. */
+            /* From the vessel (Unity, left-handed, relative to the root) to the viewer: the
+               center of mass is removed, the saved rotation relative to the planet is applied,
+               the X and Z axes are swapped (that's how you go from KSP's body frame to the
+               globe's) and it's placed relative to the camera. */
             var swap = new double[] { 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1 };
             var baseM = Mat.Mul(Mat.Translate(offsetM), Mat.Mul(swap, Mat.Mul(Mat.Rotate(a.Rot), Mat.Translate(new[] { -a.CoM[0], -a.CoM[1], -a.CoM[2] }))));
 

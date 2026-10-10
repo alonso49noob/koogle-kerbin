@@ -8,8 +8,8 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.UI
 {
-    /* Modelos de las naves: se montan con los .mu y las texturas de la instalación de KSP
-       del usuario, leídos en su sitio (nada se copia). */
+    /* Vessel models: assembled with the .mu files and textures of the user's KSP installation,
+       read in place (nothing is copied). */
     public sealed partial class MainForm
     {
         PartCatalog kspCatalog;
@@ -40,9 +40,8 @@ namespace KerbinMaps.UI
             modelInfo = naves.Add(Readout());
         }
 
-        /* GameData: la elegida a mano, la de la instalación a la que pertenece la partida
-           cargada (saves\<partida>\persistent.sfs) o la de Steam, en cualquiera de sus
-           bibliotecas (ver Steam). */
+        /* GameData: the one chosen by hand, the one of the installation the loaded save belongs
+           to (saves\<save>\persistent.sfs) or Steam's, in any of its libraries (see Steam). */
         string FindGameData()
         {
             var cands = new List<string>();
@@ -133,7 +132,7 @@ namespace KerbinMaps.UI
             }
             globe.FocusModel = a;
             globe.FocusTag = v;
-            // no dejar que la cámara se meta dentro del casco
+            // don't let the camera get inside the hull
             globe.FocusMinDist = Math.Max(a.Radius * 1.5, 3) / Body.Radius;
             if (globe.FocusDist < globe.FocusMinDist) globe.FocusDist = globe.FocusMinDist;
             SetModelStatus(Lang.F("Modelo: {0} de {1} piezas, {2} m de punta a punta.", a.PartsDrawn, a.PartsTotal, Geo.F(a.Radius * 2, 1)) +

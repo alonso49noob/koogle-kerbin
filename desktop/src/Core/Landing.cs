@@ -20,32 +20,32 @@ namespace KerbinMaps.Core
         public bool Ok;
         public string Problema;
 
-        public double BurnUT;              // cuándo frenar
-        public double Dv;                  // cuánto, retrógrado, m/s
+        public double BurnUT;              // when to brake
+        public double Dv;                  // how much, retrograde, m/s
         public double BurnLat, BurnLon, BurnAlt;
-        public double TouchUT;             // cuándo toca suelo
+        public double TouchUT;             // when it touches the ground
         public double ImpactLat, ImpactLon;
-        public double ErrorM;              // distancia al objetivo
-        public double PeriapsisTrasFrenar; // sobre el nivel del mar, puede ser negativo
-        public double EntradaUT;           // cuándo cruza el techo de la atmósfera (NaN si no hay)
-        public double VelocidadImpacto;    // m/s, sin frenada final
-        public bool ConAire;               // hubo modelo de arrastre
+        public double ErrorM;              // distance to the target
+        public double PeriapsisTrasFrenar; // above sea level, can be negative
+        public double EntradaUT;           // when it crosses the top of the atmosphere (NaN if there's none)
+        public double VelocidadImpacto;    // m/s, without a final braking burn
+        public bool ConAire;               // there was a drag model
         public List<TrackPoint> Descenso = new();
     }
 
-    /* Aterrizaje desde órbita: dónde y cuánto frenar para caer en un punto dado.
+    /* Landing from orbit: where and how much to brake to come down on a given point.
 
-       La órbita de KSP dentro de una SOI es kepleriana exacta, así que el estado se saca
-       de los elementos del guardado. La frenada se supone instantánea y retrógrada (es
-       lo que se hace en el juego: apuntar retrógrado y quemar), y el descenso se integra
-       con RK4: gravedad siempre, y arrastre si el cuerpo tiene aire.
+       KSP's orbit inside an SOI is exactly Keplerian, so the state comes from the save's
+       elements. The braking burn is assumed instantaneous and retrograde (that's what you do in
+       the game: point retrograde and burn), and the descent is integrated with RK4: gravity
+       always, and drag if the body has air.
 
-       Con atmósfera el resultado es orientativo: el arrastre depende de la forma y masa
-       de la nave, y con FAR o Kerbalism instalados el modelo del juego no es este. Sin
-       aire (Mun, Minmus, Ike, Gilly...) el cálculo es exacto salvo por el relieve. */
+       With an atmosphere the result is approximate: drag depends on the vessel's shape and
+       mass, and with FAR or Kerbalism installed the game's model isn't this one. Without air
+       (Mun, Minmus, Ike, Gilly...) the calculation is exact except for the terrain. */
     public static class Landing
     {
-        /* Posición y velocidad en el marco inercial del cuerpo, en el instante t. */
+        /* Position and velocity in the body's inertial frame, at time t. */
         public static (V3 R, V3 V) Estado(Elements e, double t)
         {
             double mu = Body.Mu, a = e.Sma, ecc = e.Ecc;
@@ -57,7 +57,7 @@ namespace KerbinMaps.Core
             double r = p / (1 + ecc * Math.Cos(nu));
             double sq = Math.Sqrt(mu / p);
 
-            // en el plano de la órbita (perifocal) y de ahí al inercial
+            // in the orbital plane (perifocal) and from there to inertial
             var rp = new V3(r * Math.Cos(nu), r * Math.Sin(nu), 0);
             var vp = new V3(-sq * Math.Sin(nu), sq * (ecc + Math.Cos(nu)), 0);
             double w = e.Lpe * Geo.D2R, i = e.Inc * Geo.D2R, om = e.Lan * Geo.D2R;
@@ -75,7 +75,7 @@ namespace KerbinMaps.Core
             return new V3(x2 * c3 - y2 * s3, x2 * s3 + y2 * c3, z2);
         }
 
-        /* Del marco inercial al suelo que gira. */
+        /* From the inertial frame to the rotating ground. */
         public static (double Lat, double Lon) Suelo(V3 r, double t, double ut, double rotUT)
         {
             double rot = rotUT + 360 * ((t - ut) / Body.SiderealDay);
@@ -84,10 +84,10 @@ namespace KerbinMaps.Core
             return (lat, lon);
         }
 
-        /* Densidad del aire a una altura, con atmósfera exponencial. La altura de escala
-           sale de que KSP corta la atmósfera donde la presión ya es despreciable (unas
-           catorce alturas de escala), así que H ≈ techo / 14 da la caída correcta de un
-           cuerpo a otro sin tener que tabular nada. */
+        /* Air density at a height, with an exponential atmosphere. The scale height follows
+           from KSP cutting the atmosphere where pressure is already negligible (about fourteen
+           scale heights), so H ≈ ceiling / 14 gives the right falloff from one body to another
+           without tabulating anything. */
         public static double Densidad(double alt)
         {
             double techo = Body.Atmosphere;
@@ -96,9 +96,9 @@ namespace KerbinMaps.Core
             return Body.Current.AirDensity * 1.225 * Math.Exp(-Math.Max(0, alt) / h);
         }
 
-        /* Aceleración: gravedad y, si hay aire, arrastre contra el viento relativo
-           (el aire gira con el cuerpo). bc es el coeficiente balístico, masa entre
-           Cd·área, en kg/m²: cuanto mayor, menos frena. */
+        /* Acceleration: gravity and, if there's air, drag against the relative wind (the air
+           rotates with the body). bc is the ballistic coefficient, mass over Cd·area, in kg/m²:
+           the larger it is, the less it brakes. */
         static V3 Acel(V3 r, V3 v, double bc, bool aire)
         {
             double rr = r.Len;
@@ -109,7 +109,7 @@ namespace KerbinMaps.Core
             double rho = Densidad(alt);
             if (rho <= 0) return g;
 
-            // velocidad del aire en ese punto: rotación del cuerpo alrededor de Z
+            // air velocity at that point: the body's rotation around Z
             double w = 2 * Math.PI / Body.SiderealDay;
             var vAire = new V3(-w * r.Y, w * r.X, 0);
             var vRel = v - vAire;
@@ -118,7 +118,7 @@ namespace KerbinMaps.Core
             return g + vRel.Unit * (-0.5 * rho * s * s / bc);
         }
 
-        /* Integra desde un estado hasta tocar suelo (o hasta agotar el tiempo). */
+        /* Integrates from a state until it touches the ground (or until time runs out). */
         public static (List<TrackPoint> Pts, double TouchT, V3 RFin, V3 VFin, double EntradaT) Caer(
             V3 r0, V3 v0, double t0, double ut, double rotUT, double bc, double maxT = 40000, bool grueso = false)
         {
@@ -142,8 +142,8 @@ namespace KerbinMaps.Core
                 double alt = r.Len - Body.Radius;
                 if (aire && double.IsNaN(entrada) && alt <= Body.Atmosphere) entrada = t;
 
-                // pasos cortos cerca del suelo y dentro del aire, largos arriba; en el
-                // barrido de búsqueda basta con pasos grandes, que solo hay que ordenar
+                // short steps near the ground and inside the air, long ones up high; in the
+                // search sweep large steps are enough, they only need ranking
                 double dt = alt > 200000 ? 20 : alt > 20000 ? 5 : alt > 2000 ? 1 : 0.25;
                 if (grueso) dt *= 8;
 
@@ -151,17 +151,17 @@ namespace KerbinMaps.Core
                 {
                     var (la, lo) = Suelo(r, t, ut, rotUT);
                     pts.Add(new TrackPoint(la, lo, alt, t));
-                    // la traza es para dibujarla: con unos cientos de puntos sobra
+                    // the trace is for drawing: a few hundred points are plenty
                     if (++contados > 600) { cadaPunto *= 2; contados = 0; }
                 }
                 if (alt <= 0) break;
 
                 var (rN, vN) = Paso(r, v, dt);
 
-                /* Si ese paso se mete bajo tierra, se parte por la mitad hasta dar con el
-                   instante del contacto. La partición va en una variable propia: si se
-                   dejara en dt, el cálculo del principio del bucle la volvería a subir y
-                   el descenso no terminaría nunca. */
+                /* If that step goes underground, it's halved until it finds the moment of
+                   contact. The halving goes in its own variable: if it were left in dt, the
+                   calculation at the top of the loop would raise it again and the descent would
+                   never end. */
                 if (rN.Len - Body.Radius < 0)
                 {
                     double h = dt;
@@ -181,8 +181,8 @@ namespace KerbinMaps.Core
             return (pts, t, r, v, entrada);
         }
 
-        /* Δv retrógrado que deja el periapsis a la altura pedida. Se busca por bisección:
-           frenar siempre lo baja, así que la función es monótona. */
+        /* Retrograde Δv that leaves the periapsis at the requested height. Found by bisection:
+           braking always lowers it, so the function is monotonic. */
         public static double DvParaPeriapsis(V3 r, V3 v, double periapsisObjetivo)
         {
             double objetivo = Body.Radius + periapsisObjetivo;
@@ -207,9 +207,9 @@ namespace KerbinMaps.Core
             return a * (1 - e);
         }
 
-        /* Busca cuándo frenar para caer en el objetivo. Primero un barrido por toda la
-           órbita y después afinado, alternando el instante y el Δv: el instante manda en
-           dónde cae y el Δv en cuánto se adelanta la caída. */
+        /* Finds when to brake to come down on the target. First a sweep over the whole orbit
+           and then refinement, alternating time and Δv: the time drives where it lands and the
+           Δv how much earlier the fall comes. */
         public static LandingPlan Planear(Elements orb, double t0, double ut, double rotUT,
                                           double objLat, double objLon, double periapsisObjetivo, double bc)
         {
@@ -244,7 +244,7 @@ namespace KerbinMaps.Core
                 return err;
             }
 
-            // barrido grueso por una vuelta entera
+            // coarse sweep over a full revolution
             int n = 240;
             double mejorT = t0, mejorErr = double.MaxValue;
             LandingPlan mejor = null;
@@ -255,10 +255,10 @@ namespace KerbinMaps.Core
                 if (err < mejorErr) { mejorErr = err; mejorT = tb; mejor = det; }
             }
             if (mejor == null) { plan.Problema = "No se encontró ninguna frenada que llegue al suelo."; return plan; }
-            // el barrido era grueso: el afinado empieza de cero con el cálculo fino
+            // the sweep was coarse: refinement starts from scratch with the fine calculation
             mejorErr = Evaluar(mejorT, 0, out mejor);
 
-            // afinado: instante y luego Δv, un par de veces
+            // refinement: time and then Δv, a couple of times
             double paso = periodo / n;
             double dvExtra = 0;
             for (int ronda = 0; ronda < 3; ronda++)
@@ -271,7 +271,7 @@ namespace KerbinMaps.Core
                     if (e1 < e2) { hi = m2; if (e1 < mejorErr) { mejorErr = e1; mejor = d1; mejorT = m1; } }
                     else { lo = m1; if (e2 < mejorErr) { mejorErr = e2; mejor = d2; mejorT = m2; } }
                 }
-                // ajuste fino del Δv: más frenada acorta el alcance
+                // fine tuning of the Δv: more braking shortens the range
                 double dlo = dvExtra - 60, dhi = dvExtra + 60;
                 for (int i = 0; i < 30; i++)
                 {

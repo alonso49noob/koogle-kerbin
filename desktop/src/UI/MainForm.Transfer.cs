@@ -8,13 +8,13 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.UI
 {
-    /* Transferencias a otros cuerpos y sus ventanas de lanzamiento.
+    /* Transfers to other bodies and their launch windows.
 
-       Se elige destino y el visor busca, a partir del instante de la barra de tiempo, las
-       salidas más baratas: cuándo salir, el Δv de eyección desde la órbita de
-       aparcamiento, el de captura al llegar, el tiempo de vuelo y los dos ángulos que
-       hacen falta para montarla en el juego (fase entre los cuerpos y eyección respecto
-       al prógrado). Todo balístico: una sola quemada, sin correcciones a medio camino. */
+       You pick a destination and the viewer searches, from the time on the time bar, for the
+       cheapest departures: when to leave, the ejection Δv from the parking orbit, the capture
+       Δv on arrival, the flight time and the two angles needed to set it up in the game (phase
+       between the bodies and ejection relative to prograde). All ballistic: a single burn, with
+       no mid-course corrections. */
     public sealed partial class MainForm
     {
         DarkCombo trDestino;
@@ -26,8 +26,8 @@ namespace KerbinMaps.UI
         TransferPlan transfer;
         bool buscandoTransfer;
 
-        /* Los cuerpos a los que tiene sentido ir desde el actual: los que comparten
-           cuerpo central (hermanos y sus lunas) y las lunas del propio cuerpo. */
+        /* The bodies it makes sense to go to from the current one: those sharing a central body
+           (siblings and their moons) and the body's own moons. */
         void RenderDestinos()
         {
             if (trDestino == null) return;
@@ -122,8 +122,8 @@ namespace KerbinMaps.UI
                 new Rectangle(r.Right - wTof, r.Y, wTof - Theme.S(6), r.Height), Theme.FgDim, flags | TextFormatFlags.Right);
         }
 
-        /* Pinchar una ventana lleva la barra de tiempo al instante de la salida, para ver
-           dónde están los cuerpos ese día. */
+        /* Clicking a window moves the time bar to the departure time, to see where the bodies
+           are that day. */
         void TransferRowClick(object item, Point pt, Rectangle rect)
         {
             var w = (TransferWindow)item;

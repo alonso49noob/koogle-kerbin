@@ -24,24 +24,23 @@ namespace KerbinMaps.Views
         public float Alpha = 0.5f;
     }
 
-    /* Cómo se coloca la cámara: girando alrededor del planeta, alrededor de una nave
-       (el foco pasa del centro de Kerbin a la nave) o de pie en la superficie
-       mirando al cielo. */
+    /* How the camera is placed: orbiting the planet, orbiting a vessel (the focus moves from
+       Kerbin's center to the vessel) or standing on the surface looking at the sky. */
     public enum CamMode { Planet, Focus, Sky, Free }
 
-    /* Vista 3D: Kerbin como esfera texturizada. Mismos shaders que la versión WebGL2,
-       pasados a OpenGL 3.3, con la cámara generalizada a los tres modos. */
+    /* 3D view: Kerbin as a textured sphere. Same shaders as the WebGL2 version, ported to
+       OpenGL 3.3, with the camera generalized to the three modes. */
     public sealed partial class GlobeView : IDisposable
     {
         const double R2D = 180 / Math.PI, D2R = Math.PI / 180;
 
-        // cámara alrededor del planeta
+        // camera around the planet
         public double CamLat = 0, CamLon = -74.5, CamDist = 3.2;
-        public double CamHeading;                 // rumbo al que se mira al bajar (inclinado), grados
-        // cámara alrededor de una nave: rumbo y elevación desde los que se la mira
+        public double CamHeading;                 // heading looked at when going down (tilted), degrees
+        // camera around a vessel: heading and elevation it's viewed from
         public double[] FocusTarget = { 0, 0, 1.1 };
         public double FocusAz, FocusEl = 25, FocusDist = 0.25;
-        // modelo de la nave enfocada, si se ha podido montar con las piezas de KSP
+        // model of the focused vessel, if it could be assembled from KSP parts
         public Ksp.AssembledVessel FocusModel;
         public object FocusTag;
         public double FocusMinDist = 0.0003;
@@ -49,13 +48,13 @@ namespace KerbinMaps.Views
 
         public bool Light = true, Atmosphere = true;
 
-        /* Longitud del punto subsolar (lo fija la ventana con el tiempo de la barra). */
+        /* Longitude of the subsolar point (the window sets it with the time on the bar). */
         public double SunLat, SunLon = -90;
-        public double SunAngularRadius = 0.0192;          // rad, visto desde el cuerpo
+        public double SunAngularRadius = 0.0192;          // rad, seen from the body
         public double[] SunDir => Sph(SunLat, SunLon, 1);
 
-        /* Cuánto Sol le llega a un punto (en radios): 0 dentro de la sombra del planeta,
-           con una penumbra corta del grosor de la atmósfera. */
+        /* How much Sun reaches a point (in radii): 0 inside the planet's shadow, with a short
+           penumbra the thickness of the atmosphere. */
         public double SunlightAt(double[] p)
         {
             var s = SunDir;
@@ -68,14 +67,14 @@ namespace KerbinMaps.Views
         public double Relief, BiomeAmt, ColorOff, BiomeOff, HeightOff;
         public double HMin = HeightRange.Min, HMax = HeightRange.Max;
         public Texture ColorTex, BiomeTex, HeightTex;
-        public Texture ScanTex;                   // cobertura de SCANsat (360x180, sin filtrar)
+        public Texture ScanTex;                   // SCANsat coverage (360x180, unfiltered)
         public double ScanAmt;
-        public double AltMin, AltMax, AltAmt;     // filtro de altimetría
+        public double AltMin, AltMax, AltAmt;     // altimetry filter
         public double MinDist = 1.0, MaxDist = 12, SceneR = 1.2;
-        /* Por debajo de este radio la vista del planeta se pinta como el vuelo: el suelo
-           trazado por rayos, con sus texturas de cerca, los scatters y los edificios. */
+        /* Below this radius the planet view is painted like flight: the ray-traced ground, with
+           its close-up textures, the scatters and the buildings. */
         public const double RadioCerca = 1.1;
-        const double RangoMinimoM = 150;          // lo más cerca del suelo que baja la rueda
+        const double RangoMinimoM = 150;          // the closest to the ground the wheel goes
         public int W = 1, H = 1;
         public float S = 1;
         public readonly List<GlobePin> Pins = new();
@@ -93,11 +92,11 @@ namespace KerbinMaps.Views
         readonly List<(int off, int n, ColorF c)> orbitSegs = new(), rutaSegs = new();
         double orbitShift;
 
-        // cámara del último fotograma, para el picking
+        // last frame's camera, for picking
         double[] eyeL = { 0, 0, 3.2 }, fwdL = { 0, 0, -1 }, upL = { 0, 1, 0 };
         double fovL = 45;
 
-        // transición suave entre modos
+        // smooth transition between modes
         struct Cam { public double[] Eye, Target, Up; public double Fov; }
         Cam trans0;
         long transStart;
@@ -138,8 +137,8 @@ void main() {
   float r = uScale;
   if (uRelief > 0.0) {
     r += dispAt(aUv);
-    /* La normal sale del terreno desplazado: con la de la esfera, la luz no se
-       entera de que hay montañas. */
+    /* The normal comes from the displaced terrain: with the sphere's, the light doesn't notice
+       there are mountains. */
     vec2 e = 2.0 / uHeightSize;
     vec2 uu = aUv + vec2(e.x, 0.0);
     vec2 vv = aUv + vec2(0.0, e.y);
@@ -169,15 +168,15 @@ uniform int uHasColor, uHasBiome, uHasHeight, uHasScan, uLit;
 uniform vec3 uLightDir, uCamPos, uTint;
 out vec4 frag;
 
-/* Con fract() la u se envuelve, pero eso dispara las derivadas en la costura y el
-   mipmap elige el nivel más borroso. Pasando las derivadas sin envolver se evita. */
+/* With fract() u wraps, but that blows up the derivatives at the seam and the mipmap picks the
+   blurriest level. Passing the unwrapped derivatives avoids it. */
 vec3 shifted(sampler2D t, float off) {
   return textureGrad(t, vec2(fract(vUv.x + off), vUv.y), dFdx(vUv), dFdy(vUv)).rgb;
 }
 
 
-/* Paleta de altimetría, al gusto de SCANsat: azul abajo, verde en las llanuras,
-   amarillo y marrón arriba y blanco en las cumbres. */
+/* Altimetry palette, in SCANsat's style: blue at the bottom, green on the plains, yellow and
+   brown higher up and white on the peaks. */
 vec3 altPalette(float t) {
   t = clamp(t, 0.0, 1.0);
   vec3 c0 = vec3(0.13, 0.25, 0.55), c1 = vec3(0.10, 0.55, 0.62), c2 = vec3(0.25, 0.62, 0.29);
@@ -190,8 +189,8 @@ vec3 altPalette(float t) {
   return mix(c4, c5, s - 4.0);
 }
 
-/* La misma altura interpolada entre los cuatro texeles vecinos (el mapa se sube sin
-   filtrar): para teñir el mar por profundidad sin que salgan los cuadros de los texeles. */
+/* The same height interpolated between the four neighboring texels (the map is uploaded
+   unfiltered): to tint the sea by depth without the texel squares showing. */
 float heightSuave(vec2 uv) {
   vec2 t = uv * uHeightSize - 0.5;
   ivec2 i = ivec2(floor(t));
@@ -208,33 +207,33 @@ float heightSuave(vec2 uv) {
   return uHMin + mix(mix(g[0], g[1], f.x), mix(g[2], g[3], f.x), f.y) * (uHMax - uHMin);
 }
 
-// altitud en metros según la calibración del mapa de alturas
+// altitude in meters according to the height map's calibration
 float heightAt(vec2 uv) {
   float lum = dot(textureGrad(uHeight, uv, dFdx(vUv), dFdy(vUv)).rgb, vec3(0.2126, 0.7152, 0.0722));
   return uHMin + lum * (uHMax - uHMin);
 }
 
 void main() {
-  // lo que mide un píxel en celdas del mapa político (aquí, antes de cualquier rama)
+  // what a pixel measures in political map cells (here, before any branch)
   float facPx = length(fwidth(vUv * uFacSize)) * 0.7071;
-  vec3 base = uTint;                       // sin mapa, el color del cuerpo
+  vec3 base = uTint;                       // without a map, the body's color
   if (uHasColor != 0) base = shifted(uColor, uColorOff);
   vec3 ground = base;
   if (uHasBiome != 0 && uBiomeAmt > 0.0) base = mix(base, shifted(uBiome, uBiomeOff), uBiomeAmt);
-  // filtro de altimetría: fuera de la franja se apaga el terreno, dentro va con la paleta
+  // altimetry filter: outside the band the terrain is dimmed, inside it uses the palette
   if (uAltAmt > 0.0 && uHasHeight != 0) {
     float altf = heightAt(vec2(fract(vUv.x + uHeightOff), vUv.y));
     if (altf < uAltMin || altf > uAltMax) base = mix(base, vec3(0.03, 0.04, 0.06), 0.78);
     else base = mix(base, altPalette((altf - uAltMin) / max(1.0, uAltMax - uAltMin)), uAltAmt);
     ground = base;
   }
-  // lo que la partida no ha escaneado con SCANsat, tapado (la textura ya trae el alfa)
+  // what the save hasn't scanned with SCANsat, covered (the texture already carries the alpha)
   if (uHasScan != 0 && uScanAmt > 0.0) {
     vec4 sc = texture(uScan, vec2(fract(vUv.x), vUv.y));
     base = mix(base, sc.rgb, sc.a * uScanAmt);
     ground = mix(ground, sc.rgb, sc.a * uScanAmt);
   }
-  // el mapa político, recortado por la costa (la del mapa de color, que es la que se ve aquí)
+  // the political map, clipped at the coast (the color map's, which is the one seen here)
   vec4 fac = vec4(0.0);
   if (uFacOn != 0) {
     float tierraF = 1.0;
@@ -249,12 +248,12 @@ void main() {
   vec3 up = normalize(vDir);
   vec3 n = up;
   float water = 0.0;
-  // el mar por el color (azul que domina sobre rojo y verde), que tiene más resolución que las alturas
+  // the sea by color (blue dominating over red and green), which has more resolution than the heights
   if (uHasColor != 0) water = smoothstep(0.03, 0.08, ground.b - max(ground.r, ground.g));
   if (uHasHeight != 0) {
-    /* Relieve por píxel: la pendiente del mapa de alturas inclina la normal, con más
-       detalle que la malla. Se mide a texel y medio porque un mapa de 8 bits escalona
-       las pendientes de un texel. En el agua la superficie queda lisa. */
+    /* Per-pixel relief: the height map's slope tilts the normal, with more detail than the
+       mesh. It's measured over a texel and a half because an 8-bit map steps one-texel slopes.
+       On water the surface stays smooth. */
     vec2 uvh = vec2(fract(vUv.x + uHeightOff), vUv.y);
     vec2 e = 1.5 / uHeightSize;
     if (uHasColor == 0) water = 1.0 - smoothstep(-20.0, 20.0, heightAt(uvh));
@@ -270,13 +269,13 @@ void main() {
 
   vec3 v = normalize(uCamPos - vWorld);
   vec3 L = shadeGround(vWorld, n, v, uLightDir, pow(base, vec3(2.2)), 0.0);
-  /* El mar, como en el vuelo (ver GlobeView.Agua): el fondo se ve donde cubre poco, así que
-     la plataforma junto a la costa sale turquesa y el mar abierto con su color; y el brillo
-     del Sol con la rugosidad de las olas, que desde aquí no se ven una a una. */
+  /* The sea, as in flight (see GlobeView.Agua): the bottom shows where it's shallow, so the
+     shelf next to the coast comes out turquoise and the open sea with its color; and the sun
+     glint with the waves' roughness, which from here can't be seen one by one. */
   if (water > 0.0) {
     float prof = 300.0;
     if (uHasHeight != 0) {
-      // promediada a texel y medio: el mapa es de 8 bits y el fondo sale a escalones (ver profColor)
+      // averaged over a texel and a half: the map is 8-bit and the bottom comes out stepped (see profColor)
       vec2 uvh = vec2(fract(vUv.x + uHeightOff), vUv.y), e = 1.5 / uHeightSize;
       prof = max(-(heightSuave(uvh) + heightSuave(uvh + vec2(e.x, 0.0)) + heightSuave(uvh - vec2(e.x, 0.0))
                  + heightSuave(uvh + vec2(0.0, e.y)) + heightSuave(uvh - vec2(0.0, e.y))) * 0.2, 0.0);
@@ -285,7 +284,7 @@ void main() {
     L = mix(L, W, water);
   }
   if (uAtmos != 0) {
-    // perspectiva aérea: el aire entre la cámara y el suelo añade bruma y se come contraste
+    // aerial perspective: the air between the camera and the ground adds haze and eats contrast
     vec3 d = -v;
     vec2 ta = raySphere(uCamPos, d, ATM_TOP);
     float t0 = max(ta.x, 0.0), t1 = min(length(uCamPos - vWorld), ta.y);
@@ -295,15 +294,14 @@ void main() {
       L = L * tr + ins;
     }
   }
-  // de noche los territorios se apagan algo, pero se siguen leyendo
+  // at night the territories dim somewhat, but stay readable
   float dia = mix(0.45, 1.0, smoothstep(-0.12, 0.2, dot(up, uLightDir)));
   frag = vec4(toneMap(L) * (1.0 - fac.a) + fac.rgb * dia, 1.0);
 }";
 
-        /* La capa de aire sobre el espacio: solo los rayos que no tocan el planeta (los que
-           lo tocan ya llevan su bruma en el shader del suelo). Dos salidas: la luz que se
-           suma y la transmitancia que multiplica lo que hay detrás, para que un cielo
-           luminoso tape las estrellas. */
+        /* The layer of air over space: only the rays that don't hit the planet (those that do
+           already carry their haze in the ground shader). Two outputs: the light that's added
+           and the transmittance that multiplies what's behind, so a bright sky hides the stars. */
         const string AtmFS = Header + AtmosphereGlsl + @"
 in vec3 vNormal;
 in vec2 vUv;
@@ -315,7 +313,7 @@ layout(location = 0, index = 1) out vec4 fragTrans;
 void main() {
   vec3 n = normalize(vNormal);
   if (uLit == 0) {
-    // sin día y noche: un halo que se ve de refilón
+    // without day and night: a halo seen at grazing angles
     vec3 viewDir = normalize(uCamPos - n * uAtmScale);
     float f = pow(1.0 - abs(dot(n, viewDir)), 3.0);
     frag = vec4(vec3(0.36, 0.60, 1.0) * f * 0.9, 1.0);
@@ -333,9 +331,9 @@ void main() {
   fragTrans = vec4(tr * clamp(1.0 - 1.6 * dot(col, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0), 1.0);
 }";
 
-        /* Las nubes vistas desde fuera: el mapa del mod de nubes sobre una esfera a la altura
-           de la capa, con la misma luz que en el cielo y la bruma del aire que queda entre
-           la cámara y la nube. */
+        /* Clouds seen from outside: the cloud mod's map on a sphere at the layer's height, with
+           the same lighting as in the sky and the haze of the air left between the camera and
+           the cloud. */
         const string CloudFS = Header + AtmosphereGlsl + NubesGlsl + @"
 in vec2 vUv;
 in vec3 vDir;
@@ -353,7 +351,7 @@ void main() {
   if (a < 0.002) discard;
   if (uLit == 0) { frag = vec4(nube.rgb, a); return; }
   vec3 nc = normalize(vDir);
-  // la luz a la altura real de la capa, aunque se dibuje más alta con el relieve exagerado
+  // the light at the layer's real height, even if it's drawn higher with exaggerated relief
   vec3 luz = uSunI * sunTransmittance(nc * uCloudR, uLightDir) * max(dot(nc, uLightDir), 0.0) * 0.55
            + uSunI * vec3(0.05, 0.07, 0.12) * 0.5;
   vec3 col = nube.rgb * luz / PI;
@@ -370,11 +368,10 @@ void main() {
   frag = vec4(toneMap(col), a);
 }";
 
-        /* Dirección unitaria + radio por separado: el shader puede levantar la línea
-           sobre el relieve y girar los anillos sin renormalizar nada. En la vista del
-           cielo no hay búfer de profundidad que valga (el suelo está a metros y las
-           órbitas a miles de kilómetros), así que el planeta tapa las líneas con un
-           corte de rayo por vértice. */
+        /* Unit direction + radius kept separate: the shader can lift the line above the relief
+           and rotate the rings without renormalizing anything. In the sky view there's no
+           usable depth buffer (the ground is meters away and orbits thousands of kilometers),
+           so the planet hides the lines with a per-vertex ray cut. */
         const string LineVS = @"#version 330 core
 in vec3 aDir;
 in float aRad;
@@ -392,8 +389,8 @@ void main() {
     float lum = dot(texture(uHeight, vec2(fract(aUv.x + uHeightOff), aUv.y)).rgb, vec3(0.2126, 0.7152, 0.0722));
     r += ((uHMin + lum * (uHMax - uHMin)) / uRadius) * uRelief;
   }
-  /* Resta uLonShift a la longitud: lo que ha girado Kerbin desde que se
-     construyeron los anillos, un giro alrededor del eje norte (Y). */
+  /* Subtracts uLonShift from the longitude: how much Kerbin has rotated since the rings were
+     built, a rotation around the north axis (Y). */
   float c = cos(uLonShift), s = sin(uLonShift);
   vec3 d = vec3(aDir.x * c - aDir.z * s, aDir.y, aDir.x * s + aDir.z * c);
   vec3 p = d * r;
@@ -422,7 +419,7 @@ void main() {
   frag = uLineColor;
 }";
 
-        /* Convenio del visor: u = (lon+180)/360, v = (90-lat)/180. */
+        /* Viewer convention: u = (lon+180)/360, v = (90-lat)/180. */
         public static double[] Sph(double lat, double lon, double r)
         {
             double a = lat * D2R, b = lon * D2R, ca = Math.Cos(a);
@@ -437,7 +434,7 @@ void main() {
             new[] { a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0] };
         static double[] Norm(double[] a) { double l = Len(a); return l > 0 ? Scale(a, 1 / l) : new double[] { 0, 1, 0 }; }
 
-        /* Ejes locales en un punto: arriba (radial), este y norte. */
+        /* Local axes at a point: up (radial), east and north. */
         static void LocalBasis(double[] p, out double[] up, out double[] east, out double[] north)
         {
             up = Norm(p);
@@ -459,9 +456,9 @@ void main() {
             var uv = new float[(cols + 1) * (rows + 1) * 2];
             var idx = new uint[cols * rows * 6];
             int pi = 0, ui = 0, ii = 0;
-            /* La columna de la costura se duplica (u=0 y u=1): si se cosen los vértices,
-               la u va de 1 a 0 dentro de un triángulo y sale una franja con toda la
-               textura comprimida. */
+            /* The seam column is duplicated (u=0 and u=1): if the vertices were stitched, u
+               would go from 1 to 0 inside a triangle and a strip with the whole texture
+               squeezed in would appear. */
             for (int y = 0; y <= rows; y++)
             {
                 double v = (double)y / rows, lat = 90 - v * 180;
@@ -523,8 +520,8 @@ void main() {
             lb.N = n;
         }
 
-        /* Traza orbital: la huella en el suelo y el camino a su altitud real, las dos en
-           el marco fijo al cuerpo. */
+        /* Orbital track: the ground footprint and the path at its real altitude, both in the
+           body-fixed frame. */
         public void SetTrack(IReadOnlyList<TrackPoint> points, bool space = true)
         {
             if (points == null || points.Count < 2) { trackG.N = 0; trackS.N = 0; return; }
@@ -548,9 +545,9 @@ void main() {
             trackSpace = space;
         }
 
-        /* Anillos de varias naves. Una órbita kepleriana es una elipse fija en el
-           espacio y lo que gira es Kerbin debajo: se construyen una vez y en cada
-           fotograma solo se giran en el shader. */
+        /* Rings for several vessels. A Keplerian orbit is an ellipse fixed in space and what
+           rotates is Kerbin underneath: they're built once and each frame they're only rotated
+           in the shader. */
         public void SetOrbits(List<OrbitRing> list)
         {
             orbitSegs.Clear();
@@ -575,7 +572,7 @@ void main() {
             Fill(orbits, data, total);
         }
 
-        /* Las rutas del planificador (aire, mar y tierra), pegadas al suelo con su relieve. */
+        /* The planner's routes (air, sea and land), stuck to the ground with its relief. */
         public void SetRutas(List<(IReadOnlyList<LatLon> Pts, ColorF Color)> list)
         {
             rutaSegs.Clear();
@@ -605,8 +602,8 @@ void main() {
         public void SetOrbitShift(double deg) => orbitShift = (((deg % 360) + 360) % 360) * D2R;
         public double OrbitShiftRad => orbitShift;
 
-        /* Tamaño de la escena: la órbita más lejana. Fija hasta dónde deja alejarse la
-           rueda y los planos de recorte. */
+        /* Scene size: the farthest orbit. It sets how far the wheel lets you pull back and the
+           clipping planes. */
         public void SetScene(double maxRadius)
         {
             SceneR = Math.Max(1.2, maxRadius);
@@ -620,9 +617,9 @@ void main() {
             if (CamDist < MinDist) CamDist = Math.Min(MinDist, MaxDist);
         }
 
-        /* Latitud y longitud bajo la cámara, sea cual sea el modo. */
-        /* Dónde está el ojo, sea cual sea el modo: latitud, longitud y altura sobre el
-           terreno en metros. */
+        /* Latitude and longitude under the camera, whatever the mode. */
+        /* Where the eye is, whatever the mode: latitude, longitude and height above the terrain
+           in meters. */
         public (double Lat, double Lon, double Agl) EyeGround()
         {
             var e = CurrentCam().Eye;
@@ -634,7 +631,7 @@ void main() {
 
         public LatLon Center()
         {
-            // la vista del planeta mira a (CamLat, CamLon); inclinada, el ojo no está encima
+            // the planet view looks at (CamLat, CamLon); tilted, the eye isn't directly above
             if (Mode == CamMode.Planet && !transActive) return new LatLon(CamLat, Geo.WrapLon(CamLon));
             var e = CurrentCam().Eye;
             double l = Len(e);
@@ -650,7 +647,7 @@ void main() {
             if (dist > 0) CamDist = Math.Clamp(dist, MinDist, MaxDist);
         }
 
-        /* ------------------------------------------------------------ cámara */
+        /* ------------------------------------------------------------ camera */
 
         Cam TargetCam()
         {
@@ -682,9 +679,9 @@ void main() {
                 }
                 default:
                 {
-                    /* Se mira al punto (CamLat, CamLon) del terreno desde CamDist. Desde lejos,
-                       en vertical, como siempre; al bajar la cámara se va inclinando hacia el
-                       horizonte, en el rumbo elegido, como en un globo terráqueo digital. */
+                    /* It looks at the terrain point (CamLat, CamLon) from CamDist. From afar,
+                       straight down, as always; as the camera goes down it tilts toward the
+                       horizon, in the chosen heading, like a digital globe. */
                     double suelo = SueloR(CamLat, CamLon);
                     var up = Sph(CamLat, CamLon, 1);
                     double rango = Math.Max(CamDist - 1 - suelo, 1e-7);
@@ -705,11 +702,11 @@ void main() {
             return t * t * (3 - 2 * t);
         }
 
-        /* Altura del terreno en radios (0 en el mar). */
+        /* Terrain height in radii (0 at sea). */
         double SueloR(double lat, double lon) => Math.Max(0, GroundAt?.Invoke(lat, lon) ?? 0) / Body.Radius;
 
-        /* Inclinación de la cámara del planeta según la distancia al suelo: vertical por
-           encima de 120 km, 70° a menos de 1,5 km, y en medio suave, en escala logarítmica. */
+        /* Tilt of the planet camera according to the distance to the ground: vertical above 120
+           km, 70° below 1.5 km, and smooth in between, on a logarithmic scale. */
         static double Inclinacion(double rangoM)
         {
             double k = Math.Clamp((Math.Log(Math.Max(rangoM, 1)) - Math.Log(1500)) / (Math.Log(120000) - Math.Log(1500)), 0, 1);
@@ -717,15 +714,15 @@ void main() {
             return 70 * (1 - k);
         }
 
-        /* La vista del planeta está tan cerca que se pinta con el suelo del vuelo. */
+        /* The planet view is so close that it's painted with the flight ground. */
         public bool PlanetaCerca => Mode == CamMode.Planet && Len(CurrentCam().Eye) < RadioCerca;
 
-        /* Girar el rumbo de la vista del planeta (solo se nota con la cámara inclinada). */
+        /* Rotate the planet view's heading (only noticeable with the camera tilted). */
         public void GirarRumbo(double grados) => CamHeading = ((CamHeading + grados) % 360 + 360) % 360;
 
-        /* La cámara de este instante: la del modo, o una mezcla si hay transición. El
-           ojo se interpola por la esfera (dirección y radio por separado) para que no
-           atraviese el planeta al pasar de un lado a otro. */
+        /* The camera at this moment: the mode's, or a blend if there's a transition. The eye is
+           interpolated over the sphere (direction and radius separately) so it doesn't go
+           through the planet when moving from one side to the other. */
         Cam CurrentCam()
         {
             var c = TargetCam();
@@ -769,8 +766,8 @@ void main() {
             Mode = m;
         }
 
-        /* Pasa el foco a un punto (una nave): la cámara conserva el lado desde el que
-           se estaba mirando y se acerca girando a su alrededor. */
+        /* Moves the focus to a point (a vessel): the camera keeps the side it was looking from
+           and closes in rotating around it. */
         public void EnterFocus(double[] target)
         {
             FocusTarget = target;
@@ -785,15 +782,15 @@ void main() {
                 double el = Math.Asin(Math.Clamp(Dot(o, up), -1, 1));
                 var h = Add(Scale(up, Math.Sin(el)), o, -1);          // -cos(el)·rumbo
                 FocusAz = Math.Atan2(Dot(h, east), Dot(h, north)) * R2D;
-                // bastante de lado y a buena distancia: que se vea la nave contra el horizonte
+                // well off to the side and at a good distance: so the vessel shows against the horizon
                 FocusEl = Math.Clamp(el * R2D, 10, 40);
                 FocusDist = Math.Clamp(len * 0.3, 0.04, 1.0);
             }
             SetMode(CamMode.Focus);
         }
 
-        /* Se acerca de golpe (con transición) a una distancia en la que la nave enfocada
-           llena buena parte de la pantalla. */
+        /* Zooms in at once (with a transition) to a distance at which the focused vessel fills
+           a good part of the screen. */
         public bool ZoomToFocusModel()
         {
             if (Mode != CamMode.Focus || FocusModel == null) return false;
@@ -802,7 +799,7 @@ void main() {
             return true;
         }
 
-        /* Devuelve el foco al centro del planeta, desde donde estaba la cámara. */
+        /* Returns the focus to the planet's center, from wherever the camera was. */
         public void ExitFocus()
         {
             if (Mode != CamMode.Focus) return;
@@ -825,7 +822,7 @@ void main() {
             SetMode(CamMode.Planet);
         }
 
-        /* ------------------------------------------------------------ interacción */
+        /* ------------------------------------------------------------ interaction */
 
         double dragX, dragY, dragA, dragB;
         bool dragMoved;
@@ -844,7 +841,7 @@ void main() {
             }
         }
 
-        /* Devuelve true la primera vez que el arrastre pasa de 3 px. */
+        /* Returns true the first time the drag goes past 3 px. */
         public bool Drag(double x, double y)
         {
             if (!Dragging) return false;
@@ -856,13 +853,13 @@ void main() {
             switch (Mode)
             {
                 case CamMode.Focus:
-                    // como en la vista del planeta, lo agarrado acompaña al cursor
+                    // as in the planet view, what's grabbed follows the cursor
                     FocusAz = dragA + dx / S * 0.35;
                     FocusEl = Math.Clamp(dragB + dy / S * 0.35, -80, 85);
                     break;
                 case CamMode.Sky:
                 {
-                    // el cielo agarrado acompaña al cursor
+                    // the grabbed sky follows the cursor
                     double degPerPx = SkyFov / Math.Max(1, H);
                     SkyAz = ((dragA - dx * degPerPx) % 360 + 360) % 360;
                     SkyEl = Math.Clamp(dragB + dy * degPerPx, -89, 89);
@@ -870,7 +867,7 @@ void main() {
                 }
                 case CamMode.Free:
                 {
-                    // mirar alrededor volando: igual que en el cielo
+                    // looking around while flying: same as in the sky
                     double degPerPx = SkyFov / Math.Max(1, H);
                     FreeAz = ((dragA - dx * degPerPx) % 360 + 360) % 360;
                     FreeEl = Math.Clamp(dragB + dy * degPerPx, -89, 89);
@@ -878,9 +875,9 @@ void main() {
                 }
                 default:
                 {
-                    /* El terreno agarrado acompaña al cursor. Con rumbo 0 el este cae a la
-                       derecha, así que arrastrar a la derecha baja la longitud; con otro
-                       rumbo, lo mismo girado. */
+                    /* The grabbed terrain follows the cursor. With heading 0 east is to the
+                       right, so dragging right lowers the longitude; with another heading, the
+                       same thing rotated. */
                     double ax = Arc(dx), ay = Arc(dy), h = CamHeading * D2R;
                     CamLat = Math.Clamp(dragA + ay * Math.Cos(h) + ax * Math.Sin(h), -89.9, 89.9);
                     CamLon = dragB + ay * Math.Sin(h) - ax * Math.Cos(h);
@@ -897,26 +894,27 @@ void main() {
             return moved;
         }
 
-        /* `notches` positivo acerca, como la rueda de Windows. */
+        /* positive `notches` zooms in, like the Windows wheel. */
         public void Wheel(double notches)
         {
             switch (Mode)
             {
                 case CamMode.Focus:
-                    // de cientos de kilómetros a unos metros: cada muesca tiene que avanzar bastante
+                    // from hundreds of kilometers to a few meters: each notch has to cover a lot
                     FocusDist = Math.Clamp(FocusDist * Math.Exp(-notches * 0.25), FocusMinDist, MaxDist);
                     break;
                 case CamMode.Sky:
                     SkyFov = Math.Clamp(SkyFov * Math.Exp(-notches * 0.1), 3, 110);
                     break;
                 case CamMode.Free:
-                    // volando, la rueda es el acelerador
+                    // when flying, the wheel is the throttle
                     FreeSpeedStep((int)Math.Round(notches));
                     break;
                 default:
                 {
-                    /* Lo que se acerca es la distancia al suelo, no al centro: así se baja
-                       de la órbita al terreno con el mismo gesto, cada muesca un 22 %. */
+                    /* What gets closer is the distance to the ground, not to the center: that
+                       way you go from orbit down to the terrain with the same gesture, each
+                       notch 22%. */
                     double suelo = SueloR(CamLat, CamLon);
                     double rango = Math.Max(CamDist - 1 - suelo, RangoMinimoM / Body.Radius);
                     rango = Math.Max(rango * Math.Exp(-notches * 0.25), RangoMinimoM / Body.Radius);
@@ -926,9 +924,9 @@ void main() {
             }
         }
 
-        /* Arco de superficie, en grados, que corresponde a arrastrar `px` píxeles desde
-           el centro. Con la cámara a distancia d y el punto a un ángulo α del eje de
-           vista, θ = asin(d · sen α) − α: el punto agarrado sigue al cursor. */
+        /* Surface arc, in degrees, corresponding to dragging `px` pixels from the center. With
+           the camera at distance d and the point at an angle α from the view axis, θ = asin(d ·
+           sin α) − α: the grabbed point follows the cursor. */
         double Arc(double px)
         {
             double h = Math.Max(1, H);
@@ -947,14 +945,14 @@ void main() {
             return sgn * (Conv(aMax) + (ang - aMax) * slope) * R2D;
         }
 
-        /* Dirección del rayo que sale de la cámara por un píxel. */
+        /* Direction of the ray leaving the camera through a pixel. */
         double[] RayDir(double px, double py)
         {
             double x = (px / W) * 2 - 1;
             double y = 1 - (py / H) * 2;
             double t = Math.Tan(fovL * D2R / 2), aspect = (double)W / H;
-            /* Derecha de pantalla = adelante × arriba. Con (arriba × adelante) el vector
-               sale cambiado de signo y el picking queda espejado respecto al dibujo. */
+            /* Screen right = forward × up. With (up × forward) the vector comes out with the
+               opposite sign and picking ends up mirrored relative to the drawing. */
             var fx = Cross(fwdL, upL);
             fx = Len(fx) < 1e-9 ? new double[] { 1, 0, 0 } : Norm(fx);
             var fy = Cross(fx, fwdL);
@@ -966,7 +964,7 @@ void main() {
             });
         }
 
-        /* Rayo desde la cámara por el píxel -> primer corte con la esfera. */
+        /* Ray from the camera through the pixel -> first hit with the sphere. */
         public LatLon? Pick(double px, double py)
         {
             var d = RayDir(px, py);
@@ -981,7 +979,7 @@ void main() {
             return new LatLon(Math.Asin(Math.Clamp(q[1], -1, 1)) * R2D, Geo.WrapLon(Math.Atan2(q[0], q[2]) * R2D));
         }
 
-        /* El pin más cercano al cursor, con preferencia por las naves. */
+        /* The pin closest to the cursor, with preference for vessels. */
         public GlobePin HitPin(double x, double y)
         {
             GlobePin best = null;
@@ -991,13 +989,13 @@ void main() {
                 if (!p.OnScreen || p.Hidden) continue;
                 double d = Math.Sqrt((p.Sx - x) * (p.Sx - x) + (p.Sy - y) * (p.Sy - y));
                 if (d > r) continue;
-                if (p.Vessel) d -= r;                 // a igual distancia, gana la nave
+                if (p.Vessel) d -= r;                 // at equal distance, the vessel wins
                 if (d < bestD) { bestD = d; best = p; }
             }
             return best;
         }
 
-        /* Proyecta un punto del espacio a pantalla; false si queda detrás de la cámara. */
+        /* Projects a point in space to the screen; false if it's behind the camera. */
         public bool ToScreen(double[] p, out double sx, out double sy)
         {
             double ex = view[0] * p[0] + view[4] * p[1] + view[8] * p[2] + view[12];
@@ -1023,8 +1021,8 @@ void main() {
             fovL = cam.Fov;
         }
 
-        /* Capa de nubes del globo: encima del suelo y de las líneas que quedan por debajo,
-           sin escribir profundidad para que la atmósfera y las órbitas sigan viéndose. */
+        /* The globe's cloud layer: over the ground and the lines below it, without writing
+           depth so the atmosphere and the orbits stay visible. */
         void DrawGlobeClouds(double[] eye, double[] lightDir)
         {
             if (!GlobeClouds || CloudTex == null || CloudAmount <= 0) return;
@@ -1047,7 +1045,7 @@ void main() {
             GL.BindVertexArray(vao);
             GL.Enable(GL.BLEND);
             GL.BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
-            GL.CullFace(Len(eye) > scale ? GL.BACK : GL.FRONT);  // por debajo de la capa se ve su cara interior
+            GL.CullFace(Len(eye) > scale ? GL.BACK : GL.FRONT);  // below the layer you see its inner face
             GL.DepthMask(false);
             GL.DrawElements(GL.TRIANGLES, count, GL.UNSIGNED_INT, 0);
             GL.DepthMask(true);
@@ -1059,9 +1057,9 @@ void main() {
         {
             Init();
             var cam = CurrentCam();
-            /* Cerca de la superficie el búfer de profundidad no da para distinguir el
-               suelo a metros de una órbita a cientos de kilómetros: ahí se usa el
-               trazado de rayos de la vista del cielo, también a mitad de transición. */
+            /* Near the surface the depth buffer isn't enough to tell ground meters away from an
+               orbit hundreds of kilometers away: there the sky view's ray tracing is used, also
+               midway through a transition. */
             if (Mode == CamMode.Sky || Mode == CamMode.Free || ((Mode == CamMode.Planet || transActive) && Len(cam.Eye) < RadioCerca))
             {
                 RenderSky(batch, tc, cam);
@@ -1072,9 +1070,9 @@ void main() {
             GL.ClearColor(0.004f, 0.006f, 0.010f, 1);
             GL.Clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
-            /* Planos de recorte según la distancia: con el cercano fijo y la cámara a
-               cientos de radios, la profundidad se queda sin precisión; y al lado de una
-               nave hace falta un plano cercano de pocos metros. */
+            /* Clipping planes according to distance: with a fixed near plane and the camera
+               hundreds of radii away, depth runs out of precision; and next to a vessel a near
+               plane of a few meters is needed. */
             double h = Math.Max(1e-5, Len(cam.Eye) - 1);
             double toTarget = Len(Add(cam.Target, cam.Eye, -1));
             double near = Math.Max(2e-5, Math.Min(h * 0.5, toTarget * 0.004));
@@ -1114,7 +1112,7 @@ void main() {
             prog.Vec3("uLightDir", lightDir[0], lightDir[1], lightDir[2]);
             prog.Int("uLit", Light ? 1 : 0);
             prog.Int("uHasHeight", HeightTex != null ? 1 : 0);
-            // el relieve por píxel se exagera como la malla, con un mínimo para que se note sin ella
+            // per-pixel relief is exaggerated like the mesh, with a minimum so it shows without it
             prog.Float("uBump", Math.Max(Relief, 4));
             prog.Vec3("uCamPos", eye[0], eye[1], eye[2]);
             AtmosUniforms(prog, 16);
@@ -1146,8 +1144,8 @@ void main() {
                 AtmosUniforms(atmProg, 16);
                 GL.BindVertexArray(vao);
                 GL.Enable(GL.BLEND);
-                GL.BlendFunc(GL.ONE, GL.SRC1_COLOR);     // luz dispersa sumada, fondo atenuado
-                GL.CullFace(Len(eye) > scale ? GL.FRONT : GL.BACK);  // dentro de la atmósfera, la cara que se ve es la interior
+                GL.BlendFunc(GL.ONE, GL.SRC1_COLOR);     // scattered light added, background attenuated
+                GL.CullFace(Len(eye) > scale ? GL.FRONT : GL.BACK);  // inside the atmosphere, the visible face is the inner one
                 GL.DepthMask(false);
                 GL.DrawElements(GL.TRIANGLES, count, GL.UNSIGNED_INT, 0);
                 GL.DepthMask(true);
@@ -1159,11 +1157,11 @@ void main() {
             GL.Disable(GL.CULL_FACE);
             GL.Disable(GL.DEPTH_TEST);
 
-            // las lunas, los planetas y el Sol, en su sitio (ver GlobeView.Cuerpos.cs)
+            // the moons, the planets and the Sun, in their place (see GlobeView.Cuerpos.cs)
             DrawCuerpos(eye);
 
-            /* La nave enfocada con su modelo, cuando la cámara está lo bastante cerca como
-               para que ocupe algo más que un punto. */
+            /* The focused vessel with its model, when the camera is close enough for it to be
+               more than a dot. */
             modelPixels = 0;
             if (Mode == CamMode.Focus && FocusModel != null && FocusModel.Items.Count > 0)
             {
@@ -1221,7 +1219,7 @@ void main() {
             GL.Enable(GL.PROGRAM_POINT_SIZE);
             lineProg.Float("uLonShift", 0);
 
-            // camino a su altitud, más tenue (las naves no lo usan: tienen su anillo)
+            // path at its altitude, fainter (vessels don't use it: they have their ring)
             if (trackSpace)
             {
                 GL.BindVertexArray(trackS.Vao);
@@ -1231,10 +1229,10 @@ void main() {
                 GL.DrawArrays(GL.LINE_STRIP, 0, trackS.N);
             }
 
-            /* La huella se levanta un pelo: la esfera es un poliedro inscrito y entre
-               vértices queda por debajo de r=1, así que una línea pegada se hunde. Desde
-               el suelo no se pinta: ese kilómetro de más la haría cruzar el cielo justo
-               por encima del observador. */
+            /* The footprint is lifted a hair: the sphere is an inscribed polyhedron and between
+               vertices it's below r=1, so a line lying on it sinks. From the ground it isn't
+               painted: that extra kilometer would make it cross the sky right above the
+               observer. */
             if (ground)
             {
                 GL.BindVertexArray(trackG.Vao);
@@ -1243,7 +1241,7 @@ void main() {
                 lineProg.Vec4("uLineColor", 0.82, 0.55, 1.0, 0.95);
                 GL.DrawArrays(GL.LINE_STRIP, 0, trackG.N);
 
-                // periapsis o instante inicial: primer punto de la serie
+                // periapsis or starting time: first point of the series
                 lineProg.Vec4("uLineColor", 1, 1, 1, 1);
                 GL.DrawArrays(GL.POINTS, 0, 1);
             }
@@ -1282,7 +1280,7 @@ void main() {
             GL.BindVertexArray(orbits.Vao);
             GL.Enable(GL.BLEND);
             GL.BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
-            GL.DepthMask(false);        // translúcidas: que no se tapen unas a otras
+            GL.DepthMask(false);        // translucent: so they don't hide each other
             foreach (var g in orbitSegs)
             {
                 lineProg.Vec4("uLineColor", g.c.R, g.c.G, g.c.B, g.c.A);
@@ -1293,8 +1291,8 @@ void main() {
             GL.BindVertexArray(0);
         }
 
-        /* ¿Tapa el planeta el segmento cámara -> punto? Para un satélite no basta el
-           test del horizonte: puede verse con su vertical tras el limbo. */
+        /* Does the planet block the camera -> point segment? For a satellite the horizon test
+           isn't enough: it can be visible with its vertical behind the limb. */
         static bool TapadoPorPlaneta(double[] p, double[] eye)
         {
             double dx = p[0] - eye[0], dy = p[1] - eye[1], dz = p[2] - eye[2];
@@ -1320,7 +1318,7 @@ void main() {
             {
                 m.OnScreen = false;
                 if (m.Hidden || (vesselsOnly && !m.Vessel)) continue;
-                // con el modelo ya a la vista, el rombo de la nave enfocada sobra
+                // with the model already in view, the focused vessel's diamond is redundant
                 if (modelPixels > 12 && FocusTag != null && m.Tag == FocusTag) continue;
                 double r = m.R > 0 ? m.R : 1;
                 var p = Sph(m.Lat, m.Lon, r);
@@ -1329,7 +1327,7 @@ void main() {
                 {
                     double dot = Dot(p, eye) / (camLen * r);
                     if (dot <= horizon) continue;
-                    visible = Math.Min(1, (dot - horizon) / 0.12);   // se desvanecen junto al limbo
+                    visible = Math.Min(1, (dot - horizon) / 0.12);   // they fade out near the limb
                 }
                 else
                 {
@@ -1354,8 +1352,8 @@ void main() {
                     b.Circle(sx, sy, 3 * S, m.Color.WithAlpha(a));
                 }
 
-                /* De lejos varios sitios caen en un puñado de píxeles y los rótulos se
-                   pisan. El punto se queda siempre; el nombre, el primero que llega. */
+                /* From afar several sites fall within a handful of pixels and the labels
+                   overlap. The dot always stays; the name, first come first served. */
                 bool choca = false;
                 foreach (var c in colocados)
                     if (Math.Abs(c.x - sx) < 110 * S && Math.Abs(c.y - sy) < 15 * S) { choca = true; break; }

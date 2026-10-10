@@ -9,24 +9,24 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.Core
 {
-    /* Órbita de un cuerpo alrededor de su padre, con los elementos tal como los escribe KSP. */
+    /* Orbit of a body around its parent, with the elements as KSP writes them. */
     public sealed class BodyOrbit
     {
         public string Parent;
         public double Sma, Ecc, Inc, Lan, ArgPe;           // m, -, °, °, °
-        public double Mna, Epoch;                          // rad en la época, s
+        public double Mna, Epoch;                          // rad at the epoch, s
         public BodyOrbit Clone() => (BodyOrbit)MemberwiseClone();
     }
 
-    /* Un cuerpo celeste. */
+    /* A celestial body. */
     public sealed class BodyDef
     {
         public string Name, DisplayName, Source = "stock";
         public double Radius, Mu, RotationPeriod, InitialRotation, Atmosphere, Soi;
         public bool TidallyLocked, Ocean, IsHome;
-        public BodyOrbit Orbit;                            // null en la estrella
-        public float[] Tint = { 0.45f, 0.45f, 0.45f };     // color del globo cuando no hay mapa
-        public double[] AirColor;                          // Rayleigh al nivel del suelo (1/m ×1e6); null si el aire no se ve
+        public BodyOrbit Orbit;                            // null for the star
+        public float[] Tint = { 0.45f, 0.45f, 0.45f };     // globe color when there's no map
+        public double[] AirColor;                          // Rayleigh at ground level (1/m ×1e6); null if the air isn't visible
         public double AirDensity = 1;
         public readonly List<(string Name, string Color)> Biomes = new();
         public bool SoiGiven;
@@ -45,11 +45,11 @@ namespace KerbinMaps.Core
             }
         }
 
-        /* Un cuerpo en rotación síncrona tarda en girar lo mismo que en dar la vuelta. */
+        /* A body in synchronous rotation takes as long to spin as to go around. */
         public double SiderealDay => TidallyLocked && Orbit != null ? OrbitalPeriod : RotationPeriod;
 
-        /* El día solar: la rotación respecto al Sol, que va cambiando de sitio a lo largo del año
-           del planeta (para una luna, el año es el de su planeta). */
+        /* The solar day: the rotation relative to the Sun, which keeps changing place over the
+           planet's year (for a moon, the year is its planet's). */
         public double SolarDay
         {
             get
@@ -66,7 +66,7 @@ namespace KerbinMaps.Core
         public BodyDef Clone(string name)
         {
             var c = (BodyDef)MemberwiseClone();
-            // MemberwiseClone comparte las listas: se rehacen las que se modifican
+            // MemberwiseClone shares the lists: the ones that get modified are rebuilt
             typeof(BodyDef).GetField(nameof(Biomes))!.SetValue(c, new List<(string, string)>(Biomes));
             c.Name = name;
             c.Orbit = Orbit?.Clone();
@@ -76,16 +76,16 @@ namespace KerbinMaps.Core
         }
     }
 
-    /* Los cuerpos del sistema: los de KSP de serie y, si la instalación usa Kopernicus (RSS,
-       SOL, OPM...), los que declare su configuración, heredando de la plantilla de serie
-       que nombren. */
+    /* The bodies of the system: stock KSP's and, if the installation uses Kopernicus (RSS, SOL,
+       OPM...), those its configuration declares, inheriting from whatever stock template they
+       name. */
     public static class SolarSystem
     {
         static List<BodyDef> bodies = Stock();
         static readonly List<BodyDef> stock = Stock();
 
         public static IReadOnlyList<BodyDef> Bodies => bodies;
-        public static string LoadedFrom { get; private set; }         // null: sistema de serie
+        public static string LoadedFrom { get; private set; }         // null: stock system
 
         public static BodyDef Find(string name)
         {
@@ -98,8 +98,8 @@ namespace KerbinMaps.Core
         public static BodyDef Home => bodies.FirstOrDefault(b => b.IsHome) ?? Find("Kerbin") ?? bodies[0];
         public static BodyDef Star => bodies.FirstOrDefault(b => b.IsStar) ?? bodies[0];
 
-        /* Los cuerpos en orden de árbol (estrella, planetas por distancia, cada uno con sus
-           lunas), con su profundidad para sangrar la lista. */
+        /* The bodies in tree order (star, planets by distance, each one with its moons), with
+           their depth for indenting the list. */
         public static IEnumerable<(BodyDef Body, int Depth)> Tree()
         {
             IEnumerable<(BodyDef, int)> Walk(BodyDef b, int depth)
@@ -113,8 +113,8 @@ namespace KerbinMaps.Core
                 foreach (var x in Walk(r, 0)) yield return x;
         }
 
-        /* Posición del cuerpo respecto a la estrella, en metros y en el marco inercial de las
-           órbitas, sumando la cadena de padres. */
+        /* Position of the body relative to the star, in meters and in the orbits' inertial
+           frame, adding up the chain of parents. */
         public static double[] PositionAt(BodyDef b, double ut)
         {
             var p = new double[3];
@@ -130,7 +130,7 @@ namespace KerbinMaps.Core
             return p;
         }
 
-        /* ---------------------------------------------------------------- de serie */
+        /* ---------------------------------------------------------------- stock */
 
         static BodyDef B(string name, string display, double radius, double mu, double rot, double initRot, double atm, double soi,
                          string parent, double sma, double ecc, double inc, double lan, double argPe, double mna,
@@ -144,8 +144,8 @@ namespace KerbinMaps.Core
             };
         }
 
-        /* Valores de KSP 1.12 de serie (los de la wiki del juego). La rotación inicial solo
-           importa sin naves con las que medirla. */
+        /* Stock KSP 1.12 values (the ones from the game's wiki). The initial rotation only
+           matters without vessels to measure it with. */
         static List<BodyDef> Stock()
         {
             var inf = double.PositiveInfinity;
@@ -169,7 +169,7 @@ namespace KerbinMaps.Core
                 B("Pol", null, 44000, 7.2170208e8, 901902.62, 0, 0, 1042138.9, "Jool", 179890000, 0.171, 4.25, 2, 15, 0.9, 0.74f, 0.70f, 0.50f),
                 B("Eeloo", null, 210000, 7.4410815e10, 19460, 0, 0, 1.1908294e8, "Sun", 90118820000, 0.26, 6.15, 50, 260, 3.14, 0.80f, 0.80f, 0.78f)
             };
-            // aire: tono de Rayleigh y densidad relativa a Kerbin
+            // air: Rayleigh tint and density relative to Kerbin
             void Air(string n, double r, double g, double b, double dens, bool ocean = false)
             {
                 var x = list.First(y => y.Name == n);
@@ -197,14 +197,14 @@ namespace KerbinMaps.Core
 
         static string Clean(string s)
         {
-            if (string.IsNullOrWhiteSpace(s) || s.StartsWith("#")) return null;      // claves de localización: se usa el nombre interno
+            if (string.IsNullOrWhiteSpace(s) || s.StartsWith("#")) return null;      // localization keys: the internal name is used
             int caret = s.IndexOf('^');
             return (caret >= 0 ? s.Substring(0, caret) : s).Trim();
         }
 
-        /* Lee el sistema de la caché de ModuleManager (ya con todos los parches de los packs).
-           Devuelve cuántos cuerpos hay; 0 si la instalación no usa Kopernicus, y entonces se
-           queda el sistema de serie. */
+        /* Reads the system from the ModuleManager cache (with all the packs' patches already
+           applied). Returns how many bodies there are; 0 if the installation doesn't use
+           Kopernicus, and then the stock system stays. */
         public static int LoadKopernicus(string gameData)
         {
             try
@@ -269,7 +269,7 @@ namespace KerbinMaps.Core
                         else if (Num(or.Get("meanAnomalyAtEpochD"), out double mnaD)) b.Orbit.Mna = mnaD * Math.PI / 180;
                         if (Num(or.Get("epoch"), out double ep)) b.Orbit.Epoch = ep;
                         if (changed) b.SoiGiven = false;
-                        // un cuerpo nuevo (no la plantilla misma) se pinta con el color de su órbita
+                        // a new body (not the template itself) is painted with its orbit color
                         var col = ParseColor(or.Get("color"));
                         if (col != null && (baseDef == null || name != baseDef.Name)) b.Tint = col;
                     }
@@ -284,8 +284,8 @@ namespace KerbinMaps.Core
                             b.AirColor ??= new[] { 5.802, 13.558, 33.1 };
                         }
                     }
-                    /* El aire de un cuerpo nuevo no es el de su plantilla (Sarnus no tiene el cielo
-                       verde de Jool): se tiñe con su color, que es lo que dispersa. */
+                    /* A new body's air isn't its template's (Sarnus doesn't have Jool's green sky):
+                       it's tinted with its color, which is what scatters. */
                     if (b.Atmosphere > 0 && (baseDef == null || name != baseDef.Name))
                     {
                         float mx = Math.Max(0.05f, b.Tint.Max());
@@ -295,10 +295,10 @@ namespace KerbinMaps.Core
                 }
                 if (loaded.Count == 0) return 0;
 
-                // la estrella se llama «Sun» dentro del juego aunque se muestre con otro nombre
+                // the star is called «Sun» inside the game even if it's shown with another name
                 bodies = loaded;
                 if (!bodies.Any(b => b.IsHome)) (Find("Kerbin") ?? bodies.FirstOrDefault(b => !b.IsStar))!.IsHome = true;
-                // esferas de influencia que no vienen dadas: la de Laplace
+                // spheres of influence that aren't given: the Laplace one
                 foreach (var b in bodies.Where(x => !x.SoiGiven && x.Orbit != null))
                 {
                     var p = b.Parent;
@@ -329,8 +329,8 @@ namespace KerbinMaps.Core
             return c;
         }
 
-        /* El nodo raíz «Kopernicus» de la caché, sin leer el resto del fichero (que son decenas
-           de megas de piezas). */
+        /* The cache's root «Kopernicus» node, without reading the rest of the file (which is
+           tens of megabytes of parts). */
         static ConfigNode ReadKopernicusNode(string cache)
         {
             var lines = new List<string>();

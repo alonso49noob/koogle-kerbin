@@ -4,17 +4,17 @@ using System.IO;
 
 namespace KerbinMaps.Ksp
 {
-    /* Texturas Crunch de Unity (formatos 28, DXT1 crunched, y 29, DXT5 crunched).
+    /* Unity Crunch textures (formats 28, DXT1 crunched, and 29, DXT5 crunched).
 
-       Crunch guarda una textura DXT como dos paletas (extremos y selectores de bloque) y,
-       por cada bloque, índices a esas paletas codificados con Huffman. Unity usa desde la
-       2017.3 su propia variante del formato: los bloques se agrupan de 2 en 2 con una
-       «referencia» que dice si el bloque trae extremos nuevos, repite los del de la
-       izquierda o los del de arriba, y los selectores se guardan como XOR con el anterior.
+       Crunch stores a DXT texture as two palettes (endpoints and block selectors) and, for each
+       block, Huffman-coded indices into those palettes. Since 2017.3 Unity uses its own variant
+       of the format: blocks are grouped 2 by 2 with a «reference» that says whether the block
+       brings new endpoints, repeats the left block's or the upper block's, and selectors are
+       stored XORed with the previous one.
 
-       Aquí se deshace eso hasta los bloques DXT de siempre, que van tal cual a la GPU. En
-       el juego es el formato de las máscaras del suelo del KSC (dónde va hierba y dónde
-       asfalto u hormigón en la pista, la rampa y los edificios). */
+       Here that's undone down to plain DXT blocks, which go to the GPU as is. In the game it's
+       the format of the KSC ground masks (where grass goes and where asphalt or concrete goes
+       on the runway, the pad and the buildings). */
     public static class Crunch
     {
         public sealed class Resultado
@@ -24,7 +24,7 @@ namespace KerbinMaps.Ksp
             public readonly List<(int W, int H, byte[] Bloques)> Niveles = new();
         }
 
-        /* Los niveles de mipmap de no más de `maxAncho` de ancho, ya en bloques DXT. */
+        /* The mipmap levels no wider than `maxAncho`, already as DXT blocks. */
         public static Resultado Decodificar(byte[] d, int maxAncho)
         {
             if (d.Length < 74 || d[0] != 'H' || d[1] != 'x') throw new InvalidDataException("no es un fichero crunch");
@@ -40,14 +40,14 @@ namespace KerbinMaps.Ksp
             int tamTablas = U(65, 2), ofsTablas = U(67, 3);
             if (tamDatos > d.Length) tamDatos = d.Length;
 
-            // las tablas de Huffman de los bloques
+            // the blocks' Huffman tables
             var t = new Bits(d, ofsTablas, tamTablas);
             var referencia = t.Modelo();
             Huffman extremoCol = null, selectorCol = null, extremoAlfa = null, selectorAlfa = null;
             if (colE.Num > 0) { extremoCol = t.Modelo(); selectorCol = t.Modelo(); }
             if (alfE.Num > 0) { extremoAlfa = t.Modelo(); selectorAlfa = t.Modelo(); }
 
-            // la paleta de extremos de color: deltas de R, G y B de los dos colores 565
+            // the color endpoint palette: R, G and B deltas of the two 565 colors
             var extremos = new uint[colE.Num];
             if (colE.Num > 0)
             {
@@ -66,8 +66,8 @@ namespace KerbinMaps.Ksp
                 }
             }
 
-            // la de selectores: XOR por grupos de 4 bits con el anterior, en orden lineal
-            // (0, 1/3, 2/3, 1), que se pasa al orden de DXT (0, 1, 1/3, 2/3)
+            // the selector palette: XOR in 4-bit groups with the previous one, in linear order
+            // (0, 1/3, 2/3, 1), converted to DXT order (0, 1, 1/3, 2/3)
             var selectores = new uint[colS.Num];
             if (colS.Num > 0)
             {
@@ -81,7 +81,7 @@ namespace KerbinMaps.Ksp
                 }
             }
 
-            // las de alfa (DXT5)
+            // the alpha ones (DXT5)
             var extremosAlfa = new ushort[alfE.Num];
             if (alfE.Num > 0)
             {
@@ -121,7 +121,7 @@ namespace KerbinMaps.Ksp
                 }
             }
 
-            // los niveles: cada uno se decodifica por su cuenta, así que los grandes se saltan
+            // the levels: each one decodes on its own, so the large ones are skipped
             for (int nivel = 0; nivel < niveles; nivel++)
             {
                 int w = Math.Max(1, r.Ancho >> nivel), h = Math.Max(1, r.Alto >> nivel);
@@ -149,8 +149,8 @@ namespace KerbinMaps.Ksp
             for (int y = 0; y < alto; y++)
                 for (int x = 0; x < ancho; x++)
                 {
-                    // cada 2×2 bloques, una referencia por bloque: 0 extremos nuevos, 1 los del
-                    // de la izquierda, 2 los del de arriba
+                    // every 2×2 blocks, one reference per block: 0 new endpoints, 1 those of the
+                    // left block, 2 those of the upper block
                     if ((y & 1) == 0 && (x & 1) == 0) grupo = c.Leer(referencia);
                     int re;
                     if ((y & 1) != 0) re = refAbajo[x];
@@ -202,8 +202,8 @@ namespace KerbinMaps.Ksp
             return o;
         }
 
-        /* Código de Huffman canónico: los símbolos, ordenados por longitud y luego por
-           número, reciben códigos consecutivos. */
+        /* Canonical Huffman code: the symbols, sorted by length and then by number, get
+           consecutive codes. */
         sealed class Huffman
         {
             readonly int[] primero = new int[18], indice = new int[18], cuantos = new int[18];
@@ -239,7 +239,7 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* Bits de más significativo a menos, como los escribe crunch. */
+        /* Bits from most to least significant, as crunch writes them. */
         sealed class Bits
         {
             readonly byte[] d;
@@ -274,8 +274,8 @@ namespace KerbinMaps.Ksp
 
             static readonly int[] probables = { 17, 18, 19, 20, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15, 16 };
 
-            /* Un modelo de Huffman tal como lo manda crunch: las longitudes de código,
-               comprimidas a su vez con otro Huffman y con series de ceros y repeticiones. */
+            /* A Huffman model as crunch sends it: the code lengths, themselves compressed with
+               another Huffman and with runs of zeros and repeats. */
             public Huffman Modelo()
             {
                 int total = (int)Bits_(14);

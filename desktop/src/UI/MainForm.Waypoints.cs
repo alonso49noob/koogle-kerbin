@@ -7,22 +7,21 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.UI
 {
-    /* Waypoints nativos: los que el juego enseña en el mapa y en el navball.
+    /* Native waypoints: the ones the game shows on the map and the navball.
 
-       KSP los guarda en la partida, dentro del escenario ScenarioCustomWaypoints, con
-       nombre, cuerpo, latitud, longitud y un identificador. El visor sabe escribirlos
-       ahí, así que un punto que marques aquí (o una anomalía que quieras visitar) sale
-       en el juego sin instalar ningún mod.
+       KSP stores them in the save, inside the ScenarioCustomWaypoints scenario, with name,
+       body, latitude, longitude and an identifier. The viewer knows how to write them there, so
+       a point you mark here (or an anomaly you want to visit) shows up in the game without
+       installing any mod.
 
-       Tocar la partida es cosa seria: siempre se hace copia de seguridad al lado, se
-       escribe en un fichero temporal y se sustituye al final, y hay que confirmar. Con
-       el juego abierto no sirve de nada: KSP tiene la partida en memoria y la sobrescribe
-       al guardar, así que se avisa. */
+       Touching the save is serious business: a backup is always made next to it, it's written
+       to a temp file and swapped in at the end, and it has to be confirmed. With the game open
+       it's useless: KSP has the save in memory and overwrites it when saving, so you're warned. */
     public sealed partial class MainForm
     {
         RichLabel wpInfo;
 
-        /* Los waypoints que el visor escribiría para lo que tengas marcado. */
+        /* The waypoints the viewer would write for whatever you have marked. */
         List<Waypoint> WaypointsDeMarcadores() =>
             MarkersAll().Select(m => new Waypoint { Name = m.Name, Body = Body.Name, Lat = m.Lat, Lon = m.Lon, Mine = true }).ToList();
 
@@ -60,7 +59,7 @@ namespace KerbinMaps.UI
                 await File.WriteAllTextAsync(tmp, nuevo);
                 File.Move(tmp, destino, true);
 
-                // para que el panel enseñe ya lo que hay en la partida
+                // so the panel shows right away what's in the save
                 if (extras != null) { extras.Waypoints.RemoveAll(w => lista.Any(l => l.Name == w.Name && l.Body == w.Body)); extras.Waypoints.AddRange(lista); }
                 RenderWaypointInfo();
                 Flash(Lang.F("Escritos {0} waypoints. Copia de seguridad: {1}", lista.Count, Path.GetFileName(bak)));
@@ -71,7 +70,7 @@ namespace KerbinMaps.UI
             }
         }
 
-        /* Trae a marcadores los waypoints que ya tenga la partida cargada. */
+        /* Brings into markers the waypoints the loaded save already has. */
         void ImportarWaypoints()
         {
             if (extras == null) { Flash(Lang.T("Carga una partida primero.")); return; }
@@ -100,7 +99,7 @@ namespace KerbinMaps.UI
                 : Lang.F("Importados {0} waypoints como marcadores.", nuevos));
         }
 
-        /* El .sfs donde escribir: el original de la partida cargada, o el que elijas. */
+        /* The .sfs to write to: the original of the loaded save, or the one you pick. */
         string ElegirPartidaDestino()
         {
             string sugerido = state.SavePath != null && File.Exists(state.SavePath) ? state.SavePath : null;

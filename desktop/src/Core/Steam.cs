@@ -6,16 +6,16 @@ using System.Text.RegularExpressions;
 
 namespace KerbinMaps.Core
 {
-    /* Dónde puede estar KSP con Steam: la carpeta de Steam y todas sus bibliotecas. Steam
-       deja instalar juegos en otras (D:\SteamLibrary...) y las apunta en
-       steamapps\libraryfolders.vdf; mirando solo la carpeta de Steam no se encontraba un KSP
-       instalado en otra. El instalador tiene la misma búsqueda (Instalador.cs, Extras). */
+    /* Where KSP can be with Steam: the Steam folder and all its libraries. Steam lets you
+       install games in others (D:\SteamLibrary...) and lists them in
+       steamapps\libraryfolders.vdf; looking only at the Steam folder missed a KSP installed in
+       another one. The installer has the same search (Instalador.cs, Extras). */
     public static class Steam
     {
         static List<string> bibliotecas;
 
-        /* Las carpetas GameData de KSP que existen en alguna biblioteca de Steam. Se mira una
-           vez por sesión: cambiar de biblioteca con la aplicación abierta no es lo normal. */
+        /* The KSP GameData folders that exist in some Steam library. Checked once per session:
+           changing libraries with the application open isn't the usual thing. */
         public static IReadOnlyList<string> GameDatasDeKsp()
         {
             bibliotecas ??= Bibliotecas()
@@ -54,7 +54,7 @@ namespace KerbinMaps.Core
                 try { texto = File.Exists(vdf) ? File.ReadAllText(vdf) : null; }
                 catch (Exception) { texto = null; }
                 if (texto == null) continue;
-                // «"path"		"D:\\SteamLibrary"»: las barras van escapadas
+                // «"path"		"D:\\SteamLibrary"»: the backslashes come escaped
                 foreach (Match m in Regex.Matches(texto, "\"path\"\\s+\"([^\"]+)\""))
                 {
                     string b = m.Groups[1].Value.Replace(@"\\", @"\");

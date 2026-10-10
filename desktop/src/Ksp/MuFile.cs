@@ -9,10 +9,10 @@ namespace KerbinMaps.Ksp
     {
         public int VertCount;
         public float[] Verts, Normals, Uvs;
-        public float[] Uvs2;                      // segundo canal: la máscara del suelo del KSC
+        public float[] Uvs2;                      // second channel: the KSC ground mask
         public readonly List<int[]> Submeshes = new();
-        /* Malla con esqueleto: 32 bytes por vértice con cuatro índices de hueso y cuatro
-           pesos, y una pose de enlace (16 valores) por hueso. */
+        /* Skinned mesh: 32 bytes per vertex with four bone indices and four weights, and a bind
+           pose (16 values) per bone. */
         public byte[] BoneWeightsRaw;
         public float[] BindPoses;
     }
@@ -21,14 +21,14 @@ namespace KerbinMaps.Ksp
     {
         public string Name;
         public float[] Pos = new float[3];
-        public float[] Rot = { 0, 0, 0, 1 };          // x, y, z, w como en Unity
+        public float[] Rot = { 0, 0, 0, 1 };          // x, y, z, w as in Unity
         public float[] Scale = { 1, 1, 1 };
         public MuMesh Mesh;
         public int[] Materials;
-        public string[] Bones;                        // SkinnedMeshRenderer: los huesos, por nombre
-        public string Tag;                            // etiqueta de Unity («Icon_Only»: solo para el icono)
+        public string[] Bones;                        // SkinnedMeshRenderer: the bones, by name
+        public string Tag;                            // Unity tag («Icon_Only»: only for the icon)
         public readonly List<MuNode> Children = new();
-        public List<MuClip> Clips;                    // si el objeto lleva un componente Animation
+        public List<MuClip> Clips;                    // whether the object carries an Animation component
     }
 
     public struct MuKey
@@ -42,8 +42,8 @@ namespace KerbinMaps.Ksp
         public int Type;
         public MuKey[] Keys;
 
-        /* Curva de animación de Unity: tramos de Hermite con las tangentes de cada clave;
-           una tangente infinita es un escalón. */
+        /* Unity animation curve: Hermite segments with each key's tangents; an infinite tangent
+           is a step. */
         public float Eval(float t)
         {
             var k = Keys;
@@ -93,11 +93,11 @@ namespace KerbinMaps.Ksp
         public int Type;
     }
 
-    /* Modelo .mu de KSP: la jerarquía de objetos de Unity con sus mallas, materiales y
-       texturas, en el formato binario que documenta io_object_mu. Todo lo que no se
-       pinta (colisionadores, animaciones, luces, partículas) se lee igualmente, porque
-       el formato no guarda tamaños y hay que recorrerlo para llegar a lo siguiente.
-       Las coordenadas se dejan tal cual, en el marco de mano izquierda de Unity. */
+    /* KSP .mu model: Unity's object hierarchy with its meshes, materials and textures, in the
+       binary format documented by io_object_mu. Everything that isn't painted (colliders,
+       animations, lights, particles) is read anyway, because the format doesn't store sizes and
+       it has to be walked to reach what comes next. Coordinates are left as they are, in
+       Unity's left-handed frame. */
     public sealed class MuFile
     {
         public const int Magic = 76543;
@@ -155,16 +155,16 @@ namespace KerbinMaps.Ksp
                 {
                     case 0: node.Children.Add(ReadObject()); break;
                     case 1: return node;
-                    case 24: node.Tag = S(); I(); break;                                // etiqueta y capa
-                    case 3: B(); ReadMesh(); break;                                     // colisionador de malla
+                    case 24: node.Tag = S(); I(); break;                                // tag and layer
+                    case 3: B(); ReadMesh(); break;                                     // mesh collider
                     case 25: B(); B(); ReadMesh(); break;
-                    case 4: Skip(4 + 12); break;                                        // esfera
+                    case 4: Skip(4 + 12); break;                                        // sphere
                     case 26: Skip(1 + 4 + 12); break;
-                    case 5: Skip(4 + 4 + 4 + 12); break;                                // cápsula
+                    case 5: Skip(4 + 4 + 4 + 12); break;                                // capsule
                     case 27: Skip(1 + 4 + 4 + 4 + 12); break;
-                    case 6: Skip(12 + 12); break;                                       // caja
+                    case 6: Skip(12 + 12); break;                                       // box
                     case 28: Skip(1 + 12 + 12); break;
-                    case 29: Skip(4 + 4 + 4 + 12 + 3 * 4 + 5 * 4 * 2); break;           // rueda
+                    case 29: Skip(4 + 4 + 4 + 12 + 3 * 4 + 5 * 4 * 2); break;           // wheel
                     case 7: node.Mesh = ReadMesh(); break;
                     case 8:
                         if (Version > 0) { B(); B(); }
@@ -182,9 +182,9 @@ namespace KerbinMaps.Ksp
                         break;
                     }
                     case 2: node.Clips = ReadAnimation(); break;
-                    case 30: Skip(4 + 16 + 4 + 1 + 4 + 4 + 4 + 4); break;              // cámara
+                    case 30: Skip(4 + 16 + 4 + 1 + 4 + 4 + 4 + 4); break;              // camera
                     case 31: SkipParticles(); break;
-                    case 23: Skip(4 + 4 + 4 + 16 + 4 + (Version > 1 ? 4 : 0)); break;  // luz
+                    case 23: Skip(4 + 4 + 4 + 16 + 4 + (Version > 1 ? 4 : 0)); break;  // light
                     case 10:
                     {
                         int n = I();
@@ -215,7 +215,7 @@ namespace KerbinMaps.Ksp
         {
             if (I() != 13) throw new InvalidDataException("malla .mu sin cabecera");
             var m = new MuMesh { VertCount = I() };
-            I();                                                                        // número de submallas
+            I();                                                                        // number of submeshes
             int nv = m.VertCount;
             while (true)
             {
@@ -245,9 +245,9 @@ namespace KerbinMaps.Ksp
             return a;
         }
 
-        /* Animaciones del objeto: las de desplegar paneles, antenas o patas. Cada curva
-           mueve una componente (m_LocalPosition.x, m_LocalRotation.w...) de un objeto
-           indicado por su ruta relativa al que lleva la animación. */
+        /* The object's animations: deploying panels, antennas or legs. Each curve moves one
+           component (m_LocalPosition.x, m_LocalRotation.w...) of an object given by its path
+           relative to the one carrying the animation. */
         List<MuClip> ReadAnimation()
         {
             var list = new List<MuClip>();
@@ -269,13 +269,13 @@ namespace KerbinMaps.Ksp
                     for (int i = 0; i < keys; i++)
                     {
                         curve.Keys[i] = new MuKey { Time = F(), Value = F(), InTan = F(), OutTan = F() };
-                        I();                                            // modo de tangente
+                        I();                                            // tangent mode
                     }
                     if (keys > 0) clip.Curves.Add(curve);
                 }
                 list.Add(clip);
             }
-            S(); B();                                                   // clip por defecto, reproducción automática
+            S(); B();                                                   // default clip, autoplay
             return list;
         }
 
@@ -344,7 +344,7 @@ namespace KerbinMaps.Ksp
                 case 12: MainTex(); mat.Color = new[] { F(), F(), F(), F() }; mat.Transparent = true; break;
                 case 13: MainTex(); mat.Color = new[] { F(), F(), F(), F() }; break;    // unlit
                 case 14:
-                case 15: MainTex(); Skip(16 + 4); mat.Transparent = true; break;        // partículas
+                case 15: MainTex(); Skip(16 + 4); mat.Transparent = true; break;        // particles
                 default: throw new InvalidDataException("tipo de material .mu desconocido: " + st);
             }
             return mat;

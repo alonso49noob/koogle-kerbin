@@ -6,20 +6,20 @@ using System.Text;
 
 namespace KerbinMaps.Ksp
 {
-    /* Los edificios del KSC de serie, sacados de los datos del juego.
+    /* The stock KSC buildings, taken from the game's data.
 
-       No hay .mu: están dentro de KSP_x64_Data/sharedassets9.assets como prefabs de Unity
-       (uno por nivel de cada instalación: RunwayLevel1..3, VABLevel1/2/4...), y el fichero
-       no lleva la descripción de los tipos, así que cada clase se lee con su disposición
-       de Unity 2019.4 escrita a mano: GameObject, Transform, MeshFilter, MeshRenderer,
-       Material y Mesh. De cada prefab sale un AssembledVessel como el de un .mu, y lo
-       pinta el mismo código que los edificios de Kerbal Konstructs.
+       There's no .mu: they're inside KSP_x64_Data/sharedassets9.assets as Unity prefabs (one
+       per level of each facility: RunwayLevel1..3, VABLevel1/2/4...), and the file doesn't
+       carry the type descriptions, so each class is read with its Unity 2019.4 layout written
+       by hand: GameObject, Transform, MeshFilter, MeshRenderer, Material and Mesh. Each prefab
+       yields an AssembledVessel like a .mu's, and the same code that draws the Kerbal
+       Konstructs buildings paints it.
 
-       Qué hay y dónde va lo dice el prefab «KSC»: un hijo por instalación (Runway,
-       LaunchPad, VehicleAssemblyBuilding...), con su posición dentro del centro espacial y
-       un script UpgradeableFacility que apunta a los prefabs de sus niveles, en orden.
-       KK llama a esos mismos prefabs «KSC_<instalación>_level_<n>»; también saca piezas
-       sueltas de alguno (KSC_FuelTanks es el nodo ksp_pad_cylTank del hangar de nivel 3). */
+       What there is and where it goes comes from the «KSC» prefab: one child per facility
+       (Runway, LaunchPad, VehicleAssemblyBuilding...), with its position inside the space
+       center and an UpgradeableFacility script pointing to the prefabs of its levels, in order.
+       KK calls those same prefabs «KSC_<facility>_level_<n>»; it also takes loose pieces from
+       some (KSC_FuelTanks is the ksp_pad_cylTank node of the level 3 hangar). */
     public sealed class StockPrefabs
     {
         const string Fichero = "sharedassets9.assets";
@@ -37,16 +37,16 @@ namespace KerbinMaps.Ksp
         readonly Dictionary<long, Tr> trs = new();
         readonly Dictionary<(UnitySerialized, long), MuMesh> mallas = new();
 
-        /* Una instalación del KSC: su nombre, dónde está dentro del prefab KSC y sus niveles. */
+        /* A KSC facility: its name, where it is inside the KSC prefab and its levels. */
         public sealed class Instalacion
         {
             public string Name;
-            public double[] M;                    // dentro del KSC (marco de Unity)
-            public long[] Niveles;                // GameObject raíz de cada nivel
+            public double[] M;                    // inside the KSC (Unity frame)
+            public long[] Niveles;                // root GameObject of each level
         }
 
         public readonly List<Instalacion> Ksc = new();
-        /* Modelos con nombre de KK («KSC_Runway_level_2», «KSC_FuelTanks»...) → nodo raíz. */
+        /* Models with KK's name («KSC_Runway_level_2», «KSC_FuelTanks»...) → root node. */
         public readonly Dictionary<string, long> PorNombreKK = new(StringComparer.OrdinalIgnoreCase);
 
         StockPrefabs(StockAssets assets, UnitySerialized s)
@@ -79,7 +79,7 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* ------------------------------------------------ jerarquía */
+        /* ------------------------------------------------ hierarchy */
 
         void LeerJerarquia()
         {
@@ -91,9 +91,9 @@ namespace KerbinMaps.Ksp
                     var g = new Go();
                     int n = r.I32();
                     for (int i = 0; i < n; i++) g.Comps.Add(r.PPtr());
-                    r.U32();                              // capa
+                    r.U32();                              // layer
                     g.Name = r.Str();
-                    r.Pos += 2;                           // etiqueta
+                    r.Pos += 2;                           // tag
                     g.Active = r.U8() != 0;
                     gos[id] = g;
                 }
@@ -120,7 +120,7 @@ namespace KerbinMaps.Ksp
             if (ksc == 0) return;
             var candidatos = trs[ksc].Kids.ToList();
             foreach (var k in trs[ksc].Kids)
-                if (gos[trs[k].Go].Name == "Grounds") candidatos.AddRange(trs[k].Kids.Select(x => -x));   // negativo: bajo Grounds
+                if (gos[trs[k].Go].Name == "Grounds") candidatos.AddRange(trs[k].Kids.Select(x => -x));   // negative: under Grounds
             foreach (var c in candidatos)
             {
                 bool bajoGrounds = c < 0;
@@ -131,7 +131,7 @@ namespace KerbinMaps.Ksp
                 {
                     if (f != 0 || !s.Objetos.TryGetValue(p, out var o) || o.ClassId != 114) continue;
                     var d = s.Leer(p);
-                    // m_GameObject, m_Enabled, m_Script y m_Name; luego los datos del script
+                    // m_GameObject, m_Enabled, m_Script and m_Name; then the script's data
                     int nl = BitConverter.ToInt32(d, 28);
                     int ini = 32 + ((nl + 3) & ~3);
                     for (int k = ini; k + 12 <= d.Length; k += 4)
@@ -148,7 +148,7 @@ namespace KerbinMaps.Ksp
                 if (!bajoGrounds)
                     for (int i = 0; i < niveles.Count; i++) PorNombreKK["KSC_" + go.Name + "_level_" + (i + 1)] = niveles[i];
             }
-            // las piezas sueltas que KK registra a partir del hangar de nivel 3
+            // the loose pieces KK registers from the level 3 hangar
             if (PorNombreKK.TryGetValue("KSC_SpaceplaneHangar_level_3", out long sph))
             {
                 foreach (var (nombreKK, nodo) in new[] { ("KSC_FuelTank", "Tank"), ("KSC_FuelTanks", "ksp_pad_cylTank"), ("KSC_WaterTower", "ksp_pad_waterTower") })
@@ -171,8 +171,8 @@ namespace KerbinMaps.Ksp
             return Mat.Mul(Mat.Translate(t.Pos), Mat.Mul(Mat.Rotate(t.Rot), Mat.Scale(t.Scale[0], t.Scale[1], t.Scale[2])));
         }
 
-        /* Un PPtr leído en `desde`: el fichero al que apunta y el objeto. fileID 0 es el propio;
-           los demás, la tabla de externos (solo los ficheros del propio juego). */
+        /* A PPtr read at `desde`: the file it points to and the object. fileID 0 is the file
+           itself; the rest, the externals table (only the game's own files). */
         (UnitySerialized S, long Id)? Resolver(UnitySerialized desde, int fileId, long pathId)
         {
             if (pathId == 0) return null;
@@ -184,10 +184,10 @@ namespace KerbinMaps.Ksp
             return otro == null || !otro.Objetos.ContainsKey(pathId) ? null : (otro, pathId);
         }
 
-        /* ------------------------------------------------ montaje */
+        /* ------------------------------------------------ assembly */
 
-        /* El modelo de un prefab (o de un nodo suyo), con la raíz en el origen: como en KK,
-           de la raíz solo se conserva la escala. */
+        /* The model of a prefab (or of one of its nodes), with the root at the origin: as in
+           KK, only the scale of the root is kept. */
         public AssembledVessel Build(long rootGo)
         {
             lock (cerrojo)
@@ -207,7 +207,7 @@ namespace KerbinMaps.Ksp
             var t = trs[tr];
             var go = gos[t.Go];
             if (!go.Active && !raiz) return;
-            // por el nombre: colisionadores, sombras falsas y demás que no se ven
+            // by name: colliders, fake shadows and other things that aren't visible
             string lower = go.Name.ToLowerInvariant();
             if (lower.Contains("collider") || lower.Contains("occlusion") || lower.Contains("_occluder") || lower.Contains("wreck")) return;
 
@@ -243,18 +243,18 @@ namespace KerbinMaps.Ksp
             foreach (var k in t.Kids) Walk(k, Mat.Mul(m, Local(k)), a, ref r2, raiz: false);
         }
 
-        /* MeshRenderer: si está activo y sus materiales. */
+        /* MeshRenderer: whether it's active, and its materials. */
         bool Renderer(long id, List<(UnitySerialized, long)?> mats)
         {
             var r = new R(s.Leer(id));
             r.PPtr();                                     // m_GameObject
             bool enabled = r.U8() != 0;
-            r.Pos += 7;                                   // sombras, sondas, vectores de movimiento, trazado de rayos
+            r.Pos += 7;                                   // shadows, probes, motion vectors, ray tracing
             r.Align();
             r.U32();                                      // m_RenderingLayerMask
             r.I32();                                      // m_RendererPriority
-            r.Pos += 4;                                   // índices de lightmap
-            r.Pos += 32;                                  // desplazamientos de lightmap
+            r.Pos += 4;                                   // lightmap indices
+            r.Pos += 32;                                  // lightmap offsets
             int n = r.I32();
             if (n < 0 || n > 64) return false;
             for (int i = 0; i < n; i++)
@@ -287,7 +287,7 @@ namespace KerbinMaps.Ksp
                 r.PPtr();                                 // m_Shader
                 string keywords = r.Str();
                 r.U32();                                  // m_LightmapFlags
-                r.U8(); r.U8(); r.Align();                // instancing, doble cara GI
+                r.U8(); r.U8(); r.Align();                // instancing, double-sided GI
                 int cola = r.I32();                       // m_CustomRenderQueue
                 int tags = r.I32();
                 var tagMap = new Dictionary<string, string>();
@@ -342,8 +342,8 @@ namespace KerbinMaps.Ksp
                 m.Transparente = cola >= 3000 || (tagMap.TryGetValue("RenderType", out var rt) && rt == "Transparent");
                 if (m.Transparente) m.Recorte = false;
                 if (m.Suelo?.Grass == null) m.Suelo = null;
-                else { m.Recorte = false; m.Color = new float[] { 1, 1, 1, 1 }; }   // el suelo ni recorta ni se tiñe con _Color
-                // halos, destellos y luces falsas: solo tienen sentido con sus shaders
+                else { m.Recorte = false; m.Color = new float[] { 1, 1, 1, 1 }; }   // the ground neither cuts out nor gets tinted with _Color
+                // halos, flares and fake lights: they only make sense with their shaders
                 m.Omitir = lower.Contains("flare") || lower.Contains("glow") || lower.Contains("light_beam") || lower.Contains("lightbeam")
                            || lower.Contains("shadow") || lower.Contains("occlu") || keywords.Contains("PARTICLE", StringComparison.OrdinalIgnoreCase);
                 mm = m;
@@ -359,14 +359,14 @@ namespace KerbinMaps.Ksp
             return file == null ? null : StockAssets.Prefijo + file + ":" + pathId;
         }
 
-        /* ------------------------------------------------ mallas */
+        /* ------------------------------------------------ meshes */
 
         MuMesh Malla(long filterId)
         {
             var r = new R(s.Leer(filterId));
             r.PPtr();
             var (f, p) = r.PPtr();
-            // las primitivas de Unity (en «unity default resources») no se leen
+            // Unity's primitives (in «unity default resources») aren't read
             if (Resolver(s, f, p) is not var (ms, id)) return null;
             if (mallas.TryGetValue((ms, id), out var m)) return m;
             try { m = LeerMalla(ms, id); }
@@ -378,7 +378,7 @@ namespace KerbinMaps.Ksp
         MuMesh LeerMalla(UnitySerialized ms, long id)
         {
             var r = new R(ms.Leer(id));
-            r.Str();                                      // nombre
+            r.Str();                                      // name
             int nSub = r.I32();
             var subs = new List<(uint First, uint Count, int Topo, uint BaseV)>();
             for (int i = 0; i < nSub; i++)
@@ -401,7 +401,7 @@ namespace KerbinMaps.Ksp
             int naabb = r.I32(); r.Pos += naabb * 24;     // m_BonesAABB
             int nvw = r.I32(); r.Pos += nvw * 4;          // m_VariableBoneCountWeights
             int compresion = r.U8();
-            r.U8(); r.U8(); r.U8(); r.Align();            // legible, conservar vértices e índices
+            r.U8(); r.U8(); r.U8(); r.Align();            // readable, keep vertices and indices
             int indexFormat = r.I32();
             int nIdx = r.I32();
             byte[] idx = r.Bytes(nIdx);
@@ -415,7 +415,7 @@ namespace KerbinMaps.Ksp
             if (compresion != 0 || vCount == 0) return null;
             if (datos.Length == 0)
             {
-                // el resto de la malla va por delante; los datos en el .resS, al final
+                // the rest of the mesh comes first; the data in the .resS, at the end
                 SaltarHastaStreamData(r);
                 uint off = r.U32(), size = r.U32();
                 string path = r.Str();
@@ -424,7 +424,7 @@ namespace KerbinMaps.Ksp
                 if (datos == null) return null;
             }
 
-            // dónde empieza cada flujo y su paso, como los reparte Unity
+            // where each stream starts and its stride, as Unity lays them out
             int nStreams = canales.Length == 0 ? 0 : canales.Max(c => c.Stream) + 1;
             var stride = new int[nStreams];
             foreach (var c in canales)
@@ -455,7 +455,7 @@ namespace KerbinMaps.Ksp
             int isz = indexFormat == 1 ? 4 : 2;
             foreach (var (first, count, topo, baseV) in subs)
             {
-                if (topo != 0) { mesh.Submeshes.Add(Array.Empty<int>()); continue; }   // solo triángulos
+                if (topo != 0) { mesh.Submeshes.Add(Array.Empty<int>()); continue; }   // triangles only
                 var tri = new int[count];
                 int f0 = (int)(first / isz);
                 for (int k = 0; k < count; k++)
@@ -469,22 +469,22 @@ namespace KerbinMaps.Ksp
             return mesh;
         }
 
-        /* Tras m_VertexData vienen la malla comprimida, la caja, las mallas de colisión y las
-           métricas; hay que pasar por encima de todo para llegar a m_StreamData. */
+        /* After m_VertexData come the compressed mesh, the bounds, the collision meshes and the
+           metrics; everything has to be skipped to get to m_StreamData. */
         static void SaltarHastaStreamData(R r)
         {
-            for (int i = 0; i < 4; i++) SaltarPackedFloat(r);   // vértices, UV, normales y tangentes
-            SaltarPackedInt(r);                                  // pesos
-            SaltarPackedInt(r);                                  // signos de normales
-            SaltarPackedInt(r);                                  // signos de tangentes
-            SaltarPackedFloat(r);                                // colores
-            SaltarPackedInt(r);                                  // índices de huesos
-            SaltarPackedInt(r);                                  // triángulos
+            for (int i = 0; i < 4; i++) SaltarPackedFloat(r);   // vertices, UV, normals and tangents
+            SaltarPackedInt(r);                                  // weights
+            SaltarPackedInt(r);                                  // normal signs
+            SaltarPackedInt(r);                                  // tangent signs
+            SaltarPackedFloat(r);                                // colors
+            SaltarPackedInt(r);                                  // bone indices
+            SaltarPackedInt(r);                                  // triangles
             r.U32();                                             // m_UVInfo
             r.Pos += 24;                                         // m_LocalAABB
             r.I32();                                             // m_MeshUsageFlags
-            r.Bytes(r.I32());                                    // colisión convexa
-            r.Bytes(r.I32());                                    // colisión de triángulos
+            r.Bytes(r.I32());                                    // convex collision
+            r.Bytes(r.I32());                                    // triangle collision
             r.Pos += 8;                                          // m_MeshMetrics
         }
 
@@ -511,7 +511,7 @@ namespace KerbinMaps.Ksp
             _ => BitConverter.ToInt32(d, o),
         };
 
-        /* Lector de los datos de un objeto, little endian y con el alineado de Unity. */
+        /* Reader for an object's data, little endian and with Unity's alignment. */
         sealed class R
         {
             readonly byte[] d;

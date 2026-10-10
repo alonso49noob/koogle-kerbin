@@ -1,9 +1,9 @@
-# Genera la version lista para usar en desktop\dist\KoogleKerbin:
-# KoogleKerbin.exe con su KoogleKerbin.dll + data\ con los mapas y catalogos.
-# No se publica como fichero unico ni para un RID concreto: eso obliga a bajar de
-# NuGet los paquetes del runtime, y para una app que usa el runtime instalado no hacen falta.
-# Necesita el SDK de .NET 10. El .exe necesita el runtime de escritorio de .NET 10
-# en el equipo donde se ejecute (el instalador se encarga de eso).
+# Builds the ready-to-use version in desktop\dist\KoogleKerbin:
+# KoogleKerbin.exe with its KoogleKerbin.dll + data\ with the maps and catalogs.
+# It isn't published as a single file or for a specific RID: that requires downloading the
+# runtime packages from NuGet, and an app that uses the installed runtime doesn't need them.
+# Needs the .NET 10 SDK. The .exe needs the .NET 10 desktop runtime on the machine
+# where it runs (the installer takes care of that).
 param([string]$Salida = (Join-Path $PSScriptRoot 'dist\KoogleKerbin'))
 
 $ErrorActionPreference = 'Stop'

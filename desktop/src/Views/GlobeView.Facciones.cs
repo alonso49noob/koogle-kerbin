@@ -5,18 +5,19 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* El mapa político en el globo: los territorios sobre el suelo (desde órbita y en la bajada),
-       sus nombres, y lo que dibuja la herramienta mientras se pinta (el círculo del pincel y el
-       polígono a medias). En el vuelo y en el cielo no se pinta nada: es un mapa, no el paisaje. */
+    /* The political map on the globe: territories on the ground (from orbit and during the
+       descent), their names, and what the tool draws while painting (the brush circle and the
+       half-drawn polygon). Nothing is painted in flight and sky views: it's a map, not the
+       landscape. */
     public sealed partial class GlobeView
     {
         public Texture FacTex;
         public float[] FacColores;
         public double FacRelleno = 0.45;
-        public bool FacConMar;                    // recortar por la costa (cuerpos con mar)
+        public bool FacConMar;                    // clip at the coast (bodies with sea)
         public readonly List<MapEtiqueta> FacEtiquetas = new();
 
-        /* Trazos de la herramienta, en lat/lon: se pintan en pantalla por encima de todo. */
+        /* Tool strokes, in lat/lon: painted on screen on top of everything. */
         public readonly List<(IReadOnlyList<LatLon> Pts, ColorF Color, bool Cerrado)> Trazos = new();
         public readonly List<(LatLon P, ColorF Color)> TrazoPuntos = new();
 
@@ -29,7 +30,7 @@ namespace KerbinMaps.Views
             p.Int("uFacConMar", FacConMar ? 1 : 0);
         }
 
-        /* Altura del suelo en radios para colocar algo encima de él, cuando se está cerca. */
+        /* Ground height in radii for placing something on top of it, when close. */
         double RadioSuelo(double lat, double lon, bool cerca) =>
             cerca ? 1 + Math.Max(0, GroundAt?.Invoke(lat, lon) ?? 0) / Body.Radius : 1;
 
@@ -37,7 +38,7 @@ namespace KerbinMaps.Views
         {
             if (cerca)
             {
-                // tapado si la visual pasa por debajo del nivel del mar (con un margen de 100 m)
+                // hidden if the line of sight goes below sea level (with a 100 m margin)
                 double k = 1 / (1 - 100 / Body.Radius);
                 return !TapadoPorPlaneta(Scale(p, k), Scale(eye, k));
             }
@@ -45,9 +46,9 @@ namespace KerbinMaps.Views
             return Dot(p, eye) / (camLen * Len(p)) > 1 / camLen;
         }
 
-        /* Lo que hay bajo el cursor sobre el terreno. Desde lejos basta la esfera; de cerca, el
-           rayo recorre el relieve (con la cámara inclinada, una ladera está kilómetros más acá de
-           donde el rayo corta la esfera). */
+        /* What's under the cursor on the terrain. From afar the sphere is enough; up close, the
+           ray walks the relief (with the camera tilted, a slope is kilometers nearer than where
+           the ray hits the sphere). */
         public LatLon? PickSuelo(double px, double py)
         {
             bool cerca = Mode != CamMode.Planet || Len(eyeL) < RadioCerca;
@@ -85,7 +86,7 @@ namespace KerbinMaps.Views
             return Pick(px, py);
         }
 
-        /* Los nombres de los territorios, con el tamaño que tengan en pantalla. */
+        /* The territory names, at whatever size they have on screen. */
         void DrawFacEtiquetas(Batch2D b, TextCache tc, double[] eye, double fov)
         {
             if (!FacVisibles || FacEtiquetas.Count == 0) return;
@@ -110,7 +111,7 @@ namespace KerbinMaps.Views
             }
         }
 
-        /* El círculo del pincel y el polígono a medias, proyectados a pantalla. */
+        /* The brush circle and the half-drawn polygon, projected to the screen. */
         void DrawTrazos(Batch2D b, double[] eye)
         {
             if (Trazos.Count == 0 && TrazoPuntos.Count == 0) return;

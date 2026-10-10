@@ -3,13 +3,13 @@ using System.Collections.Generic;
 
 namespace KerbinMaps.Core
 {
-    /* Una zona del terreno allanada a una altura, como las calcomanías de terreno del juego
-       (PQSMod_MapDecal): el KSC está sobre una explanada que el mapa de alturas, de 1,8 km
-       por píxel, no recoge; sin ella sus céspedes flotarían o quedarían enterrados.
+    /* A patch of terrain flattened to a height, like the game's terrain decals
+       (PQSMod_MapDecal): the KSC sits on a leveled area that the height map, at 1.8 km per
+       pixel, doesn't capture; without it its lawns would float or be buried.
 
-       Plana hasta R0 y fundida con el terreno de alrededor hasta R1. La dirección va en el
-       marco del visor (x = cos lat sin lon, y = sin lat, z = cos lat cos lon). Las mismas
-       cuentas en la CPU (cámara, colocación, scatters) y en el shader del suelo. */
+       Flat up to R0 and blended into the surrounding terrain up to R1. The direction is in the
+       viewer's frame (x = cos lat sin lon, y = sin lat, z = cos lat cos lon). The same math
+       runs on the CPU (camera, placement, scatters) and in the ground shader. */
     public sealed class Aplanado
     {
         public double[] N;
@@ -25,7 +25,7 @@ namespace KerbinMaps.Core
             };
         }
 
-        /* Distancia en metros (por la cuerda, que en float y a estas distancias es exacta). */
+        /* Distance in meters (along the chord, which in float and at these distances is exact). */
         double Dist(double lat, double lon, double radio)
         {
             double la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
@@ -46,7 +46,7 @@ namespace KerbinMaps.Core
             return h;
         }
 
-        /* Dentro de la parte plana: ahí el juego quita los scatters. */
+        /* Inside the flat part: the game removes scatters there. */
         public static bool Dentro(IReadOnlyList<Aplanado> lista, double lat, double lon, double radio)
         {
             if (lista == null) return false;

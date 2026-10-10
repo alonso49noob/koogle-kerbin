@@ -7,16 +7,16 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Vista «Vuelo»: una cámara libre a ras de suelo.
+    /* «Flight» view: a free camera skimming the ground.
 
-       Se mueve como en un juego: W/S adelante y atrás en la dirección en la que se mira,
-       A/D de lado, R/F o espacio y control para subir y bajar, arrastrar para mirar y la
-       rueda para el acelerador. Mayúsculas multiplica la velocidad. No hay inercia ni
-       choques: solo no deja bajar del suelo. */
+       It moves like in a game: W/S forward and back in the direction you're looking, A/D
+       sideways, R/F or space and control to go up and down, drag to look and the wheel for the
+       throttle. Shift multiplies the speed. There's no inertia or collisions: it just doesn't
+       let you go below the ground. */
     public sealed partial class MainForm
     {
         bool isFree;
-        bool restaurandoVista;                    // al arrancar, la cámara vuelve donde se quedó
+        bool restaurandoVista;                    // at startup, the camera goes back to where it was left
         readonly HashSet<Keys> teclas = new();
         double ultimoVuelo;
 
@@ -24,15 +24,15 @@ namespace KerbinMaps.UI
 
         void EntrarVuelo(string vista)
         {
-            // se entra por donde se estaba mirando: el centro del mapa o del globo
+            // you enter where you were looking: the center of the map or the globe
             double lat, lon;
             if (vista == "sky") { lat = state.ObsLat; lon = state.ObsLon; }
             else if (vista == "3d") { var c = globe.Center(); lat = c.Lat; lon = c.Lon; }
             else { lat = map.CenterLat; lon = Geo.WrapLon(map.CenterLon); }
 
             globe.GroundAt = AlturaDelSuelo;
-            /* Al arrancar se vuelve a donde se dejó la cámara; entrando desde otra vista,
-               a donde se estaba mirando, que es lo que uno espera al pulsar «Vuelo». */
+            /* At startup it goes back to where the camera was left; entering from another view,
+               to where you were looking, which is what you expect when pressing «Vuelo». */
             if (state.FreeLat is double fl && state.FreeLon is double fo && (restaurandoVista || vista == "sky"))
                 globe.SetFree(fl, fo, state.FreeAlt, state.FreeAz);
             else
@@ -47,12 +47,12 @@ namespace KerbinMaps.UI
             ultimoVuelo = 0;
         }
 
-        /* Altura del terreno bajo un punto, con el mapa de alturas del cuerpo y su
-           calibración, interpolada igual que en el shader. Sin mapa, el nivel del mar. */
+        /* Terrain height under a point, with the body's height map and its calibration,
+           interpolated the same as in the shader. Without a map, sea level. */
         double AlturaDelSuelo(double lat, double lon) => Math.Max(0, AlturaCruda(lat, lon));
 
-        /* La misma sin cortar en el nivel del mar: el fondo marino, para los scatters que
-           solo salen en la costa o bajo el agua. */
+        /* The same without clipping at sea level: the sea floor, for scatters that only appear
+           on the coast or underwater. */
         double AlturaCruda(double lat, double lon)
         {
             var img = MapImg("height");
@@ -61,9 +61,8 @@ namespace KerbinMaps.UI
             return Aplanado.Aplicar(aplanados, lat, lon, ConTesela(lat, lon, h), Body.Radius);
         }
 
-        /* Un paso de vuelo con las teclas que estén pulsadas. Lo llama el bucle de
-           fotogramas con el tiempo transcurrido, así que la velocidad no depende de los
-           fotogramas por segundo. */
+        /* One flight step with whatever keys are pressed. The frame loop calls it with the
+           elapsed time, so speed doesn't depend on frames per second. */
         void PasoDeVuelo(double now)
         {
             if (!isFree) return;
@@ -120,8 +119,8 @@ namespace KerbinMaps.UI
             SaveSettings();
         }
 
-        /* La velocidad va de 2 a 20 000 m/s: el deslizador la recorre en escala
-           logarítmica, para tener tanto paseo como vuelo rasante rápido. */
+        /* Speed goes from 2 to 20 000 m/s: the slider covers it on a logarithmic scale, to
+           allow both strolling and fast low flying. */
         static int VelocidadAPaso(double v) =>
             (int)Math.Round(1 + 99 * (Math.Log(Math.Clamp(v, GlobeView.FreeMinSpeed, GlobeView.FreeMaxSpeed) / GlobeView.FreeMinSpeed)
                                       / Math.Log(GlobeView.FreeMaxSpeed / GlobeView.FreeMinSpeed)));
@@ -129,8 +128,8 @@ namespace KerbinMaps.UI
         static double PasoAVelocidad(int paso) =>
             GlobeView.FreeMinSpeed * Math.Pow(GlobeView.FreeMaxSpeed / GlobeView.FreeMinSpeed, (paso - 1) / 99.0);
 
-        /* Lo que viste el suelo en el vuelo y en el cielo: texturas, nubes y scatters, con
-           los ajustes del panel. */
+        /* What dresses the ground in flight and sky views: textures, clouds and scatters, with
+           the panel's settings. */
         void CargarSuelo()
         {
             globe.Clouds = state.Clouds;
@@ -139,7 +138,7 @@ namespace KerbinMaps.UI
             globe.Scatters = state.Scatters;
             globe.ScatterDensity = state.ScatterDensity;
             globe.Wind = state.Wind;
-            // también al bajar hasta el suelo desde la vista 3D, que no pasa por EntrarVuelo
+            // also when going down to the ground from the 3D view, which doesn't go through EntrarVuelo
             globe.FreeRelief = state.FreeRelief;
             globe.Detail = state.FreeDetail;
             _ = CargarTexturasDeTerreno();
@@ -187,7 +186,7 @@ namespace KerbinMaps.UI
                 if (hex != null) rows.Add(("bioma", BiomeName(hex) ?? hex));
             }
             hud.SetRows(rows.ToArray());
-            hud.Location = new System.Drawing.Point(mapArea.Width - Theme.S(12) - hud.Width, Theme.S(56));
+            hud.Location = new System.Drawing.Point(mapArea.Width - Theme.S(12) - hud.Width, HudTop);
         }
     }
 }

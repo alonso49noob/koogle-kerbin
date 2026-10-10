@@ -7,11 +7,11 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Asistente de aterrizaje: dónde frenar para caer en un punto.
+    /* Landing assistant: where to brake to come down on a point.
 
-       Se elige una nave en órbita del cuerpo y un objetivo en el suelo, y el visor busca
-       el instante de la frenada retrógrada y su Δv, integra el descenso y dice dónde
-       acabaría. El resultado se dibuja como traza en el mapa y en el globo. */
+       You pick a vessel orbiting the body and a target on the ground, and the viewer finds the
+       time of the retrograde burn and its Δv, integrates the descent and says where it would
+       end up. The result is drawn as a trace on the map and the globe. */
     public sealed partial class MainForm
     {
         readonly MapLayer landLayer = new();
@@ -102,7 +102,7 @@ namespace KerbinMaps.UI
 
                 plan = await Task.Run(() =>
                 {
-                    Body.Current = cuerpo;              // el cálculo usa las constantes del cuerpo
+                    Body.Current = cuerpo;              // the calculation uses the body's constants
                     return Landing.Planear(orb, t0, ut, rot, objLat, objLon, pe, bc);
                 });
 

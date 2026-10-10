@@ -4,8 +4,8 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.UI
 {
-    /* Resúmenes de las secciones plegadas del panel: con quince secciones, saber de un
-       vistazo qué hay dentro de cada una ahorra abrirlas y volverlas a cerrar. */
+    /* Summaries of the sidebar's collapsed sections: with fifteen sections, knowing at a glance
+       what's inside each one saves opening and closing them again. */
     public sealed partial class MainForm
     {
         void ActualizarEstadosSecciones()

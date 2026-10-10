@@ -5,9 +5,9 @@ using System.Windows.Forms;
 
 namespace KerbinMaps.UI
 {
-    /* Contenedor con desplazamiento vertical y barra fina de tema oscuro. La barra
-       nativa de un Panel con AutoScroll sale clara aunque todo lo demás sea oscuro, y
-       no hay forma documentada de teñirla. */
+    /* Container with vertical scrolling and a thin themed scrollbar. The native scrollbar of a
+       Panel with AutoScroll comes out light even when everything else is dark, and there's no
+       documented way to tint it. */
     public sealed class ScrollHost : Control, IMessageFilter
     {
         [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point p);
@@ -65,8 +65,8 @@ namespace KerbinMaps.UI
 
         protected override void OnPaint(PaintEventArgs e) => e.Graphics.Clear(BackColor);
 
-        /* La rueda sobre el panel desplaza el panel, salvo que el cursor esté sobre una
-           lista que tiene su propio desplazamiento. */
+        /* The wheel over the panel scrolls the panel, unless the cursor is over a list that has
+           its own scrolling. */
         public bool PreFilterMessage(ref Message m)
         {
             if (m.Msg != 0x020A || !Visible || !IsHandleCreated) return false;

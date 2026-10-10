@@ -8,9 +8,9 @@ using System.Windows.Forms;
 
 namespace KerbinMaps.UI
 {
-    /* Visibilidad pedida para un control dentro de una pila. Visible no sirve para
-       maquetar: devuelve false mientras cualquier antecesor esté oculto (una sección
-       plegada, la ventana aún sin mostrar), y la pila mediría todo a cero. */
+    /* Requested visibility for a control inside a stack. Visible is no good for layout: it
+       returns false while any ancestor is hidden (a collapsed section, the window not shown
+       yet), and the stack would measure everything as zero. */
     public static class Vis
     {
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> hidden = new();
@@ -25,12 +25,20 @@ namespace KerbinMaps.UI
         }
     }
 
-    /* Apila sus hijos en vertical con un hueco fijo, como los .panel de la web, y
-       ajusta su propia altura al contenido. */
+    /* Stacks its children vertically with a fixed gap, like the web's .panel, and adjusts its
+       own height to the content. */
     public class StackPanel : Panel, IHeightForWidth
     {
         public int Gap;
         bool laying;
+
+        /* The order the children were added in. Controls can't be trusted for that: when a
+           hidden child is shown for the first time its window is created, and WinForms moves it
+           within Controls to match the windows' z-order, so it would jump to another row. */
+        readonly List<Control> orden = new();
+
+        protected override void OnControlAdded(ControlEventArgs e) { if (!orden.Contains(e.Control)) orden.Add(e.Control); base.OnControlAdded(e); }
+        protected override void OnControlRemoved(ControlEventArgs e) { orden.Remove(e.Control); base.OnControlRemoved(e); }
 
         public StackPanel(int gap = 10)
         {
@@ -44,7 +52,7 @@ namespace KerbinMaps.UI
         public int HeightFor(int width)
         {
             int w = width - Padding.Horizontal, y = Padding.Top, n = 0;
-            foreach (Control c in Controls)
+            foreach (Control c in orden)
             {
                 if (!Vis.Shown(c)) continue;
                 y += ChildHeight(c, w) + Gap; n++;
@@ -59,7 +67,7 @@ namespace KerbinMaps.UI
             try
             {
                 int w = Width - Padding.Horizontal, y = Padding.Top, n = 0;
-                foreach (Control c in Controls)
+                foreach (Control c in orden)
                 {
                     if (!Vis.Shown(c)) continue;
                     int h = ChildHeight(c, w);
@@ -74,37 +82,44 @@ namespace KerbinMaps.UI
         }
     }
 
-    /* Dos columnas del mismo ancho (.row2). */
+    /* Two columns of the same width (.row2). */
     public sealed class Row2 : Control, IHeightForWidth
     {
+        // kept apart from Controls, whose order WinForms may change (see StackPanel)
+        readonly Control a, b;
+
         public Row2(Control a, Control b)
         {
+            this.a = a; this.b = b;
             Controls.Add(a); Controls.Add(b);
         }
 
         public int HeightFor(int width)
         {
             int cw = (width - Theme.S(10)) / 2;
-            return Controls.Cast<Control>().Max(c => StackPanel.ChildHeight(c, cw));
+            return Math.Max(StackPanel.ChildHeight(a, cw), StackPanel.ChildHeight(b, cw));
         }
 
         protected override void OnLayout(LayoutEventArgs levent)
         {
-            // Add() maqueta en cuanto entra el primer hijo, antes de que llegue el segundo
-            if (Controls.Count < 2) return;
+            // Add() lays out as soon as the first child goes in, before the second arrives
+            if (b == null) return;
             int cw = (Width - Theme.S(10)) / 2;
-            Controls[0].SetBounds(0, 0, cw, StackPanel.ChildHeight(Controls[0], cw));
-            Controls[1].SetBounds(cw + Theme.S(10), 0, Width - cw - Theme.S(10), StackPanel.ChildHeight(Controls[1], cw));
+            a.SetBounds(0, 0, cw, StackPanel.ChildHeight(a, cw));
+            b.SetBounds(cw + Theme.S(10), 0, Width - cw - Theme.S(10), StackPanel.ChildHeight(b, cw));
             base.OnLayout(levent);
         }
     }
 
-    /* Botones que se reparten el ancho y bajan de línea si no caben (.btn-row). */
+    /* Buttons that share the width and wrap to the next line if they don't fit (.btn-row). */
     public sealed class BtnRow : Control, IHeightForWidth
     {
+        readonly DarkButton[] botones = Array.Empty<DarkButton>();
+
         public BtnRow(params DarkButton[] buttons)
         {
             foreach (var b in buttons) Controls.Add(b);
+            botones = buttons;
         }
 
         List<List<DarkButton>> Rows(int width)
@@ -112,7 +127,7 @@ namespace KerbinMaps.UI
             var rows = new List<List<DarkButton>>();
             var cur = new List<DarkButton>();
             int used = 0, gap = Theme.S(8);
-            foreach (var b in Controls.OfType<DarkButton>().Where(Vis.Shown))
+            foreach (var b in botones.Where(Vis.Shown))
             {
                 int pw = b.PreferredWidth;
                 if (cur.Count > 0 && used + gap + pw > width) { rows.Add(cur); cur = new List<DarkButton>(); used = 0; }
@@ -153,7 +168,40 @@ namespace KerbinMaps.UI
         }
     }
 
-    /* Sección plegable del panel lateral (<details> con su <summary>). */
+    /* Buttons in columns of the same width that never wrap: for button grids (the building
+       editor's pad), where BtnRow would leave one button alone on a line. */
+    public sealed class EqualRow : Control, IHeightForWidth
+    {
+        readonly Control[] items = Array.Empty<Control>();
+
+        public EqualRow(params Control[] items)
+        {
+            foreach (var c in items) Controls.Add(c);
+            this.items = items;
+        }
+
+        static int Gap => Theme.S(6);
+
+        public int HeightFor(int width) =>
+            items.Select(c => c is DarkButton b ? b.PreferredHeight : StackPanel.ChildHeight(c, width)).DefaultIfEmpty(0).Max();
+
+        protected override void OnLayout(LayoutEventArgs levent)
+        {
+            int n = items.Length;
+            if (n == 0) return;
+            int h = HeightFor(Width), x = 0;
+            for (int k = 0; k < n; k++)
+            {
+                // the last column takes the leftover pixels so the right edge lines up with the rows around it
+                int w = k == n - 1 ? Width - x : (Width - Gap * (n - 1)) / n;
+                items[k].SetBounds(x, 0, w, h);
+                x += w + Gap;
+            }
+            base.OnLayout(levent);
+        }
+    }
+
+    /* Collapsible sidebar section (<details> with its <summary>). */
     public sealed class Section : Control, IHeightForWidth
     {
         readonly SectionHeader header;
@@ -176,8 +224,8 @@ namespace KerbinMaps.UI
 
         public string Titulo { get; }
 
-        /* Resumen que sale a la derecha del título cuando la sección está plegada: de un
-           vistazo se sabe qué hay dentro sin abrirla. */
+        /* Summary shown to the right of the title when the section is collapsed: you can tell
+           at a glance what's inside without opening it. */
         public string Estado
         {
             get => estado;
@@ -189,7 +237,7 @@ namespace KerbinMaps.UI
         {
             BackColor = Theme.Bg2;
             Titulo = title;
-            header = new SectionHeader(this) { Text = Core.Lang.T(title).ToUpperInvariant() };
+            header = new SectionHeader(this) { Text = Core.Lang.T(title) };
             Body = new StackPanel(10) { Padding = new Padding(Theme.S(16), Theme.S(4), Theme.S(16), Theme.S(16)), BackColor = Theme.Bg2 };
             Controls.Add(header);
             Controls.Add(Body);
@@ -201,13 +249,15 @@ namespace KerbinMaps.UI
 
         public T Add<T>(T c) where T : Control { Body.Controls.Add(c); return c; }
 
+        static int HeaderH => Theme.S(40);
+
         public int HeightFor(int width) =>
-            Theme.S(38) + (expanded ? Body.HeightFor(width) : 0) + 1;
+            HeaderH + (expanded ? Body.HeightFor(width) : 0) + 1;
 
         protected override void OnLayout(LayoutEventArgs levent)
         {
-            header.SetBounds(0, 0, Width, Theme.S(38));
-            if (expanded) Body.SetBounds(0, Theme.S(38), Width, Body.HeightFor(Width));
+            header.SetBounds(0, 0, Width, HeaderH);
+            if (expanded) Body.SetBounds(0, HeaderH, Width, Body.HeightFor(Width));
             base.OnLayout(levent);
         }
 
@@ -228,21 +278,16 @@ namespace KerbinMaps.UI
             protected override void OnPaint(PaintEventArgs e)
             {
                 var g = e.Graphics;
-                g.Clear(hover ? Theme.Bg3 : Theme.Bg2);
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                float cx = Theme.Sf(21), cy = Height / 2f, s = Theme.Sf(4);
-                using (var b = new SolidBrush(Theme.Accent))
-                {
-                    if (owner.expanded) g.FillPolygon(b, new[] { new PointF(cx - s, cy - s * 0.6f), new PointF(cx + s, cy - s * 0.6f), new PointF(cx, cy + s * 0.8f) });
-                    else g.FillPolygon(b, new[] { new PointF(cx - s * 0.6f, cy - s), new PointF(cx + s * 0.8f, cy), new PointF(cx - s * 0.6f, cy + s) });
-                }
+                g.Clear(hover ? Theme.Mix(Theme.Bg2, Theme.Fg, Theme.Dark ? 0.04f : 0.03f) : Theme.Bg2);
+                Theme.DrawGlyph(g, owner.expanded ? Theme.Glyph.ChevronDown : Theme.Glyph.ChevronRight, Theme.IconSmall,
+                                new Rectangle(Theme.S(12), 0, Theme.S(16), Height), hover ? Theme.Fg : Theme.FgDim);
                 var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
                 string estado = owner.expanded ? null : owner.Estado;
                 int anchoEstado = 0;
                 if (!string.IsNullOrEmpty(estado))
                 {
                     anchoEstado = Math.Min(Width / 2, TextRenderer.MeasureText(g, estado, Theme.Tiny, Size.Empty, flags).Width + Theme.S(12));
-                    // el título manda: si con el resumen no cabe entero, el resumen no sale
+                    // the title rules: if it doesn't fit whole alongside the summary, the summary isn't shown
                     int anchoTitulo = TextRenderer.MeasureText(g, Text, Theme.Header, Size.Empty, flags).Width;
                     if (anchoTitulo > Width - Theme.S(36) - anchoEstado) anchoEstado = 0;
                 }
@@ -251,17 +296,16 @@ namespace KerbinMaps.UI
                     TextRenderer.DrawText(g, estado, Theme.Tiny, new Rectangle(Width - anchoEstado, 0, anchoEstado - Theme.S(12), Height),
                         Theme.FgDim, flags | TextFormatFlags.Right | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
                 }
-                TextRenderer.DrawText(g, Text, Theme.Header, new Rectangle(Theme.S(32), 0, Width - Theme.S(36) - anchoEstado, Height),
-                    hover ? Theme.Fg : Theme.FgDim, flags | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, Text, Theme.Header, new Rectangle(Theme.S(34), 0, Width - Theme.S(38) - anchoEstado, Height),
+                    Theme.Fg, flags | TextFormatFlags.EndEllipsis);
             }
         }
     }
 
     public enum RichMode { Hint, Readout, Popup, Banner, Plain }
 
-    /* Texto con un marcado mínimo: <b>, <code>, <m> (monoespaciado atenuado) y
-       <sw=#rrggbb> (muestra de color). Parte palabras, respeta saltos de línea y, en
-       las lecturas, los espacios de alineación. */
+    /* Text with minimal markup: <b>, <code>, <m> (dimmed monospace) and <sw=#rrggbb> (color
+       swatch). Wraps words, respects line breaks and, in readouts, alignment spaces. */
     public sealed class RichLabel : Control, IHeightForWidth
     {
         readonly RichMode mode;
@@ -282,7 +326,7 @@ namespace KerbinMaps.UI
 
         public void SetText(string text)
         {
-            // las ayudas son texto fijo y se traducen; los datos que se arman al vuelo, no
+            // hints are fixed text and get translated; data assembled on the fly doesn't
             markup = Core.Lang.T(text) ?? "";
             runs = Parse(markup);
             if (HideWhenEmpty && mode == RichMode.Readout && Vis.Shown(this) != markup.Length > 0) Vis.Set(this, markup.Length > 0);
@@ -292,7 +336,7 @@ namespace KerbinMaps.UI
 
         public static string Esc(string s) => (s ?? "").Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 
-        // estilo: bit 1 = negrita, bit 2 = code, bit 4 = mono atenuado
+        // style: bit 1 = bold, bit 2 = code, bit 4 = dimmed mono
         static List<(string, int, Color?)> Parse(string s)
         {
             var list = new List<(string, int, Color?)>();
@@ -322,9 +366,9 @@ namespace KerbinMaps.UI
                     return b ? (Theme.MonoBold, Theme.Fg) : (Theme.Mono, Theme.FgDim);
                 case RichMode.Popup:
                     if (code || mono) return (Theme.Mono, Theme.FgDim);
-                    return b ? (Theme.Semibold, Theme.Accent) : (Theme.UI, Theme.Fg);
+                    return b ? (Theme.Semibold, Theme.Fg) : (Theme.UI, Theme.Fg);
                 case RichMode.Banner:
-                    return b ? (BoldOf(Theme.UISmall), Theme.Warn) : (Theme.UISmall, Theme.Fg);
+                    return b ? (Theme.Semibold, Theme.Fg) : (Theme.UISmall, Theme.Fg);
                 default:
                     return (b ? Theme.Semibold : Theme.UI, Theme.Fg);
             }
@@ -354,7 +398,7 @@ namespace KerbinMaps.UI
             return w;
         }
 
-        /* Coloca cada trozo: devuelve (x, y, texto, estilo, muestra) y la altura total. */
+        /* Places each piece: returns (x, y, text, style, swatch) and the total height. */
         List<(int x, int y, string t, int st, Color? sw)> Flow(int width, out int height)
         {
             var output = new List<(int, int, string, int, Color?)>();
@@ -386,8 +430,8 @@ namespace KerbinMaps.UI
                         if (x + w > maxW && x > 0)
                         {
                             if (space) { x = 0; y += lineH; continue; }
-                            /* Una palabra hecha de varios estilos (un paréntesis pegado a un
-                               <code>) baja entera: no se corta por la costura entre estilos. */
+                            /* A word made of several styles (a parenthesis stuck to a <code>)
+                               wraps whole: it isn't split at the seam between styles. */
                             if (wordStart >= 0 && wordX > 0 && x - wordX + w <= maxW)
                             {
                                 y += lineH;
@@ -433,7 +477,7 @@ namespace KerbinMaps.UI
             g.Clear(Parent?.BackColor ?? Theme.Bg2);
             var pad = Inner;
             if (mode == RichMode.Readout)
-                Theme.FillRound(g, Theme.Bg, Theme.Line, new RectangleF(0, 0, Width, Height), Theme.Sf(7));
+                Theme.FillRound(g, Theme.Well, Theme.Dark ? Color.Transparent : Theme.Line, new RectangleF(0, 0, Width, Height), Theme.Sf(Theme.Radius));
             int lineH = (int)Math.Ceiling(StyleOf(0).font.Height * LineHeightFactor);
             foreach (var (x, y, t, st, sw) in Flow(Width, out _))
             {
@@ -443,7 +487,7 @@ namespace KerbinMaps.UI
                     var r = new Rectangle(pad.Left + x, pad.Top + y + (lineH - s) / 2, s, s);
                     using var b = new SolidBrush(sw.Value);
                     g.FillRectangle(b, r);
-                    using var pen = new Pen(Color.FromArgb(102, 102, 102));
+                    using var pen = new Pen(Color.FromArgb(110, Theme.FgDim));
                     g.DrawRectangle(pen, r);
                     continue;
                 }
@@ -454,7 +498,7 @@ namespace KerbinMaps.UI
         }
     }
 
-    /* Zona de arrastre con borde discontinuo; también se puede pinchar. */
+    /* Drop zone with a dashed border; it can also be clicked. */
     public sealed class DropZone : DarkControl, IHeightForWidth
     {
         readonly string bold, rest, small;
@@ -491,10 +535,10 @@ namespace KerbinMaps.UI
             g.Clear(ParentBack);
             g.SmoothingMode = SmoothingMode.AntiAlias;
             var r = new RectangleF(1, 1, Width - 2, Height - 2);
-            using (var path = Theme.RoundRect(r, Theme.Sf(7)))
+            using (var path = Theme.RoundRect(r, Theme.Sf(Theme.Radius)))
             {
-                if (over || hover) using (var b = new SolidBrush(Color.FromArgb(20, 78, 163, 255))) g.FillPath(b, path);
-                using var pen = new Pen(over || hover ? Theme.Accent : Theme.Line, Theme.Sf(1.5)) { DashStyle = DashStyle.Dash };
+                if (over || hover) using (var b = new SolidBrush(Color.FromArgb(over ? 34 : 18, Theme.Accent))) g.FillPath(b, path);
+                using var pen = new Pen(over || hover ? Theme.Accent : Theme.Current.LineStrong, Theme.Sf(1.2)) { DashStyle = DashStyle.Dash };
                 g.DrawPath(pen, path);
             }
             var fontB = new Font(Theme.UISmall, FontStyle.Bold);
@@ -512,8 +556,8 @@ namespace KerbinMaps.UI
         }
     }
 
-    /* Lista dibujada a mano con su propio desplazamiento (.mk-list). Aguanta cientos
-       de filas sin crear un control por cada una. */
+    /* Hand-drawn list with its own scrolling (.mk-list). Handles hundreds of rows without
+       creating a control for each one. */
     public sealed class DrawList : DarkControl, IHeightForWidth
     {
         public IList<object> Items = new List<object>();
@@ -633,14 +677,15 @@ namespace KerbinMaps.UI
             {
                 var r = RowRect(i);
                 bool sel = IsSelected(Items[i]);
-                if (sel || i == hoverIndex) Theme.FillRound(g, Theme.Bg3, sel ? Theme.Accent : Color.Transparent, r, Theme.Sf(7), sel ? 1 : 0);
+                if (sel) Theme.FillRound(g, Theme.Current.Selected, Color.Transparent, r, Theme.Sf(Theme.Radius), 0);
+                else if (i == hoverIndex) Theme.FillRound(g, Theme.Mix(ParentBack, Theme.Fg, Theme.Dark ? 0.06f : 0.045f), Color.Transparent, r, Theme.Sf(Theme.Radius), 0);
                 DrawItem?.Invoke(g, r, Items[i], i == hoverIndex);
             }
-            if (Overflow) Theme.FillRound(g, Theme.Line, Color.Transparent, ThumbRect(), Theme.Sf(3), 0);
+            if (Overflow) Theme.FillRound(g, Theme.Current.LineStrong, Color.Transparent, ThumbRect(), Theme.Sf(3), 0);
         }
     }
 
-    /* Ranura de imagen: nombre, estado, grados de giro, Cargar y quitar (.slot). */
+    /* Image slot: name, state, rotation degrees, Load and remove (.slot). */
     public sealed class SlotRow : Control, IHeightForWidth
     {
         public readonly string SlotName;
@@ -659,7 +704,7 @@ namespace KerbinMaps.UI
             LoadBtn = new DarkButton("Cargar", small: true);
             ClearBtn = new DarkButton("×", ButtonVariant.Ghost, small: true) { Tip = "Quitar" };
             Controls.AddRange(new Control[] { Offset, LoadBtn, ClearBtn });
-            BackColor = Theme.Bg;
+            BackColor = Theme.Well;
         }
 
         public void SetState(bool isFilled, string stateText, string tooltip)
@@ -687,7 +732,7 @@ namespace KerbinMaps.UI
         {
             var g = e.Graphics;
             g.Clear(Parent?.BackColor ?? Theme.Bg2);
-            Theme.FillRound(g, Theme.Bg, filled ? Color.FromArgb(115, 126, 231, 135) : Theme.Line, new RectangleF(0, 0, Width, Height), Theme.Sf(7));
+            Theme.FillRound(g, Theme.Well, filled ? Theme.Mix(Theme.Line, Theme.Accent2, 0.55f) : Theme.Line, new RectangleF(0, 0, Width, Height), Theme.Sf(Theme.Radius));
             int pad = Theme.S(7);
             TextRenderer.DrawText(g, SlotName, Theme.Semibold, new Rectangle(pad, 0, Theme.S(46), Height), Theme.Fg,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
@@ -697,10 +742,13 @@ namespace KerbinMaps.UI
         }
     }
 
-    /* Panel opaco que flota sobre el mapa (HUD, barra de tiempo, avisos). */
+    /* Opaque panel floating over the map (HUD, time bar, notices). It has square corners: over
+       the GL there's no transparency, and rounded corners would show the background of the
+       panel underneath. */
     public class OverlayPanel : Panel
     {
-        public Color BorderColor = Theme.Line;
+        /* Warning: a colored stripe on the left instead of a whole border. */
+        public bool Warning;
 
         public OverlayPanel()
         {
@@ -712,12 +760,13 @@ namespace KerbinMaps.UI
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            using var pen = new Pen(BorderColor);
+            using var pen = new Pen(Theme.Current.LineStrong);
             e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            if (Warning) using (var b = new SolidBrush(Theme.Warn)) e.Graphics.FillRectangle(b, 0, 0, Theme.S(3), Height);
         }
     }
 
-    /* Pregunta de una línea con el tema oscuro, en lugar del prompt() de la web. */
+    /* One-line prompt in the app's theme, instead of the web's prompt(). */
     public sealed class InputBox : Form
     {
         readonly DarkTextBox box;
@@ -755,6 +804,12 @@ namespace KerbinMaps.UI
             cancel.SetBounds(ok.Left - Theme.S(8) - Theme.S(96), by, Theme.S(96), cancel.Height);
             ClientSize = new Size(ClientSize.Width, by + ok.Height + pad);
             Shown += (s, e) => { box.Inner.Focus(); box.Inner.SelectAll(); };
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            MainForm.TintTitleBar(Handle);
         }
 
         public static string Ask(IWin32Window owner, string message, string value)

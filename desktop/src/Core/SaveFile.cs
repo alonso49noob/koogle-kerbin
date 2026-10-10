@@ -11,8 +11,8 @@ namespace KerbinMaps.Core
         public bool HasMna, HasEph;
     }
 
-    /* Una pieza tal como la guarda la partida: su posición y giro respecto a la pieza
-       raíz (en el marco de Unity) y las variantes elegidas. */
+    /* A part as the save stores it: its position and rotation relative to the root part (in
+       Unity's frame) and the chosen variants. */
     public sealed class PartSnapshot
     {
         public string Name;
@@ -20,10 +20,10 @@ namespace KerbinMaps.Core
         public double[] Rot = { 0, 0, 0, 1 };
         public string Variant;
         public readonly List<(string ModuleId, string Subtype)> B9 = new();
-        /* Estado de los módulos que mueven piezas del modelo (paneles, antenas, patas),
-           en el orden en que aparecen en la pieza. */
+        /* State of the modules that move parts of the model (panels, antennas, legs), in the
+           order they appear in the part. */
         public readonly List<(string Name, Dictionary<string, string> Fields)> Modules = new();
-        /* Nodos de unión que tienen otra pieza enganchada. */
+        /* Attach nodes that have another part hooked on. */
         public readonly HashSet<string> Attached = new(StringComparer.Ordinal);
     }
 
@@ -31,13 +31,13 @@ namespace KerbinMaps.Core
     {
         public string Name, Type, Sit, BodyName;
         public double? Lat, Lon, Alt;
-        // altura sobre el terreno en el instante del guardado y, si estaba en un sitio de
-        // lanzamiento conocido (plataforma, pista...), su nombre; vacío si no
+        // height above the terrain at the time of the save and, if it was at a known launch
+        // site (pad, runway...), its name; empty otherwise
         public double? Hgt;
         public string LandedAt;
         public Elements Orbit;
-        public double[] Rot = { 0, 0, 0, 1 };      // orientación respecto al planeta que gira
-        public double[] CoM = { 0, 0, 0 };         // centro de masas en el marco de la nave
+        public double[] Rot = { 0, 0, 0, 1 };      // orientation relative to the rotating planet
+        public double[] CoM = { 0, 0, 0 };         // center of mass in the vessel's frame
         public readonly List<PartSnapshot> Parts = new();
     }
 
@@ -54,15 +54,15 @@ namespace KerbinMaps.Core
         public bool HasMad;
     }
 
-    /* Lectura de una partida de KSP (.sfs) y calibración del marco de rotación.
+    /* Reading a KSP save (.sfs) and calibrating the rotation frame.
 
-       El formato es ConfigNode: un nombre en su línea, una llave que abre, pares
-       clave = valor, y llave que cierra. Se recorre de una pasada. Solo interesan el
-       UT de la partida y los nodos VESSEL con su subnodo ORBIT. */
+       The format is ConfigNode: a name on its own line, an opening brace, key = value pairs,
+       and a closing brace. It's walked in a single pass. We only care about the save's UT and
+       the VESSEL nodes with their ORBIT subnode. */
     public static class SaveFile
     {
-        /* Campos de VESSEL que se conservan; el resto (piezas, tripulación, recursos)
-           se ignora, que es la mayor parte del fichero. */
+        /* VESSEL fields that are kept; the rest (parts, crew, resources) is ignored, which is
+           most of the file. */
         static readonly HashSet<string> Campos = new() { "name", "type", "sit", "landed", "splashed", "lat", "lon", "alt", "hgt", "landedAt", "pid", "rot", "CoM" };
         static readonly HashSet<string> Orbita = new() { "SMA", "ECC", "INC", "LPE", "LAN", "MNA", "EPH", "REF", "IDENT" };
 
@@ -70,9 +70,9 @@ namespace KerbinMaps.Core
         {
             "ModuleDeployableSolarPanel", "ModuleDeployableAntenna", "ModuleDeployableRadiator", "ModuleDeployableReflector",
             "ModuleDeployablePart", "ModuleAnimateGeneric", "ModuleWheelDeployment", "ModuleAnimationGroup",
-            // y los que enseñan u ocultan partes: cubiertas de motor, cofias y estructuras de interetapa
+            // and the ones that show or hide parts: engine shrouds, fairings and interstage structures
             "ModuleJettison", "ModuleProceduralFairing", "ModuleStructuralNode", "ModuleDynamicNodes",
-            // paracaídas: plegados, abiertos o cortados
+            // parachutes: packed, deployed or cut
             "ModuleParachute", "RealChuteFAR"
         };
 
@@ -124,7 +124,7 @@ namespace KerbinMaps.Core
         {
             var lines = text.Split('\n');
             var stack = new List<string>();
-            string pend = null;                 // nombre leído, a la espera de su llave
+            string pend = null;                 // name read, waiting for its brace
             double? ut = null;
             var vessels = new List<Raw>();
             Raw v = null;
@@ -141,9 +141,9 @@ namespace KerbinMaps.Core
                 if (s == "{")
                 {
                     stack.Add(pend ?? "");
-                    /* Se apunta la profundidad de la nave: dentro de cada VESSEL hay PARTs y
-                       módulos con sus propios «name», «type» u «ORBIT», y solo valen los que
-                       cuelgan directamente de la nave. */
+                    /* We track the vessel's depth: inside each VESSEL there are PARTs and
+                       modules with their own «name», «type» or «ORBIT», and only those hanging
+                       directly from the vessel count. */
                     if (pend == "VESSEL" && v == null) { v = new Raw { D = stack.Count }; enOrbita = false; }
                     else if (v != null && pend == "ORBIT" && v.Orbit == null && stack.Count == v.D + 1)
                     {
@@ -227,7 +227,7 @@ namespace KerbinMaps.Core
                     Rot = Vec(rp.F.GetValueOrDefault("rotation"), 4) ?? new double[] { 0, 0, 0, 1 },
                     Variant = rp.F.TryGetValue("moduleVariantName", out var mv) && mv.Length > 0 ? mv : null
                 };
-                // «attN = bottom, 3»: el nodo y la pieza unida (-1 si no hay ninguna)
+                // «attN = bottom, 3»: the node and the attached part (-1 if there's none)
                 foreach (var a in rp.AttN)
                 {
                     int c = a.LastIndexOf(',');
@@ -247,8 +247,8 @@ namespace KerbinMaps.Core
             {
                 double? sma = Num(o.GetValueOrDefault("SMA")), ecc = Num(o.GetValueOrDefault("ECC"));
                 double? mna = Num(o.GetValueOrDefault("MNA")), eph = Num(o.GetValueOrDefault("EPH"));
-                /* Las naves posadas llevan una órbita radial degenerada (e≈1, SMA = R/2)
-                   que no describe ninguna trayectoria: se descarta. */
+                /* Landed vessels carry a degenerate radial orbit (e≈1, SMA = R/2) that
+                   describes no trajectory: it's discarded. */
                 if (sma != null && ecc != null && ecc < 0.99 && sma > 0)
                 {
                     output.Orbit = new Elements
@@ -267,8 +267,8 @@ namespace KerbinMaps.Core
 
         public readonly record struct Dir(double X, double Y, double Z, double R);
 
-        /* Dirección unitaria en el marco inercial para unos elementos y una anomalía
-           media dada. Norte = Z, comprobado contra 107 naves de una partida. */
+        /* Unit direction in the inertial frame for some elements and a given mean anomaly.
+           North = Z, checked against 107 vessels of a save. */
         public static Dir DirInercial(Elements e, double M)
         {
             double ecc = e.Ecc;
@@ -285,14 +285,14 @@ namespace KerbinMaps.Core
 
         static double Mod360(double a) => (a % 360 + 360) % 360;
 
-        /* Ángulo de rotación del cuerpo en el UT de la partida.
+        /* Rotation angle of the body at the save's UT.
 
-           No se usa una constante: se mide con las propias naves. Cada VESSEL guarda la
-           lat/lon de su posición en SU época EPH; la diferencia entre la longitud
-           inercial que dan sus elementos y la longitud del mapa ES el ángulo de rotación
-           en esa época. Se propagan todas al UT y se promedian en el círculo, con
-           recorte de las incoherentes. Hace falta medirlo porque tras cientos de miles
-           de vueltas, 7e-5 s de error en el periodo ya desplaza un grado. */
+           No constant is used: it's measured with the vessels themselves. Each VESSEL stores
+           the lat/lon of its position at ITS epoch EPH; the difference between the inertial
+           longitude its elements give and the map longitude IS the rotation angle at that
+           epoch. They're all propagated to the UT and averaged on the circle, trimming the
+           inconsistent ones. It needs measuring because after hundreds of thousands of
+           revolutions, 7e-5 s of error in the period already shifts a degree. */
         public static Calibration CalibrarRotacion(IEnumerable<Vessel> vessels, double ut, double periodo = 0)
         {
             double T = periodo > 0 ? periodo : Body.SiderealDay;
@@ -305,8 +305,8 @@ namespace KerbinMaps.Core
                 if (!e.HasEph || !e.HasMna) continue;
                 var d = DirInercial(e, e.Mna);
 
-                /* Solo valen las naves cuya lat/lon está sincronizada con su época. La
-                   latitud no depende de la rotación, así que sirve de filtro limpio. */
+                /* Only vessels whose lat/lon is synchronized with their epoch count. Latitude
+                   doesn't depend on rotation, so it makes a clean filter. */
                 double latCalc = Math.Asin(Math.Max(-1, Math.Min(1, d.Z))) * Geo.R2D;
                 if (Math.Abs(latCalc - v.Lat.Value) > 0.01) continue;
 
@@ -330,10 +330,10 @@ namespace KerbinMaps.Core
                 return s[(s.Count - 1) / 2];
             }
 
-            /* La media circular a secas no aguanta una nave cuya lat/lon sea de otro
-               instante y se haya colado por el filtro de latitud. Se recorta en dos
-               pasadas: lo que se aleje más de 5 veces la dispersión mediana (con un suelo
-               de 2°) queda fuera, y se recalcula con el resto. */
+            /* A plain circular mean can't cope with a vessel whose lat/lon is from another
+               moment and slipped through the latitude filter. It's trimmed in two passes:
+               whatever is more than 5 times the median spread away (with a floor of 2°) is left
+               out, and it's recomputed with the rest. */
             var usadas = muestras;
             double rot = Media(muestras);
             for (int pasada = 0; pasada < 2; pasada++)
@@ -359,7 +359,7 @@ namespace KerbinMaps.Core
             };
         }
 
-        /* Posición sobre el suelo (lat, lon, altitud) en un instante dado. */
+        /* Position on the ground (lat, lon, altitude) at a given time. */
         public static TrackPoint PosicionEn(Elements e, double t, double ut, double rotUT, double periodo = 0)
         {
             double T = periodo > 0 ? periodo : Body.SiderealDay;
@@ -377,9 +377,8 @@ namespace KerbinMaps.Core
 
         public readonly record struct Estado(double R, double V, double Nu, double TAp, double TPe, double Periodo);
 
-        /* Dónde va la nave en su órbita en el instante t: distancia al centro, velocidad
-           (vis-viva), anomalía verdadera en grados y lo que falta para el próximo
-           apoapsis y periapsis. */
+        /* Where the vessel is in its orbit at time t: distance to the center, speed (vis-viva),
+           true anomaly in degrees, and how long until the next apoapsis and periapsis. */
         public static Estado EstadoEn(Elements e, double t)
         {
             double n = Math.Sqrt(Body.Mu / Math.Pow(e.Sma, 3));
@@ -394,8 +393,8 @@ namespace KerbinMaps.Core
             return new Estado(r, v, (nu * Geo.R2D + 360) % 360, tAp, tPe, 2 * Math.PI / n);
         }
 
-        /* Traza desde un instante cualquiera (el de la simulación). `porVuelta` fija la
-           densidad: para dibujar todas las naves a la vez basta con menos puntos. */
+        /* Track from any moment (the simulation's). `porVuelta` sets the density: to draw all
+           the vessels at once fewer points are enough. */
         public static List<TrackPoint> TrazaDesde(Elements e, double t0, double ut, double rotUT, double orbitas, int porVuelta = 0, double periodo = 0)
         {
             double P = Periodo(e);
@@ -408,10 +407,10 @@ namespace KerbinMaps.Core
             return pts;
         }
 
-        /* La órbita como anillo cerrado, en el marco fijo al cuerpo con la rotación del
-           instante del guardado (rotUT). Se muestrea en anomalía excéntrica y no en
-           tiempo: en tiempo, una órbita excéntrica amontona los puntos en el apoapsis y
-           deja el periapsis hecho de tramos rectos. */
+        /* The orbit as a closed ring, in the body-fixed frame with the rotation at the time of
+           the save (rotUT). It's sampled in eccentric anomaly and not in time: in time, an
+           eccentric orbit crowds the points at apoapsis and leaves periapsis made of straight
+           segments. */
         public static List<TrackPoint> Anillo(Elements e, double rotUT, int puntos = 180)
         {
             var pts = new List<TrackPoint>(puntos + 1);

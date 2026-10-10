@@ -4,14 +4,14 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.UI
 {
-    /* Filtro de altimetría: se elige una franja de altura y el terreno que cae dentro se
-       pinta con una paleta tipo SCANsat, mientras que el de fuera se apaga. Sirve para
-       ver de un vistazo dónde hay meseta a tal altura, dónde queda por encima de la
-       cota de un océano o qué zona está por debajo de una altitud de aterrizaje.
+    /* Altimetry filter: a height band is chosen and the terrain that falls inside it is painted
+       with a SCANsat-style palette, while the rest is dimmed. It shows at a glance where
+       there's plateau at a given height, where things stand above an ocean's level or which
+       area is below a landing altitude.
 
-       Necesita mapa de alturas: el de Kerbin que trae el visor, o el del cuerpo si has
-       apuntado a una carpeta con las texturas del juego. La conversión de gris a metros
-       es la calibración de la ranura (o la de SCANsat para ese cuerpo). */
+       It needs a height map: the Kerbin one the viewer ships, or the body's if you've pointed
+       to a folder with the game's textures. The gray-to-meters conversion is the slot's
+       calibration (or SCANsat's for that body). */
     public sealed partial class MainForm
     {
         DarkCheck chkAlt;
@@ -48,8 +48,8 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Cuánta superficie queda dentro de la franja, pesando por cos(lat) como en los
-           biomas: sin eso los polos contarían muchísimo más de lo que ocupan. */
+        /* How much surface is inside the band, weighting by cos(lat) as with biomes: without it
+           the poles would count far more than they cover. */
         double PorcentajeEnRango(ImageData img, double min, double max)
         {
             if (img == null) return double.NaN;
@@ -93,8 +93,8 @@ namespace KerbinMaps.UI
             altInfo.SetText(string.Join("\n", partes));
         }
 
-        /* Al cambiar de cuerpo, una franja que no tiene sentido en el nuevo (Kerbin llega
-           a 6500 m, Gilly a 6000 menos) se devuelve al rango entero. */
+        /* When changing body, a band that makes no sense on the new one (Kerbin reaches 6500 m,
+           Gilly 6000 less) goes back to the full range. */
         void AjustarFiltroAlCuerpo()
         {
             var r = RangoTerreno();
@@ -109,10 +109,10 @@ namespace KerbinMaps.UI
             AplicarAltimetria();
         }
 
-        /* Calibra la ranura de altura como lo que es un volcado de las texturas del juego:
-           gris 0 en el minTerrainAltitude del cuerpo y la rampa con el tope de gris 145.
-           Es lo que arregla un mapa sacado del juego al que se le ha dejado la escala de
-           un export de SCANsat, que es de otro sitio. */
+        /* Calibrates the height slot as what a dump of the game's textures is: gray 0 at the
+           body's minTerrainAltitude and the ramp topping out at gray 145. That's what fixes a
+           map taken from the game that was left with the scale of a SCANsat export, which is
+           from somewhere else. */
         void CalibrarComoVolcado()
         {
             if (!parallaxRanges.TryGetValue(Body.Name, out var pr))
@@ -134,10 +134,10 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Un mapa de alturas de Kerbin cargado a mano que es un volcado de las texturas del
-           juego (su gris se queda en el 145) se calibra solo, una vez por fichero: con la
-           escala de un export de SCANsat, el KSC salía a −684 m y toda la tierra baja quedaba
-           bajo el mar. Si luego se cambia el rango a mano, se respeta. */
+        /* A Kerbin height map loaded by hand that is a dump of the game's textures (its gray
+           stops at 145) calibrates itself, once per file: with a SCANsat export's scale, the
+           KSC came out at −684 m and all the low land ended up under the sea. If the range is
+           changed by hand afterwards, that's respected. */
         void CalibrarVolcadoSiToca()
         {
             var img = Img("height");
@@ -175,8 +175,8 @@ namespace KerbinMaps.UI
             AplicarAltimetria();
         }
 
-        /* Vuelve al rango entero del cuerpo, que es lo que hay que hacer al cambiar de
-           cuerpo: una franja de Kerbin no significa nada en Tylo. */
+        /* Goes back to the body's full range, which is what has to happen when changing body: a
+           Kerbin band means nothing on Tylo. */
         void ResetAltRange()
         {
             var r = RangoTerreno();

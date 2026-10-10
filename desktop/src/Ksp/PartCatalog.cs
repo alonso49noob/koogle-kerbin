@@ -8,7 +8,7 @@ namespace KerbinMaps.Ksp
 {
     public sealed class ModelRef
     {
-        public string Url;                       // relativa a GameData, sin «.mu»
+        public string Url;                       // relative to GameData, without «.mu»
         public double[] Pos = { 0, 0, 0 };
         public double[] Euler = { 0, 0, 0 };
         public double[] Scale = { 1, 1, 1 };
@@ -25,20 +25,20 @@ namespace KerbinMaps.Ksp
     public sealed class PartDef
     {
         public string Name, UrlDir;
-        public double RescaleFactor = 1.25;      // el valor por defecto de KSP
+        public double RescaleFactor = 1.25;      // KSP's default value
         public readonly List<ModelRef> Models = new();
         public readonly Dictionary<string, Dictionary<string, bool>> Variants = new(StringComparer.OrdinalIgnoreCase);
         public string BaseVariant;
         public readonly List<B9Module> B9 = new();
-        /* Módulos que animan el modelo, con su configuración (animationName, pivotName...),
-           en el mismo orden que en la partida. */
+        /* Modules that animate the model, with their configuration (animationName,
+           pivotName...), in the same order as in the save. */
         public readonly List<(string Name, Dictionary<string, string> Values)> AnimModules = new();
     }
 
-    /* Definición de cada pieza: qué modelos la forman y cómo cambian con sus variantes.
-       Se lee de la caché de ModuleManager, que ya trae aplicados los parches de todos los
-       mods (ReStock cambia los modelos de las piezas de serie, por ejemplo). Sin
-       ModuleManager se leen los .cfg de GameData tal cual. */
+    /* Definition of each part: which models make it up and how they change with its variants.
+       Read from the ModuleManager cache, which already has every mod's patches applied (ReStock
+       changes the stock parts' models, for example). Without ModuleManager the GameData .cfg
+       files are read as they are. */
     public sealed class PartCatalog
     {
         public readonly string GameData;
@@ -48,7 +48,7 @@ namespace KerbinMaps.Ksp
 
         PartCatalog(string gameData) { GameData = gameData; }
 
-        /* En la partida los nombres llevan puntos donde los .cfg tienen guiones bajos. */
+        /* In the save, names have dots where the .cfg files have underscores. */
         public PartDef Find(string partName) =>
             partName != null && parts.TryGetValue(partName.Replace('.', '_'), out var d) ? d : null;
 
@@ -118,8 +118,8 @@ namespace KerbinMaps.Ksp
             }
             if (def.Models.Count == 0)
             {
-                /* Piezas antiguas con «mesh = model.mu»: KSP carga el modelo de la propia
-                   carpeta de la pieza. */
+                /* Old parts with «mesh = model.mu»: KSP loads the model from the part's own
+                   folder. */
                 string mesh = p.Get("mesh");
                 string file = string.IsNullOrEmpty(mesh) ? "model" : Path.GetFileNameWithoutExtension(mesh.Trim());
                 def.Models.Add(new ModelRef { Url = (dir.Length > 0 ? dir + "/" : "") + file });
@@ -132,7 +132,7 @@ namespace KerbinMaps.Ksp
                 {
                     var vals = new Dictionary<string, string>(StringComparer.Ordinal);
                     foreach (var kv in mod.Values) if (!vals.ContainsKey(kv.Key)) vals[kv.Key] = kv.Value.Trim();
-                    // las mallas de cada juego de nodos de una placa de motores, en orden
+                    // the meshes of each node set of an engine plate, in order
                     if (mname == "ModuleDynamicNodes")
                         vals["__meshes"] = string.Join(",", mod.Children("NODE_SET").Select(ns => (ns.Get("MeshTransform") ?? "").Trim()));
                     def.AnimModules.Add((mname, vals));

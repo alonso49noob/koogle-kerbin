@@ -9,15 +9,16 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* SCANsat y progreso de la partida.
+    /* SCANsat and save progress.
 
-       De la partida se saca lo que el juego ya sabe: qué has escaneado con SCANsat, qué
-       cuerpos has visitado y con qué hitos. Con eso el visor puede enseñar solo lo
-       descubierto (modo progresión) o todo (modo sandbox), como el juego mismo. */
+       From the save we take what the game already knows: what you've scanned with SCANsat,
+       which bodies you've visited and with which milestones. With that the viewer can show only
+       what's been discovered (progression mode) or everything (sandbox mode), like the game
+       itself. */
     public sealed partial class MainForm
     {
-        SaveExtras extras;                          // null mientras no haya partida
-        ScanCoverage cov;                           // cobertura del cuerpo que se ve
+        SaveExtras extras;                          // null while there's no save
+        ScanCoverage cov;                           // coverage of the viewed body
         List<Anomaly> anomalias = new();
         Texture scanTex;
         readonly MapLayer anomalyLayer = new();
@@ -28,7 +29,7 @@ namespace KerbinMaps.UI
 
         bool Progresion => state.Progresion;
 
-        /* La partida trae su propio modo; al cargarla se propone el que le toca. */
+        /* The save carries its own mode; when it's loaded, the matching one is suggested. */
         void AplicarExtras(SaveExtras nuevos, bool proponerModo)
         {
             extras = nuevos;
@@ -45,7 +46,7 @@ namespace KerbinMaps.UI
             RenderTransferInfo();
         }
 
-        /* Cobertura, anomalías y rótulos del cuerpo que se está viendo. */
+        /* Coverage, anomalies and labels of the body being viewed. */
         void ActualizarScan()
         {
             cov = extras?.Cobertura(Body.Name);
@@ -61,8 +62,8 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Textura de 360×180 con lo no escaneado tapado. Se reconstruye al cambiar de
-           cuerpo o de partida, no por fotograma. */
+        /* 360×180 texture with what's unscanned covered. Rebuilt when the body or the save
+           changes, not per frame. */
         void ConstruirScanTex()
         {
             bool quiere = state.ShowScan && cov != null;
@@ -80,7 +81,7 @@ namespace KerbinMaps.UI
             for (int y = 0; y < H; y++)
                 for (int x = 0; x < W; x++)
                 {
-                    // la fila 0 de la textura es el norte; la celda 0 de SCANsat es el sur
+                    // row 0 of the texture is north; SCANsat's cell 0 is south
                     int lat = H - 1 - y;
                     bool visto = cov.Cells[x * H + lat] != 0;
                     int i = (y * W + x) * 4;
@@ -95,8 +96,8 @@ namespace KerbinMaps.UI
             globe.ScanTex = scanTex; globe.ScanAmt = 0.82;
         }
 
-        /* Los pines de las anomalías. En progresión solo salen las detectadas, que es lo
-           que el juego te deja ver. */
+        /* The anomaly pins. In progression mode only detected ones show, which is what the game
+           lets you see. */
         void RenderAnomalias()
         {
             anomalyLayer.Clear();
@@ -157,7 +158,7 @@ namespace KerbinMaps.UI
                 : Lang.F("{0}: {1}.", Body.Current.Label, Lang.T(p.Resumen())));
         }
 
-        /* ------------------------------------------------------------------ lista */
+        /* ------------------------------------------------------------------ list */
 
         void DrawAnomalyRow(Graphics g, Rectangle r, object item, bool hover)
         {
@@ -181,7 +182,7 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* ---------------------------------------------------------------- ajustes */
+        /* ---------------------------------------------------------------- settings */
 
         void SetProgresion(bool on)
         {

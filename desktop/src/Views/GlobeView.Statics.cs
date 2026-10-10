@@ -6,37 +6,37 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.Views
 {
-    /* Edificios de Kerbal Konstructs en la vista de vuelo y en la del cielo.
+    /* Kerbal Konstructs buildings in the flight and sky views.
 
-       Se pintan como los scatters: relativos al ojo y en metros (a 600 km del centro un
-       float ya no distingue centímetros), con la misma proyección y la misma profundidad
-       logarítmica que escribe el suelo trazado por rayos, así que una colina tapa un hangar
-       y un hangar tapa los árboles de detrás. La luz es la del suelo (Sol filtrado por el
-       aire, cielo y bruma), no la de estudio de la nave enfocada.
+       They're painted like the scatters: relative to the eye and in meters (600 km from the
+       center a float can no longer tell centimeters apart), with the same projection and the
+       same logarithmic depth the ray-traced ground writes, so a hill hides a hangar and a
+       hangar hides the trees behind it. The lighting is the ground's (Sun filtered by the air,
+       sky and haze), not the studio lighting of the focused vessel.
 
-       Cada instancia lleva su matriz en el marco del cuerpo de KSP (ver Konstructs.cs); al
-       del visor se pasa cambiando X por Z. */
+       Each instance carries its matrix in KSP's body frame (see Konstructs.cs); it's taken to
+       the viewer's by swapping X and Z. */
     public sealed partial class GlobeView
     {
-        public KkDatabase Statics;                // null: sin Kerbal Konstructs
+        public KkDatabase Statics;                // null: no Kerbal Konstructs
         public bool StaticsOn = true;
-        /* El modelo montado de un edificio, o null mientras se carga (quien lo da avisa para
-           pintar otra vez cuando esté). */
+        /* The assembled model of a building, or null while it loads (whoever provides it
+           signals to paint again once it's ready). */
         public Func<KkModel, AssembledVessel> StaticModel;
-        public KkInstance StaticSelected;         // la que se está editando, resaltada
+        public KkInstance StaticSelected;         // the one being edited, highlighted
         public int StaticsVisible { get; private set; }
 
-        /* Las naves posadas o amerizadas de la partida, en el mismo cuerpo que se ve: se
-           pintan con el mismo pipeline que los edificios de Kerbal Konstructs, una más entre
-           ellos. `M` ya está en el marco del cuerpo de KSP, igual que KkInstance.M (la arma
-           ColocarNavesEnSuelo en MainForm.Vessels.cs); `A` es su modelo montado con las
-           piezas de KSP, o null mientras se monta. */
+        /* The save's landed or splashed-down vessels, on the same body being viewed: they're
+           painted with the same pipeline as the Kerbal Konstructs buildings, one more among
+           them. `M` is already in KSP's body frame, same as KkInstance.M (ColocarNavesEnSuelo
+           in MainForm.Vessels.cs builds it); `A` is its model assembled from KSP parts, or null
+           while it's assembled. */
         public List<(double[] M, AssembledVessel A, object Tag)> GroundVessels = new();
 
         ShaderProgram staticProg;
         ModelGpu staticGpu;
 
-        /* Las naves van aparte de «Edificios»: con Kerbal Konstructs apagado se siguen viendo. */
+        /* Vessels are separate from «Edificios»: with Kerbal Konstructs off they're still shown. */
         bool HasGroundVessels => GroundVessels.Count > 0;
         bool HasBuildings => StaticsOn && Statics != null && StaticModel != null;
         bool StaticsActive => (HasBuildings || HasGroundVessels)
@@ -49,7 +49,7 @@ layout(location = 2) in vec2 aUv;
 layout(location = 3) in vec2 aUv2;
 uniform mat4 uModel, uNrm;
 uniform vec4 uUvXform;
-uniform vec2 uOrto;                     // en el mapa 2D: ortográfica, en NDC por metro
+uniform vec2 uOrto;                     // on the 2D map: orthographic, in NDC per meter
 uniform vec3 uF, uR, uU, uEyeR, uSun;
 uniform float uTan, uAspect, uNear, uFar, uRadiusM;
 out vec2 vUv, vUv2;
@@ -84,9 +84,9 @@ uniform float uRadiusM, uFar;
 uniform sampler2D uTex;
 uniform int uHasTex, uCutout, uBlend;
 uniform vec4 uColor;
-uniform vec3 uTint;                     // resaltado de la instancia elegida
-/* Suelo del KSC («Diffuse Ground KSC»): hierba repetida por la posición en la malla y
-   teñida, asfalto por las UV, y una máscara con las UV que dice dónde va cada uno. */
+uniform vec3 uTint;                     // highlight of the chosen instance
+/* KSC ground («Diffuse Ground KSC»): grass tiled by position on the mesh and tinted, asphalt by
+   UV, and a mask on the UVs that says where each one goes. */
 uniform int uGround, uHasGrass, uHasTarmac, uHasMask;
 uniform sampler2D uGrass, uTarmac, uMask;
 uniform float uGrassTiling;
@@ -102,13 +102,13 @@ void main() {
   if (uGround != 0) {
     vec3 g = (uHasGrass != 0 ? texture(uGrass, vLocal.xz * uGrassTiling).rgb : vec3(0.5)) * uGrassColor;
     vec3 t = (uHasTarmac != 0 ? texture(uTarmac, vUv * uTarmacScale).rgb : vec3(0.55)) * uTarmacColor;
-    // la máscara va por el segundo canal de UV, que cubre la explanada entera de 0 a 1
+    // the mask goes through the second UV channel, which covers the whole leveled area from 0 to 1
     float m = uHasMask != 0 ? texture(uMask, vUv2 * uMaskXform.xy + uMaskXform.zw).r : 0.0;
     c = vec4(mix(g, t, m), 1.0);
   }
   if (uCutout != 0 && c.a < 0.5) discard;
-  /* Las caras de KSP son de una sola cara y el cambio de marco (mano izquierda a
-     derecha) invierte su sentido: la normal se vuelve hacia quien mira. */
+  /* KSP's faces are single-sided and the change of frame (left-handed to right-handed) reverses
+     their winding: the normal is turned toward the viewer. */
   vec3 n = normalize(vN);
   vec3 v = normalize(-vRel);
   if (dot(n, v) < 0.0) n = -n;
@@ -122,18 +122,18 @@ void main() {
   gl_FragDepth = clamp(log2(1.0 + max(vZ, 0.0)) / log2(1.0 + uFar), 0.0, 1.0);
 }";
 
-        // del marco del cuerpo de KSP al del visor: X y Z cambian de sitio
+        // from KSP's body frame to the viewer's: X and Z swap places
         static readonly double[] SwapXZ = { 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1 };
 
         readonly List<(KkInstance I, AssembledVessel A, double[] M)> staticsFrame = new();
 
-        /* Pinta los edificios encima del suelo ya trazado. `eye` en radios del cuerpo. */
+        /* Paints the buildings on top of the already-traced ground. `eye` in body radii. */
         void DrawStatics(double[] eye, double[] right, double[] camUp, double tan, double[] orto = null, double radioVista = 0, double far = 0)
         {
             staticProg ??= new ShaderProgram(StaticVS, StaticFS, ("aPos", 0), ("aNrm", 1), ("aUv", 2), ("aUv2", 3));
             staticGpu ??= new ModelGpu();
             double R = Body.Radius;
-            // el ojo en el marco de KSP, en metros
+            // the eye in KSP's frame, in meters
             double kx = eye[2] * R, ky = eye[1] * R, kz = eye[0] * R;
             double fx = fwdL[0], fy = fwdL[1], fz = fwdL[2];
 
@@ -143,12 +143,12 @@ void main() {
                 {
                     if (!i.Placed || i.Body != Body.Name || i.ModelRef == null || !i.ModelRef.HasMesh) continue;
                     var m = i.M;
-                    // posición respecto al ojo, ya en el marco del visor
+                    // position relative to the eye, already in the viewer's frame
                     double dx = m[14] - kz, dy = m[13] - ky, dz = m[12] - kx;
                     double dist = Math.Sqrt(dx * dx + dy * dy + dz * dz);
                     if (orto != null)
                     {
-                        // en planta: lo que cae en la vista, por la distancia en horizontal
+                        // in plan view: whatever falls in the view, by horizontal distance
                         double along = dx * fx + dy * fy + dz * fz;
                         dist = Math.Sqrt(Math.Max(0, dist * dist - along * along));
                         if (dist > radioVista + 3000) continue;
@@ -161,14 +161,14 @@ void main() {
                     else
                     {
                         if (dist - rad > ScatterFar) continue;
-                        if (dx * fx + dy * fy + dz * fz < -rad) continue;   // detrás de la cámara
+                        if (dx * fx + dy * fy + dz * fz < -rad) continue;   // behind the camera
                     }
                     var rel = Mat.Mul(SwapXZ, Mat.Mul(Mat.Translate(new[] { -kx, -ky, -kz }), m));
                     staticsFrame.Add((i, a, rel));
                 }
-            // las naves posadas o amerizadas, con la misma distancia de dibujado que los
-            // scatters y los edificios (el ajuste del panel): de más lejos no merece la
-            // pena ni montarlas
+            // landed or splashed-down vessels, with the same draw distance as the
+            // scatters and the buildings (the panel setting): from farther away it isn't even
+            // worth assembling them
             foreach (var (m, a, _) in GroundVessels)
             {
                 if (a == null || a.Items.Count == 0) continue;
@@ -275,13 +275,13 @@ void main() {
             GL.BindTexture(GL.TEXTURE_2D, 0);
         }
 
-        // la cámara del último fotograma con edificios, para elegir uno con el ratón
+        // the camera of the last frame with buildings, for picking one with the mouse
         double[] picF, picR, picU;
         double picTan;
 
-        /* El edificio bajo el ratón en la vista de vuelo o del cielo, o null. Primero las
-           esferas que los envuelven y luego, de los candidatos, los triángulos de verdad:
-           un hangar grande envuelve con su esfera a medio grupo. */
+        /* The building under the mouse in the flight or sky view, or null. First the enclosing
+           spheres and then, among the candidates, the actual triangles: a large hangar's sphere
+           encloses half a group. */
         public KkInstance PickStatic(int px, int py)
         {
             if (picF == null || staticsFrame.Count == 0 || W <= 1 || H <= 1) return null;
@@ -295,7 +295,7 @@ void main() {
             double tMejor = double.MaxValue;
             foreach (var (inst, a, rel) in staticsFrame)
             {
-                if (inst == null) continue;    // una nave, no un edificio: no se puede editar
+                if (inst == null) continue;    // a vessel, not a building: it can't be edited
                 double cx = rel[12], cy = rel[13], cz = rel[14];
                 double rad = a.Radius * inst.Scale * (inst.GroupRef?.Scale ?? 1) + 1;
                 double tc = cx * d[0] + cy * d[1] + cz * d[2];
@@ -306,7 +306,7 @@ void main() {
                     if (it.Submesh >= it.Mesh.Submeshes.Count) continue;
                     var inv = Mat.Inverse(Mat.Mul(rel, it.M));
                     if (inv == null) continue;
-                    // el rayo en el espacio de la malla: el parámetro t es el mismo que fuera
+                    // the ray in mesh space: the t parameter is the same as outside
                     var o = Mat.Apply(inv, 0, 0, 0);
                     var dd = new[]
                     {
@@ -321,10 +321,9 @@ void main() {
             return mejor;
         }
 
-        /* Lo más alto de los edificios en la vertical de un punto, en metros sobre el nivel
-           del mar, o null si no hay ninguno. Es donde se pone de pie el observador del cielo
-           cuando cae encima de uno: la plataforma de lanzamiento, que es donde está por
-           defecto, o un tejado. */
+        /* The top of the buildings above a point, in meters above sea level, or null if there
+           are none. It's where the sky observer stands when it lands on one: the launch pad,
+           which is where it is by default, or a roof. */
         public double? TechoDeEstaticos(double lat, double lon, double sobre)
         {
             if (Statics == null || StaticModel == null || !StaticsOn) return null;
@@ -332,7 +331,7 @@ void main() {
             if (Equals(techoClave, clave)) return techo;
             double R = Body.Radius;
             var n = Sph(lat, lon, 1);
-            // en el marco de KSP (x y z cambiados respecto al del visor), desde 500 m más arriba
+            // in KSP's frame (x and z swapped relative to the viewer's), from 500 m above
             double top = R + sobre + 500;
             var o = new[] { n[2] * top, n[1] * top, n[0] * top };
             var d = new[] { -n[2], -n[1], -n[0] };
@@ -344,7 +343,7 @@ void main() {
                 if (!i.Placed || i.Body != Body.Name || i.ModelRef == null || !i.ModelRef.HasMesh) continue;
                 var m = i.M;
                 double cx = m[12] - o[0], cy = m[13] - o[1], cz = m[14] - o[2];
-                if (cx * cx + cy * cy + cz * cz > 4e6) continue;          // a más de 2 km: ni se mira
+                if (cx * cx + cy * cy + cz * cz > 4e6) continue;          // more than 2 km away: not even checked
                 var a = StaticModel(i.ModelRef);
                 if (a == null) { completo = false; continue; }
                 double rad = a.Radius * i.Scale * (i.GroupRef?.Scale ?? 1) + 1;
@@ -366,7 +365,7 @@ void main() {
                 }
             }
             double? r = tMejor < largo ? top - R - tMejor : null;
-            // si algún modelo aún no estaba montado, se vuelve a mirar la próxima vez
+            // if some model wasn't assembled yet, it's checked again next time
             if (completo) { techoClave = clave; techo = r; }
             return r;
         }
@@ -374,7 +373,7 @@ void main() {
         object techoClave;
         double? techo;
 
-        /* Moller-Trumbore contra una lista de triángulos: el t más cercano por debajo de `max`. */
+        /* Möller-Trumbore against a list of triangles: the nearest t below `max`. */
         static double RayMesh(double[] o, double[] d, float[] v, int[] idx, double max)
         {
             double best = max;
@@ -400,7 +399,8 @@ void main() {
             return best;
         }
 
-        /* Al cambiar de instalación o apagar los edificios: fuera lo subido a la GPU. */
+        /* When changing installation or turning buildings off: away with what was uploaded to the
+           GPU. */
         public void DisposeStatics()
         {
             staticGpu?.Dispose();

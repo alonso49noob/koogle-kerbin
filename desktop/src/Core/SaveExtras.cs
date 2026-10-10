@@ -8,8 +8,8 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.Core
 {
-    /* Lo que la partida sabe de un cuerpo: hitos de ProgressTracking, que es lo que el
-       juego usa para el árbol de progreso y para las estadísticas. */
+    /* What the save knows about a body: ProgressTracking milestones, which is what the game
+       uses for the progress tree and for statistics. */
     public sealed class ProgressBody
     {
         public string Name;
@@ -28,25 +28,24 @@ namespace KerbinMaps.Core
         }
     }
 
-    /* Un waypoint de los que el juego enseña en el navball y en el mapa. */
+    /* A waypoint of the kind the game shows on the navball and the map. */
     public sealed class Waypoint
     {
         public string Name, Body, Id;
         public double Lat, Lon;
-        public bool Mine;                 // creado por el visor
+        public bool Mine;                 // created by the viewer
     }
 
-    /* Lo que hay en una partida además de las naves: el modo de juego, la cobertura de
-       SCANsat, los hitos por cuerpo y los waypoints. Se lee de una pasada, quedándose
-       solo con los nodos SCENARIO que interesan: el resto del fichero (naves y piezas,
-       que es casi todo) ni se guarda. */
+    /* What a save holds besides the vessels: game mode, SCANsat coverage, milestones per body
+       and waypoints. It's read in a single pass, keeping only the SCENARIO nodes we care about:
+       the rest of the file (vessels and parts, which is almost everything) isn't even stored. */
     public sealed class SaveExtras
     {
         public string Mode;                                          // SANDBOX, CAREER, SCIENCE_SANDBOX
         public readonly Dictionary<string, ScanCoverage> Scan = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, ProgressBody> Progress = new(StringComparer.OrdinalIgnoreCase);
         public readonly List<Waypoint> Waypoints = new();
-        /* Nivel de cada instalación del KSC («SpaceCenter/LaunchPad» → 0, 0,5 o 1). */
+        /* Level of each KSC facility («SpaceCenter/LaunchPad» → 0, 0.5 or 1). */
         public readonly Dictionary<string, double> NivelesKsc = new(StringComparer.OrdinalIgnoreCase);
 
         public bool HasScan => Scan.Count > 0;
@@ -65,7 +64,7 @@ namespace KerbinMaps.Core
             var extras = new SaveExtras();
             int depth = 0;
             string pend = null;
-            List<string> buf = null;                 // el SCENARIO que se está copiando
+            List<string> buf = null;                 // the SCENARIO being copied
             int bufDepth = 0;
 
             foreach (var raw in lines)
@@ -126,8 +125,8 @@ namespace KerbinMaps.Core
                     foreach (var prog in node.Children("Progress"))
                         foreach (var b in prog.Nodes)
                         {
-                            // el nodo trae hitos generales además de los cuerpos (FirstLaunch,
-                            // RecordsAltitude, RecordsDepth...): solo valen los que son un cuerpo
+                            // the node carries general milestones besides the bodies (FirstLaunch,
+                            // RecordsAltitude, RecordsDepth...): only the ones that are a body count
                             if (SolarSystem.Find(b.Name) == null) continue;
                             if (b.Get("reached") == null && !b.Nodes.Any(n => Hito(n.Name))) continue;
                             var p = new ProgressBody { Name = b.Name, ReachedAt = Num(b.Get("reached")) };
@@ -174,13 +173,13 @@ namespace KerbinMaps.Core
         static double? Num(string s) =>
             s != null && double.TryParse(s.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double v) && double.IsFinite(v) ? v : null;
 
-        /* ---------------------------------------------------------------- escritura */
+        /* ---------------------------------------------------------------- writing */
 
-        /* Mete waypoints en el nodo ScenarioCustomWaypoints de una partida, que es de
-           donde los saca el juego. Devuelve el texto nuevo; no toca el disco.
+        /* Puts waypoints into a save's ScenarioCustomWaypoints node, which is where the game
+           takes them from. Returns the new text; doesn't touch the disk.
 
-           Reemplazar: se quitan los que tengan el mismo nombre y cuerpo, para que
-           exportar dos veces no los duplique. */
+           Replace: those with the same name and body are removed, so exporting twice doesn't
+           duplicate them. */
         public static string ConWaypoints(string text, IEnumerable<Waypoint> nuevos, bool reemplazar = true)
         {
             var lista = nuevos.Select(w => new Waypoint { Name = w.Name, Body = w.Body, Lat = w.Lat, Lon = w.Lon, Id = w.Id, Mine = w.Mine }).ToList();
@@ -238,7 +237,7 @@ namespace KerbinMaps.Core
 
             if (ini < 0)
             {
-                // la partida no trae el nodo (pasa en partidas muy viejas): se crea al final de GAME
+                // the save doesn't have the node (happens in very old saves): it's created at the end of GAME
                 int cierre = lines.FindLastIndex(l => l.Trim() == "}");
                 if (cierre < 0) return text;
                 var nodo = new List<string> { "\tSCENARIO", "\t{", "\t\tname = ScenarioCustomWaypoints", "\t\tscene = 7, 8, 21" };
@@ -271,8 +270,8 @@ namespace KerbinMaps.Core
                     }
                     if (nom != null && quitar.Contains(Clave(nom, cuerpo)))
                     {
-                        /* Se hereda el identificador del que se sustituye: si tenías ese
-                           waypoint puesto como destino en el juego, lo sigue siendo. */
+                        /* The identifier of the one being replaced is inherited: if you had
+                           that waypoint set as a target in the game, it still is. */
                         var mismo = lista.FirstOrDefault(w => Clave(w.Name, w.Body) == Clave(nom, cuerpo));
                         if (mismo != null && string.IsNullOrEmpty(mismo.Id)) mismo.Id = id;
                         lines.RemoveRange(i, cierra - i + 1);
@@ -287,7 +286,7 @@ namespace KerbinMaps.Core
 
         static string Clave(string nombre, string cuerpo) => (cuerpo ?? "") + "|" + (nombre ?? "");
 
-        /* Copia de seguridad antes de tocar una partida: partida.sfs -> partida.sfs.bak-<fecha> */
+        /* Backup before touching a save: partida.sfs -> partida.sfs.bak-<date> */
         public static string Respaldar(string path)
         {
             string bak = path + ".bak-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");

@@ -6,36 +6,36 @@ using System.Linq;
 
 namespace KerbinMaps.Ksp
 {
-    /* Texturas de superficie de Parallax para un cuerpo, con cómo las mezcla el mod.
+    /* Parallax surface textures for a body, with how the mod blends them.
 
-       Parallax pinta el suelo con cuatro texturas por cuerpo: baja, media y alta según la
-       altitud, y una de pendiente para lo empinado. Cuándo pasa de una a otra (en metros)
-       y cómo de brusco es el paso a la de pendiente lo dice Terrain.cfg, y las texturas van
-       dentro de un paquete de Unity que se lee con UnityBundle. */
+       Parallax paints the ground with four textures per body: low, mid and high by altitude,
+       and a slope one for steep ground. When it switches from one to another (in meters) and
+       how sharp the transition to the slope one is comes from Terrain.cfg, and the textures
+       live inside a Unity bundle read with UnityBundle. */
     public sealed class ParallaxTerrain
     {
         public string Body;
         public TextureFile Low, Mid, High, Steep;
-        /* Lo que da variedad al suelo en Parallax, en mosaico como las otras cuatro y con un
-           canal por textura (r baja, g media, b alta, a pendiente):
-           - influencia: cuánto manda la textura frente al color del planeta;
-           - desplazamiento: el relieve fino, con el que se decide la mezcla entre texturas
-             (la hierba asoma entre las piedras en vez de fundirse con ellas);
-           - oclusión: las sombras de ese relieve. */
+        /* What gives the ground variety in Parallax, tiled like the other four and with one
+           channel per texture (r low, g mid, b high, a slope):
+           - influence: how much the texture dominates over the planet color;
+           - displacement: the fine relief, used to decide the blend between textures (grass
+             peeks out between stones instead of fading into them);
+           - occlusion: the shadows of that relief. */
         public TextureFile Influence, Displacement, Occlusion;
-        /* Mapas de normales de cada textura: el relieve fino que da la luz al suelo. */
+        /* Normal maps of each texture: the fine relief that lights the ground. */
         public TextureFile BumpLow, BumpMid, BumpHigh, BumpSteep;
         public double LowMidStart, LowMidEnd, MidHighStart, MidHighEnd;
         public double SteepPower = 8, SteepContrast = 4, SteepMidpoint = 0.7;
-        public double Tiling = 0.03;                 // repeticiones por metro
+        public double Tiling = 0.03;                 // repeats per meter
 
         public double MetrosPorRepeticion => Tiling > 0 ? 1 / Tiling : 30;
 
-        /* Busca la configuración y el paquete de Parallax en GameData. Devuelve null si no
-           está instalado o si ese cuerpo no tiene texturas. */
+        /* Looks for the Parallax configuration and bundle in GameData. Returns null if it isn't
+           installed or that body has no textures. */
         public static ParallaxTerrain Load(string gameData, string body, int maxAncho = 2048)
         {
-            // en el KSP del jugador o en lo que haya bajado el instalador
+            // in the player's KSP or in whatever the installer downloaded
             string dir = ParallaxPlanets.GameDatas(gameData)
                 .Select(gd => Path.Combine(gd, "Parallax_StockTerrainTextures"))
                 .FirstOrDefault(d => File.Exists(Path.Combine(d, "Terrain.cfg")));
@@ -76,7 +76,7 @@ namespace KerbinMaps.Ksp
                 return n.Path == null ? null : (n.Offset, n.Size);
             }
 
-            // la misma textura puede servir para varias ranuras (la Mun usa mid00 en las tres)
+            // the same texture can serve several slots (the Mun uses mid00 in all three)
             var leidas = new Dictionary<string, TextureFile>(StringComparer.OrdinalIgnoreCase);
             TextureFile Leer(string clave)
             {
@@ -105,17 +105,17 @@ namespace KerbinMaps.Ksp
             t.BumpHigh = Leer("_BumpMapHigh");
             t.BumpSteep = Leer("_BumpMapSteep");
             if (t.Low == null && t.Mid == null && t.High == null && t.Steep == null) return null;
-            // las que falten se cubren con otra, para no dejar ranuras vacías
+            // missing ones are covered by another, so no slot is left empty
             t.Mid ??= t.Low ?? t.High ?? t.Steep;
             t.Low ??= t.Mid; t.High ??= t.Mid; t.Steep ??= t.Mid;
             return t;
         }
 
-        /* De textura de Unity a una lista de niveles lista para la GPU. DXT1 y DXT5, que es
-           lo que usa Parallax, se suben tal cual (también las de crunch, que se deshacen
-           hasta sus bloques DXT); los niveles más anchos que `maxAncho` se
-           saltan para no llenar la memoria de vídeo con texturas de 4096 que de cerca no se
-           notan. Lo demás (algún mapa en R8 o RGBA32) se descomprime a RGBA. */
+        /* From a Unity texture to a list of levels ready for the GPU. DXT1 and DXT5, which is
+           what Parallax uses, are uploaded as is (crunched ones too, undone down to their DXT
+           blocks); levels wider than `maxAncho` are skipped so video memory isn't filled with
+           4096 textures that don't show up close. Everything else (some map in R8 or RGBA32) is
+           decompressed to RGBA. */
         internal static TextureFile Convertir(UnitySerialized.Textura u, int maxAncho)
         {
             int block;
@@ -124,9 +124,9 @@ namespace KerbinMaps.Ksp
             {
                 case 10: block = 8; fmt = TextureFile.DXT1; break;       // DXT1
                 case 12: block = 16; fmt = TextureFile.DXT5; break;      // DXT5
-                case 28: case 29:                                         // DXT1 y DXT5 en crunch
+                case 28: case 29:                                         // crunched DXT1 and DXT5
                 {
-                    // en el juego son máscaras de 4096 para un par de km: con 1024 sobra
+                    // in the game they're 4096 masks for a couple of km: 1024 is plenty
                     var c = Crunch.Decodificar(u.Datos, Math.Min(maxAncho, 1024));
                     if (c.Niveles.Count == 0) throw new InvalidDataException("sin niveles utilizables");
                     var ct = new TextureFile { CompressedFormat = c.Dxt5 ? TextureFile.DXT5 : TextureFile.DXT1, HasAlpha = c.Dxt5,

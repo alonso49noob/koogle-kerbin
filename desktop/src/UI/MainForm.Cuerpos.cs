@@ -8,21 +8,21 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Los demás cuerpos en el globo 3D (ver GlobeView.Cuerpos.cs): dónde está cada uno en el
-       instante de la barra de tiempo, visto desde el cuerpo que se ve, con su luz y su mapa.
+    /* The other bodies on the 3D globe (see GlobeView.Cuerpos.cs): where each one is at the
+       time on the time bar, seen from the body being viewed, with its light and its map.
 
-       Las posiciones salen de las órbitas del sistema solar (las mismas que mueven el Sol)
-       en el marco inercial, con el norte en Z; se pasan al marco del globo con la misma
-       rotación del cuerpo que usa el Sol. En KSP todos los cuerpos giran alrededor del mismo
-       eje, así que el mapa de cada uno solo necesita su propio giro en longitud. */
+       Positions come from the solar system's orbits (the same ones that move the Sun) in the
+       inertial frame, with north on Z; they're taken to the globe's frame with the same body
+       rotation the Sun uses. In KSP all bodies rotate around the same axis, so each one's map
+       only needs its own longitude rotation. */
     public sealed partial class MainForm
     {
         DarkCheck chkCuerpos;
         readonly Dictionary<string, Texture> mapasCuerpos = new(StringComparer.OrdinalIgnoreCase);
-        string mapasCuerposDe;                    // el paquete del que ya se pidieron
+        string mapasCuerposDe;                    // the bundle they were already requested from
 
-        /* El instante de la barra de tiempo y la rotación del cuerpo que se ve en él (la que
-           mueve las naves; sin partida, la del juego al empezar). */
+        /* The time on the time bar and the rotation of the viewed body at that time (the one
+           that moves vessels; without a save, the game's at the start). */
         (double Ut, double Rot) InstanteYGiro()
         {
             if (sv.Data == null) return (0, Sun.DefaultRotation(0));
@@ -43,7 +43,7 @@ namespace KerbinMaps.UI
             globe.VerCuerpos = state.VerCuerpos;
         }
 
-        /* Cada fotograma: son unas pocas decenas de cuentas de órbita. */
+        /* Every frame: it's a few dozen orbit calculations. */
         void ActualizarCuerpos()
         {
             globe.Cuerpos.Clear();
@@ -60,7 +60,7 @@ namespace KerbinMaps.UI
                 var rel = new[] { pb[0] - pYo[0], pb[1] - pYo[1], pb[2] - pYo[2] };
                 double dist = Math.Sqrt(rel[0] * rel[0] + rel[1] * rel[1] + rel[2] * rel[2]);
                 if (dist <= 0) continue;
-                // hacia la estrella, que está en el origen del marco inercial
+                // toward the star, which is at the origin of the inertial frame
                 double dEst = Math.Sqrt(pb[0] * pb[0] + pb[1] * pb[1] + pb[2] * pb[2]);
                 var luz = b.IsStar || dEst <= 0 ? new double[] { 0, 1, 0 } : AlGlobo(new[] { -pb[0], -pb[1], -pb[2] }, rot, 1);
                 double rotB = b.IsStar ? 0 : b.InitialRotation + 360 * ut / b.SiderealDay;
@@ -79,8 +79,8 @@ namespace KerbinMaps.UI
             }
         }
 
-        /* Del marco inercial (norte en Z) al del globo: latitud y longitud, menos la rotación
-           del cuerpo, como hace el Sol (Sun.Subsolar). */
+        /* From the inertial frame (north on Z) to the globe's: latitude and longitude, minus
+           the body's rotation, as the Sun does (Sun.Subsolar). */
         static double[] AlGlobo(double[] v, double rot, double r)
         {
             double l = Math.Sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
@@ -89,8 +89,8 @@ namespace KerbinMaps.UI
             return GlobeView.Sph(lat, lon, r);
         }
 
-        /* Los mapas de color de los cuerpos que trae el paquete de Parallax, a 1024 (de
-           lejos no hace falta más), una vez y en segundo plano. */
+        /* The color maps of the bodies in the Parallax bundle, at 1024 (from afar nothing more
+           is needed), once and in the background. */
         void CargarMapasCuerpos()
         {
             string paquete = parallaxBundle;

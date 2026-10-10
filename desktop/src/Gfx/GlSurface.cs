@@ -5,12 +5,12 @@ using System.Windows.Forms;
 
 namespace KerbinMaps.Gfx
 {
-    /* Control con un contexto OpenGL 3.3 core y antialias multimuestra.
+    /* Control with an OpenGL 3.3 core context and multisample antialiasing.
 
-       El formato de píxel de una ventana solo se puede fijar una vez, y para pedir
-       uno con multimuestra hacen falta funciones WGL que solo existen con un contexto
-       ya creado. Así que primero se monta un contexto de usar y tirar en una ventana
-       auxiliar, con él se elige el formato bueno y se crea el contexto definitivo. */
+       A window's pixel format can only be set once, and requesting a multisample one needs WGL
+       functions that only exist with a context already created. So first a throwaway context is
+       set up on an auxiliary window, with it the right format is chosen, and the final context
+       is created. */
     public sealed unsafe class GlSurface : Control
     {
         [StructLayout(LayoutKind.Sequential)]
@@ -48,7 +48,7 @@ namespace KerbinMaps.Gfx
             SetStyle(ControlStyles.Opaque | ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.Selectable, true);
             SetStyle(ControlStyles.OptimizedDoubleBuffer, false);
             TabStop = true;
-            BackColor = Color.FromArgb(7, 11, 17);
+            BackColor = UI.Theme.MapBg;
         }
 
         protected override CreateParams CreateParams

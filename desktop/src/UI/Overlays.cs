@@ -5,11 +5,11 @@ using System.Windows.Forms;
 
 namespace KerbinMaps.UI
 {
-    /* Texto de una línea sin fondo propio, que mide su ancho. */
+    /* Single-line text with no background of its own, that measures its width. */
     public sealed class TextLabel : DarkControl
     {
         public Font TextFont = Theme.UI;
-        public Color TextColor = Theme.Fg;
+        public bool Dim;
         public int MinWidth;
         public bool Center;
 
@@ -21,31 +21,56 @@ namespace KerbinMaps.UI
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.Clear(ParentBack);
-            TextRenderer.DrawText(e.Graphics, Text, TextFont, ClientRectangle, TextColor,
+            TextRenderer.DrawText(e.Graphics, Text, TextFont, ClientRectangle, Dim ? Theme.FgDim : Theme.Fg,
                 (Center ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left) |
                 TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
         }
     }
 
-    /* Cabecera del panel lateral: «KerbinMaps» y el subtítulo. */
+    /* Sidebar header: the logo and the name, at the height of the toolbar so both form a single
+       band at the top. */
     public sealed class SidebarHeader : Control
     {
+        static Image logo;
+        static Image Logo
+        {
+            get
+            {
+                if (logo != null) return logo;
+                try
+                {
+                    using var st = typeof(SidebarHeader).Assembly.GetManifestResourceStream("app.png");
+                    if (st != null) logo = Image.FromStream(st);
+                }
+                catch { }
+                return logo;
+            }
+        }
+
         public SidebarHeader()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            Height = Theme.S(16 + 26 + 3 + 17 + 12);
+            Height = Toolbar.BarHeight;
+            new ToolTip { InitialDelay = 500 }.SetToolTip(this, Core.Lang.T("Visor de superficie · KSP stock"));
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
             g.Clear(Theme.Bg2);
-            var flags = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
-            int x = Theme.S(16), y = Theme.S(14);
-            int wk = TextRenderer.MeasureText("Koogle", Theme.Title, Size.Empty, flags).Width;
-            TextRenderer.DrawText(g, "Koogle", Theme.Title, new Point(x, y), Theme.Fg, flags);
-            TextRenderer.DrawText(g, "Kerbin", Theme.Title, new Point(x + wk, y), Theme.Accent, flags);
-            TextRenderer.DrawText(g, Core.Lang.T("Visor de superficie · KSP stock"), Theme.Small, new Point(x, y + Theme.Title.Height + Theme.S(3)), Theme.FgDim, flags);
+            var flags = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
+            int x = Theme.S(14), s = Theme.S(22);
+            if (Logo != null)
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(Logo, new Rectangle(x, (Height - s) / 2, s, s));
+                x += s + Theme.S(9);
+            }
+            TextRenderer.DrawText(g, "Koogle Kerbin", Theme.Title, new Rectangle(x, 0, Width - x, Height), Theme.Fg, flags);
+            int wt = TextRenderer.MeasureText(g, "Koogle Kerbin", Theme.Title, Size.Empty, flags).Width;
+            var v = Core.Updater.Current;
+            TextRenderer.DrawText(g, v.Major + "." + v.Minor + "." + Math.Max(0, v.Build), Theme.Tiny,
+                new Rectangle(x + wt + Theme.S(8), Theme.S(1), Width, Height), Theme.FgDim, flags);
             using var pen = new Pen(Theme.Line);
             g.DrawLine(pen, 0, Height - 1, Width, Height - 1);
         }
@@ -67,7 +92,49 @@ namespace KerbinMaps.UI
         }
     }
 
-    /* Lectura de coordenadas bajo el cursor, arriba a la derecha. */
+    /* The view's top band: sidebar button, views, search and theme. It's a fixed bar, not
+       buttons floating over the map. */
+    public sealed class Toolbar : Panel
+    {
+        public static int BarHeight => Theme.S(48);
+
+        public Toolbar()
+        {
+            DoubleBuffered = true;
+            BackColor = Theme.Bg2;
+            Height = BarHeight;
+            SetStyle(ControlStyles.ResizeRedraw, true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using var pen = new Pen(Theme.Line);
+            e.Graphics.DrawLine(pen, 0, Height - 1, Width, Height - 1);
+        }
+    }
+
+    /* Group of buttons joined in a frame (the views). */
+    public sealed class SegmentGroup : Panel
+    {
+        /* The group's well, deeper than the bar: the chosen option rises out of it. */
+        public override Color BackColor { get => Theme.Dark ? Theme.Bg : Theme.Bg3; set { } }
+
+        public SegmentGroup()
+        {
+            DoubleBuffered = true;
+            SetStyle(ControlStyles.ResizeRedraw, true);
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(Parent?.BackColor ?? Theme.Bg2);
+            Theme.FillRound(g, BackColor, Theme.Line, new RectangleF(0, 0, Width, Height), Theme.Sf(Theme.Radius + 1));
+        }
+    }
+
+    /* Coordinate readout under the cursor, top right. */
     public sealed class HudPanel : OverlayPanel
     {
         public readonly List<(string label, string value)> Rows = new();
@@ -88,8 +155,8 @@ namespace KerbinMaps.UI
             int lineH = (int)(Theme.Mono.Height * 1.45);
             int w = Theme.S(150);
             foreach (var (l, v) in Rows)
-                w = Math.Max(w, TextRenderer.MeasureText(l, Theme.Mono).Width + TextRenderer.MeasureText(v, Theme.MonoBold).Width + Theme.S(32));
-            var size = new Size(w, Rows.Count * lineH + Theme.S(14));
+                w = Math.Max(w, TextRenderer.MeasureText(l, Theme.Small).Width + TextRenderer.MeasureText(v, Theme.Mono).Width + Theme.S(36));
+            var size = new Size(w, Rows.Count * lineH + Theme.S(16));
             if (Size != size)
             {
                 int right = Right;
@@ -104,25 +171,25 @@ namespace KerbinMaps.UI
             var g = e.Graphics;
             g.Clear(Theme.Bg2);
             int lineH = (int)(Theme.Mono.Height * 1.45);
-            int y = Theme.S(7), padX = Theme.S(10);
+            int y = Theme.S(8), padX = Theme.S(12);
             var f = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
             foreach (var (l, v) in Rows)
             {
                 var r = new Rectangle(padX, y, Width - padX * 2, lineH);
-                TextRenderer.DrawText(g, l, Theme.Mono, r, Theme.FgDim, f | TextFormatFlags.Left);
-                TextRenderer.DrawText(g, v, Theme.MonoBold, r, Theme.Fg, f | TextFormatFlags.Right);
+                TextRenderer.DrawText(g, l, Theme.Small, r, Theme.FgDim, f | TextFormatFlags.Left);
+                TextRenderer.DrawText(g, v, Theme.Mono, r, Theme.Fg, f | TextFormatFlags.Right);
                 y += lineH;
             }
-            using var pen = new Pen(Theme.Line);
+            using var pen = new Pen(Theme.Current.LineStrong);
             g.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
         }
     }
 
-    /* Globo de información anclado a un punto del mapa (el popup de Leaflet). */
+    /* Info bubble anchored to a point on the map (Leaflet's popup). */
     public sealed class MapPopup : OverlayPanel
     {
         readonly RichLabel body = new(RichMode.Popup) { HideWhenEmpty = false };
-        readonly DarkButton close = new("×", ButtonVariant.Ghost, small: true);
+        readonly DarkButton close = new(Theme.Glyph.Close, ButtonVariant.Ghost, small: true) { IconFont = Theme.IconSmall };
         readonly List<DarkButton> buttons = new();
         public Core.LatLon AnchorLatLon { get; private set; }
 
@@ -176,7 +243,7 @@ namespace KerbinMaps.UI
                 y += rowH;
             }
             Size = new Size(textW + padX * 2 + Theme.S(14), y + padY);
-            close.SetBounds(Width - Theme.S(24), Theme.S(3), Theme.S(21), Theme.S(21));
+            close.SetBounds(Width - Theme.S(28), Theme.S(6), Theme.S(22), Theme.S(22));
         }
     }
 }

@@ -13,31 +13,31 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Creador de países y facciones.
+    /* Country and faction maker.
 
-       Cada cuerpo tiene su mapa político (ver MapaPolitico): una lista de facciones con su
-       nombre y su color, y de quién es cada trozo de tierra. Se pinta en el mapa 2D o en el
-       globo con cuatro herramientas: pincel, relleno (una isla entera, o el hueco que deja
-       una frontera), polígono y goma. Solo sobre tierra: el mar no es de nadie, y el dibujo
-       recorta por la costa. Con una herramienta activa el botón izquierdo pinta y el derecho
-       mueve el mapa; Ctrl+Z deshace.
+       Each body has its political map (see MapaPolitico): a list of factions with their name
+       and color, and who owns each piece of land. It's painted on the 2D map or the globe with
+       four tools: brush, fill (a whole island, or the gap left by a border), polygon and
+       eraser. Only over land: the sea belongs to nobody, and the drawing is clipped at the
+       coast. With a tool active the left button paints and the right one moves the map; Ctrl+Z
+       undoes.
 
-       Se guarda solo, por cuerpo, en %APPDATA%\KoogleKerbin\facciones-<cuerpo>.json, y se
-       puede exportar (el mismo JSON, o una imagen equirectangular en PNG) e importar. */
+       It's saved automatically, per body, in %APPDATA%\KoogleKerbin\facciones-<body>.json, and
+       can be exported (the same JSON, or an equirectangular PNG image) and imported. */
     public sealed partial class MainForm
     {
         MapaPolitico politico;
         Texture facTex;
         Faccion facSel;
-        string facTool;                           // null, "pincel", "rellenar", "poligono" o "goma"
+        string facTool;                           // null, "pincel", "rellenar", "poligono" or "goma"
         readonly List<LatLon> facPoli = new();
         LatLon? facCursor, facUltimo;
         bool facPintando, facPan, facMidiendo;
         Dictionary<int, double> facAreas = new();
         List<EtiquetaFaccion> facEtiq = new();
         double facTierraKm2;
-        object facTierraDe;                       // de qué mapas sale la máscara de tierra
-        byte[] facTierra;                         // y la máscara, para no rehacerla al importar
+        object facTierraDe;                       // which maps the land mask comes from
+        byte[] facTierra;                         // and the mask, so it isn't rebuilt when importing
         int facMedida = -1, facGuardada;
         readonly Timer facGuardarTimer = new() { Interval = 1500 };
         readonly MapLayer facLayer = new();
@@ -51,7 +51,7 @@ namespace KerbinMaps.UI
         RichLabel facInfo;
 
         bool FacActivo => facTool != null && politico != null;
-        /* Se pinta en el mapa 2D y en el globo; en el vuelo y en el cielo el ratón hace lo de siempre. */
+        /* It's painted on the 2D map and the globe; in flight and sky views the mouse does its usual thing. */
         bool FacPuedePintar => FacActivo && (!GlobeVisible || is3D);
 
         static string ArchivoFacciones(string cuerpo) =>
@@ -136,12 +136,12 @@ namespace KerbinMaps.UI
             facGuardarTimer.Tick += (o, e) =>
             {
                 facGuardarTimer.Stop();
-                if (facPintando) { facGuardarTimer.Start(); return; }    // a mitad de pincelada, luego
+                if (facPintando) { facGuardarTimer.Start(); return; }    // mid-stroke, later
                 GuardarFacciones();
             };
         }
 
-        /* El radio del pincel va en escala logarítmica: de 1 a 316 km. */
+        /* The brush radius is on a logarithmic scale: from 1 to 316 km. */
         static int PincelAPaso(double km) => (int)Math.Round(Math.Clamp(40 * Math.Log10(Math.Max(km, 1)), 0, 100));
         static double PasoAPincel(int paso) => Math.Round(Math.Pow(10, paso / 40.0), paso < 40 ? 1 : 0);
         string FmtPincel() => Geo.F(state.FacPincelKm, state.FacPincelKm < 10 ? 1 : 0) + " km";
@@ -153,7 +153,7 @@ namespace KerbinMaps.UI
             var f = (Faccion)item;
             int sw = Theme.S(14), x = r.X + Theme.S(6);
             var col = Theme.Hex(f.Color);
-            Theme.FillRound(g, f.Visible ? col : Color.FromArgb(70, col), Color.FromArgb(80, 255, 255, 255),
+            Theme.FillRound(g, f.Visible ? col : Color.FromArgb(70, col), Color.FromArgb(70, Theme.Fg),
                             new RectangleF(x, r.Y + (r.Height - sw) / 2f, sw, sw), Theme.Sf(3));
             x += sw + Theme.S(8);
             int aw = Theme.S(92), ew = Theme.S(24);
@@ -184,7 +184,7 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* ------------------------------------------------------------ facciones */
+        /* ------------------------------------------------------------ factions */
 
         void NuevaFaccion() => CrearFaccion(preguntar: true);
 
@@ -239,7 +239,7 @@ namespace KerbinMaps.UI
             FacCambiado();
         }
 
-        /* Tras cualquier cambio: guardar (en un momento), medir y volver a dibujar. */
+        /* After any change: save (shortly), measure and redraw. */
         void FacCambiado()
         {
             facGuardarTimer.Stop();
@@ -259,7 +259,7 @@ namespace KerbinMaps.UI
             if (politico?.Rehacer() == true) FacCambiado();
         }
 
-        /* ------------------------------------------------------------ herramientas */
+        /* ------------------------------------------------------------ tools */
 
         void SetFacTool(string t)
         {
@@ -279,7 +279,7 @@ namespace KerbinMaps.UI
             facPoligonoBtn.Active = t == "poligono";
             facGomaBtn.Active = t == "goma";
             surface.Cursor = t != null ? Cursors.Cross : Cursors.Default;
-            // si se va a pintar, que se vea
+            // if you're going to paint, it should be visible
             if (t != null && !state.FaccionesOn) chkFac.Checked = true;
             if (t != null && GlobeVisible && !is3D) Flash("Los territorios se pintan en el mapa 2D o en el globo 3D.");
             FacPrevia();
@@ -287,8 +287,8 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Dónde cae el cursor: en el 2D, el mapa; en el globo, el terreno (de cerca, con su
-           relieve). En el vuelo y en el cielo no se pinta. */
+        /* Where the cursor lands: in 2D, the map; on the globe, the terrain (up close, with its
+           relief). In flight and sky views there's no painting. */
         LatLon? FacPunto(int x, int y)
         {
             if (!GlobeVisible)
@@ -304,7 +304,7 @@ namespace KerbinMaps.UI
         (byte Id, byte Propia) FacPintura() =>
             ((byte)(facTool == "goma" ? 0 : facSel?.Id ?? 0), (byte)(facSel?.Id ?? 0));
 
-        /* true si el clic es de la herramienta (y nadie más tiene que hacer nada con él). */
+        /* true if the click belongs to the tool (and nobody else has to do anything with it). */
         bool FacMouseDown(MouseEventArgs e)
         {
             if (!FacPuedePintar) return false;
@@ -350,7 +350,7 @@ namespace KerbinMaps.UI
             return true;
         }
 
-        /* Pintando, el arrastre pinta: devuelve true para que no mueva el mapa. */
+        /* While painting, dragging paints: returns true so it doesn't move the map. */
         bool FacMouseMove(MouseEventArgs e)
         {
             if (!FacPuedePintar || facPan) return false;
@@ -406,7 +406,7 @@ namespace KerbinMaps.UI
         void FacPoligonoClic(LatLon p, Point pt)
         {
             if (facPoli.Count >= 3 && APantalla(facPoli[0]) is PointF a && Dist(a, pt) < Theme.S(10)) { CerrarPoligono(); return; }
-            // el segundo clic de un doble clic no es otro vértice
+            // the second click of a double click isn't another vertex
             if (facPoli.Count > 0 && APantalla(facPoli[^1]) is PointF b && Dist(b, pt) < Theme.S(4)) return;
             facPoli.Add(p);
             FacPrevia();
@@ -447,8 +447,8 @@ namespace KerbinMaps.UI
             return true;
         }
 
-        /* [ y ] cambian el radio del pincel. Por el carácter y no por la tecla: en un teclado
-           español se escriben con AltGr y la tecla es otra. */
+        /* [ and ] change the brush radius. By character and not by key: on a Spanish keyboard
+           they're typed with AltGr and the key is a different one. */
         bool FacKeyPress(char c)
         {
             if (!FacActivo || FocusInText() || (c != '[' && c != ']')) return false;
@@ -456,7 +456,7 @@ namespace KerbinMaps.UI
             return true;
         }
 
-        /* Esc: primero el polígono a medias, luego la herramienta. */
+        /* Esc: first the half-drawn polygon, then the tool. */
         bool FacEscape()
         {
             if (!FacActivo) return false;
@@ -465,7 +465,7 @@ namespace KerbinMaps.UI
             return true;
         }
 
-        /* Lo que se ve de la herramienta: el círculo del pincel y el polígono a medias. */
+        /* What shows of the tool: the brush circle and the half-drawn polygon. */
         void FacPrevia()
         {
             facLayer.Clear();
@@ -493,8 +493,8 @@ namespace KerbinMaps.UI
             }
         }
 
-        /* Los lados del polígono son rectos en el mapa (lat/lon): en el globo hay que trocearlos
-           para que se vean igual que lo que se va a pintar. */
+        /* The polygon's sides are straight on the map (lat/lon): on the globe they have to be
+           split up so they look the same as what will be painted. */
         static List<LatLon> Densificar(List<LatLon> pts)
         {
             var u = Geo.Unwrap(pts);
@@ -511,7 +511,7 @@ namespace KerbinMaps.UI
             return r;
         }
 
-        /* ------------------------------------------------------------ carga, máscara y dibujo */
+        /* ------------------------------------------------------------ loading, mask and drawing */
 
         void InitFacciones()
         {
@@ -552,7 +552,7 @@ namespace KerbinMaps.UI
             FacPrevia();
         }
 
-        /* Al cambiar de cuerpo: se guarda lo de este y se carga lo del otro. */
+        /* When changing body: this one's is saved and the other's is loaded. */
         void CambiarCuerpoFacciones()
         {
             if (politico == null || politico.Cuerpo == Body.Name) return;
@@ -568,7 +568,7 @@ namespace KerbinMaps.UI
             try
             {
                 string p = RutaFacciones(politico.Cuerpo);
-                // un cuerpo sin facciones y sin nada guardado no deja fichero
+                // a body with no factions and nothing saved leaves no file
                 if (politico.Facciones.Count == 0 && !File.Exists(p)) { facGuardada = politico.Version; return; }
                 Directory.CreateDirectory(Store.RoamingDir);
                 string tmp = p + ".tmp";
@@ -579,9 +579,9 @@ namespace KerbinMaps.UI
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[facciones] " + ex.Message); }
         }
 
-        /* La máscara de tierra sale del mapa de alturas (lo que queda por encima del mar) o, sin
-           él, del de color (lo que no es azul). En un cuerpo sin mar todo es superficie. Se
-           calcula en segundo plano cada vez que cambian los mapas o su calibración. */
+        /* The land mask comes from the height map (what's above the sea) or, without it, from
+           the color map (what isn't blue). On a body without sea everything is surface. It's
+           computed in the background every time the maps or their calibration change. */
         void ActualizarTierraFacciones()
         {
             if (politico == null) return;
@@ -634,12 +634,12 @@ namespace KerbinMaps.UI
             });
         }
 
-        /* Superficie y sitio de los nombres, en segundo plano con una copia de la rejilla. */
+        /* Area and name positions, in the background with a copy of the grid. */
         void FacMedir(bool forzar = false)
         {
             if (politico == null) return;
             if (!forzar && facMedida == politico.Version) return;
-            if (facMidiendo) return;                  // al acabar se vuelve a mirar si hace falta
+            if (facMidiendo) return;                  // when it finishes, it checks again whether it's needed
             facMidiendo = true;
             var m = politico;
             int ver = m.Version;
@@ -670,13 +670,13 @@ namespace KerbinMaps.UI
                 });
         }
 
-        /* Sube a la GPU las filas de la rejilla que han cambiado (lo llama cada fotograma). */
+        /* Uploads to the GPU the grid rows that have changed (called every frame). */
         void FacSubir()
         {
             if (politico == null || politico.SucioY1 < 0) return;
             if (facTex == null)
             {
-                if (politico.Facciones.Count == 0) return;   // sin facciones no hace falta la textura
+                if (politico.Facciones.Count == 0) return;   // without factions the texture isn't needed
                 facTex = Texture.FromR8(politico.Celdas, MapaPolitico.Ancho, MapaPolitico.Alto);
                 politico.LimpiarSucio();
                 AplicarFacciones();
@@ -686,7 +686,7 @@ namespace KerbinMaps.UI
             politico.LimpiarSucio();
         }
 
-        /* Empuja al mapa y al globo la rejilla, los colores, la máscara y los nombres. */
+        /* Pushes the grid, the colors, the mask and the names to the map and the globe. */
         void AplicarFacciones()
         {
             bool on = state.FaccionesOn && politico != null && politico.Facciones.Count > 0 && facTex != null;
@@ -720,7 +720,7 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* El resumen de la sección cuando está plegada. */
+        /* The section's summary when it's collapsed. */
         void EstadoFacciones()
         {
             if (secFacciones == null) return;
@@ -767,7 +767,7 @@ namespace KerbinMaps.UI
             facInfo.SetText(string.Join("\n", lineas));
         }
 
-        /* ------------------------------------------------------------ ficheros */
+        /* ------------------------------------------------------------ files */
 
         void ExportarFacciones()
         {
@@ -796,14 +796,14 @@ namespace KerbinMaps.UI
                                 "Koogle Kerbin", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             SetFacTool(null);
             m.Cuerpo = Body.Name;
-            m.Version = politico.Version + 1;            // para que se guarde
+            m.Version = politico.Version + 1;            // so it gets saved
             UsarPolitico(m);
             FacCambiado();
             Flash(Lang.F("Importadas {0} facciones.", m.Facciones.Count));
         }
 
-        /* El mapa político como imagen equirectangular de 4096×2048, con transparencia donde
-           no hay nadie (y en el mar): para usarla en otro sitio o volver a cargarla como capa. */
+        /* The political map as a 4096×2048 equirectangular image, transparent where it belongs to
+           nobody (and on the sea): to use it elsewhere or load it again as a layer. */
         void ExportarImagenFacciones()
         {
             if (politico == null || politico.Facciones.Count == 0) { Flash("No hay ningún territorio que exportar."); return; }

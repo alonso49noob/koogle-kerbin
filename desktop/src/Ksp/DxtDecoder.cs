@@ -3,12 +3,12 @@ using System.Threading.Tasks;
 
 namespace KerbinMaps.Ksp
 {
-    /* Descompresión de texturas DXT1 (BC1) y DXT5 (BC3) a RGBA en la CPU.
+    /* Decompression of DXT1 (BC1) and DXT5 (BC3) textures to RGBA on the CPU.
 
-       Para pintar basta con subirlas comprimidas a la GPU, pero los mapas de los cuerpos
-       también se leen en la CPU (la sonda del HUD, el suelo bajo la cámara, el filtro de
-       altimetría), y eso pide los píxeles. Cada bloque de 4×4 lleva dos colores y un índice
-       de dos bits por píxel entre ellos; DXT5 añade un bloque de alfa igual de sencillo. */
+       For painting it's enough to upload them compressed to the GPU, but the body maps are also
+       read on the CPU (the HUD probe, the ground under the camera, the altimetry filter), and
+       that needs the pixels. Each 4×4 block carries two colors and a two-bit index per pixel
+       between them; DXT5 adds an equally simple alpha block. */
     public static class DxtDecoder
     {
         public static byte[] Decode(byte[] data, int w, int h, bool dxt5)

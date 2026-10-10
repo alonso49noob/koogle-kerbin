@@ -11,42 +11,42 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.UI
 {
-    /* Mapas de los demás cuerpos, sacados de una carpeta con las texturas del juego.
+    /* Maps of the other bodies, taken from a folder with the game's textures.
 
-       El visor solo trae mapas de Kerbin. Si tienes volcadas las texturas de KSP (con
-       cualquier extractor de assets), apuntando aquí a esa carpeta cada cuerpo se ve con
-       su mapa de verdad, sus alturas y sus biomas si los hay. */
+       The viewer only ships Kerbin maps. If you've dumped KSP's textures (with any asset
+       extractor), pointing here to that folder shows each body with its real map, its heights
+       and its biomes if there are any. */
     public sealed partial class MainForm
     {
         Dictionary<string, BodyMapSet> bodyMapIndex = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, (double Min, double Max)> bodyHeightRanges = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, (double Min, double Max)> parallaxRanges = new(StringComparer.OrdinalIgnoreCase);
-        string parallaxBundle;                       // paquete de Parallax con los mapas de los cuerpos
+        string parallaxBundle;                       // Parallax bundle with the bodies' maps
         HashSet<string> parallaxCuerpos = new(StringComparer.OrdinalIgnoreCase);
-        string bodyMapsSource;                       // de dónde salen los del cuerpo actual
+        string bodyMapsSource;                       // where the current body's come from
         readonly Dictionary<string, ImageData> bodyImages = new();
         readonly Dictionary<string, Texture> bodyTextures = new();
-        string bodyMapsLoaded;                       // el cuerpo cuyas imágenes están cargadas
+        string bodyMapsLoaded;                       // the body whose images are loaded
         CancellationTokenSource bodyMapsCts;
 
         RichLabel bodyMapsInfo;
 
-        /* El desfase y el espejo que hay que aplicar a esas texturas (ver BodyMaps). */
+        /* The offset and mirror to apply to those textures (see BodyMaps). */
         double BodyMapOffset => state.BodyMapOffset;
 
-        /* Calibración del mapa de alturas del cuerpo que se ve: qué altura es el gris 0 y
-           cuál el 255.
+        /* Calibration of the viewed body's height map: which height gray 0 is and which gray
+           255 is.
 
-           Para los mapas de la carpeta manda Parallax, que es de donde salen: su rango de
-           terreno con el tope de gris 145. Si no está, se usa el rango de SCANsat (el de
-           la partida o el de su configuración), que es el correcto para un export en
-           grises de SCANsat pero solo una aproximación para un volcado. */
+           For the folder's maps Parallax rules, since that's where they come from: its terrain
+           range with the top at gray 145. If it isn't there, SCANsat's range is used (the
+           save's or its configuration's), which is right for a SCANsat grayscale export but
+           only an approximation for a dump. */
         (double Min, double Max) RangoAltura()
         {
             if (OnMapBody) return (state.HMin, state.HMax);
-            /* Leídos del paquete de Parallax, el gris usa toda la escala: 0 y 255 son el
-               mínimo y el máximo del terreno (en Kerbin, así el KSC queda a 79 m y la
-               plataforma a 74). El tope de 145 es de los volcados a PNG de la carpeta. */
+            /* Read from the Parallax bundle, the gray uses the full scale: 0 and 255 are the
+               terrain's minimum and maximum (on Kerbin, that puts the KSC at 79 m and the pad
+               at 74). The 145 top belongs to the folder's PNG dumps. */
             if (parallaxRanges.TryGetValue(Body.Name, out var pr))
                 return bodyMapsSource == "Parallax" ? (pr.Min, pr.Max) : BodyMaps.Calibracion(pr.Min, pr.Max);
             var cobertura = extras?.Cobertura(Body.Name);
@@ -56,8 +56,8 @@ namespace KerbinMaps.UI
             return (state.HMin, state.HMax);
         }
 
-        /* Alturas que de verdad tiene el terreno del cuerpo (no la rampa de grises): es lo
-           que el filtro de altimetría usa como franja de partida. */
+        /* Heights the body's terrain really has (not the gray ramp): it's what the altimetry
+           filter uses as its starting band. */
         (double Min, double Max) RangoTerreno()
         {
             if (parallaxRanges.TryGetValue(Body.Name, out var pr)) return pr;
@@ -74,7 +74,7 @@ namespace KerbinMaps.UI
         double ColorOffNow => OnMapBody ? state.LonOffset.Color : BodyMapOffset;
         double BiomeOffNow => OnMapBody ? state.LonOffset.Biome : BodyMapOffset;
 
-        /* Relee la carpeta (al arrancar, al elegirla o al cambiar de sistema solar). */
+        /* Rereads the folder (at startup, when it's chosen or when the solar system changes). */
         void IndexarMapasDeCuerpos()
         {
             bodyMapIndex = BodyMaps.Index(state.BodyMapsDir);
@@ -149,7 +149,7 @@ namespace KerbinMaps.UI
             bodyImages.Clear();
         }
 
-        /* Carga (en segundo plano) los mapas del cuerpo que se está viendo. */
+        /* Loads (in the background) the maps of the body being viewed. */
         async Task CargarMapasDelCuerpo()
         {
             if (OnMapBody) { bodyMapsLoaded = null; SoltarMapasDeCuerpo(); return; }
@@ -163,8 +163,9 @@ namespace KerbinMaps.UI
             bodyMapsLoaded = Body.Name;
             var set = bodyMapIndex.GetValueOrDefault(Body.Name);
             string cuerpo = Body.Name;
-            /* Primero la carpeta elegida a mano; si no tiene este cuerpo, Parallax (del KSP
-               del jugador o de lo que bajó el instalador), leído directo de su paquete. */
+            /* First the folder chosen by hand; if it doesn't have this body, Parallax (from the
+               player's KSP or from what the installer downloaded), read straight from its
+               bundle. */
             bool deParallax = (set == null || !set.Any) && state.UseParallax && parallaxBundle != null && parallaxCuerpos.Contains(cuerpo);
             if ((set == null || !set.Any) && !deParallax) { ApplyMapTextures(); SyncGlobe(); RequestRender(); return; }
 

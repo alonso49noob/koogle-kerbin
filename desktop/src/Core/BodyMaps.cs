@@ -7,40 +7,40 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.Core
 {
-    /* Los mapas de un cuerpo dentro de la carpeta elegida. */
+    /* The maps of a body inside the chosen folder. */
     public sealed class BodyMapSet
     {
         public string Color, Height, Biome;
         public bool Any => Color != null || Height != null || Biome != null;
     }
 
-    /* Mapas de los demás cuerpos sacados de una carpeta: las texturas del propio juego,
-       volcadas a PNG con cualquier herramienta de las que extraen los assets.
+    /* Maps of the other bodies taken from a folder: the game's own textures, dumped to PNG with
+       any of the tools that extract assets.
 
-       Vienen en espejo horizontal respecto al convenio de los mapas equirectangulares al
-       uso, y giradas 90° en longitud. Se comprobó cuadrando las texturas contra los mapas
-       de biomas de la wiki: Kerbin encaja al 95,6 % (el control entre los dos mapas que
-       trae el visor da 95,9 %), y el mismo par espejo+90° sale en Duna, Eve, Laythe, Moho
-       y Dres. Por eso el visor aplica esa vuelta solo, y deja cambiarla por si tu volcado
-       viene de otra herramienta. */
+       They come mirrored horizontally relative to the usual equirectangular map convention, and
+       rotated 90° in longitude. This was checked by matching the textures against the wiki's
+       biome maps: Kerbin fits at 95.6% (the control between the two maps the viewer ships gives
+       95.9%), and the same mirror+90° pair shows up on Duna, Eve, Laythe, Moho and Dres. That's
+       why the viewer applies that flip on its own, and lets you change it in case your dump
+       comes from another tool. */
     public static class BodyMaps
     {
         public const double DefaultOffset = 90;
 
-        /* Esas texturas no usan toda la escala de grises: el tope es 145, no 255. Medido
-           en los quince cuerpos del volcado de Parallax, donde el gris maximo va de 141 a
-           145 y con ese tope la altura sale justo en el maxTerrainAltitude que el mod
-           tiene tabulado. En Kerbin, ademas, pone el KSC en 70 m (su altitud real) y el
-           mar abierto en -1052 m (la referencia de SCANsat da entre -1090 y -935). */
+        /* Those textures don't use the full gray scale: the top is 145, not 255. Measured on
+           the fifteen bodies of the Parallax dump, where the maximum gray goes from 141 to 145,
+           and with that top the height lands exactly on the maxTerrainAltitude the mod has
+           tabulated. On Kerbin it also puts the KSC at 70 m (its real altitude) and the open
+           sea at -1052 m (the SCANsat reference gives between -1090 and -935). */
         public const double GrisTope = 145;
 
-        /* De rango de terreno a calibracion de la rampa de grises (gris 0 y gris 255). */
+        /* From terrain range to calibration of the gray ramp (gray 0 and gray 255). */
         public static (double Min, double Max) Calibracion(double minTerreno, double maxTerreno) =>
             (minTerreno, minTerreno + 255.0 / GrisTope * (maxTerreno - minTerreno));
 
-        /* Un fichero es de un cuerpo si su nombre empieza por el nombre del cuerpo; de ahí
-           se mira qué ranura es. Los mapas de normales no sirven para nada aquí, y las
-           versiones «_PQS» son de menos resolución que la principal. */
+        /* A file belongs to a body if its name starts with the body's name; from there we work
+           out which slot it is. Normal maps are of no use here, and the «_PQS» versions have
+           less resolution than the main one. */
         public static Dictionary<string, BodyMapSet> Index(string dir)
         {
             var found = new Dictionary<string, BodyMapSet>(StringComparer.OrdinalIgnoreCase);
@@ -68,7 +68,7 @@ namespace KerbinMaps.Core
                 if (slot == null) continue;
 
                 long size = new FileInfo(path).Length;
-                if (file.Contains("_PQS", StringComparison.OrdinalIgnoreCase)) size /= 4;   // la de respaldo
+                if (file.Contains("_PQS", StringComparison.OrdinalIgnoreCase)) size /= 4;   // the fallback one
                 var key = (body, slot);
                 if (mejor.TryGetValue(key, out var prev) && prev.size >= size) continue;
                 mejor[key] = (path, size);
@@ -87,9 +87,9 @@ namespace KerbinMaps.Core
             return found;
         }
 
-        /* Rango de alturas de cada cuerpo, que es lo que convierte el gris del mapa en
-           metros. SCANsat lo trae tabulado en su configuración; si no está instalado, se
-           usa el de la partida (que es el mismo dato) o uno por defecto. */
+        /* Height range of each body, which is what turns the map's gray into meters. SCANsat
+           has it tabulated in its configuration; if it isn't installed, the save's is used
+           (it's the same data) or a default one. */
         public static Dictionary<string, (double Min, double Max)> Ranges(string gameData)
         {
             var r = new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase);
@@ -113,8 +113,8 @@ namespace KerbinMaps.Core
             return r;
         }
 
-        /* Alturas reales de cada cuerpo segun Parallax, que es de donde salen estas
-           texturas: son las que convierten su gris en metros. */
+        /* Real heights of each body according to Parallax, which is where these textures come
+           from: they're what turn their gray into meters. */
         public static Dictionary<string, (double Min, double Max)> ParallaxRanges(string gameData)
         {
             var r = new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase);
@@ -132,7 +132,7 @@ namespace KerbinMaps.Core
 
         static void Recorrer(ConfigNode n, string cuerpo, Dictionary<string, (double, double)> r)
         {
-            // los nodos del parche vienen como «@Body[Kerbin]»
+            // the patch nodes come as «@Body[Kerbin]»
             if (n.Name.StartsWith("@Body[", StringComparison.Ordinal)) cuerpo = n.Name.Substring(6).TrimEnd(']');
             foreach (var hijo in n.Nodes)
             {

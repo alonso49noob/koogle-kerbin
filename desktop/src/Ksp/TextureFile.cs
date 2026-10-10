@@ -6,24 +6,24 @@ using System.IO;
 
 namespace KerbinMaps.Ksp
 {
-    /* Una textura lista para subir a la GPU. Las DDS comprimidas (DXT1/3/5) se suben tal
-       cual, con sus mipmaps; el resto se descomprime a RGBA.
+    /* A texture ready to upload to the GPU. Compressed DDS files (DXT1/3/5) are uploaded as is,
+       with their mipmaps; the rest is decompressed to RGBA.
 
-       Orientación: OpenGL, como Unity, pone la primera fila de datos abajo. Los DDS de
-       KSP ya vienen guardados pensando en eso y se suben sin tocar; PNG y JPG se leen de
-       arriba abajo y hay que darles la vuelta. */
+       Orientation: OpenGL, like Unity, puts the first row of data at the bottom. KSP's DDS
+       files are already stored with that in mind and are uploaded untouched; PNG and JPG are
+       read top to bottom and have to be flipped. */
     public sealed class TextureFile
     {
         public const uint DXT1 = 0x83F1, DXT3 = 0x83F2, DXT5 = 0x83F3;
 
         public int Width, Height;
-        public uint CompressedFormat;          // 0 = RGBA8 sin comprimir
+        public uint CompressedFormat;          // 0 = uncompressed RGBA8
         public readonly List<byte[]> Levels = new();
         public bool HasAlpha;
 
         static readonly string[] Extensions = { ".dds", ".png", ".tga", ".jpg", ".jpeg" };
 
-        /* Busca la textura por su nombre sin extensión, como hace KSP. */
+        /* Finds the texture by its name without extension, as KSP does. */
         public static string Find(string pathWithoutExt)
         {
             foreach (var ext in Extensions)
@@ -34,10 +34,10 @@ namespace KerbinMaps.Ksp
             return null;
         }
 
-        /* Carga solo los niveles de mipmap que no pasen de `maxAncho`, leyendo del fichero
-           unicamente esa parte. Los mapas de nubes del juego son de 16384x8192 y pesan
-           179 MB con sus mipmaps: para pintarlas basta un nivel de 2048 de ancho, que son
-           dos megas y se lee al instante. Solo vale para DDS comprimidos. */
+        /* Loads only the mipmap levels no wider than `maxAncho`, reading only that part of the
+           file. The game's cloud maps are 16384x8192 and weigh 179 MB with their mipmaps: to
+           paint them a 2048-wide level is enough, which is two megabytes and loads instantly.
+           Only works for compressed DDS. */
         public static TextureFile LoadDdsLevel(string path, int maxAncho)
         {
             using var f = File.OpenRead(path);
@@ -48,7 +48,7 @@ namespace KerbinMaps.Ksp
             int mips = Math.Max(1, BitConverter.ToInt32(cab, 28));
             uint pfFlags = BitConverter.ToUInt32(cab, 80);
             string four = System.Text.Encoding.ASCII.GetString(cab, 84, 4);
-            if ((pfFlags & 0x4) == 0) return Load(path);          // sin comprimir: se lee entero
+            if ((pfFlags & 0x4) == 0) return Load(path);          // uncompressed: read whole
 
             int block = four switch { "DXT1" => 8, "DXT3" => 16, "DXT5" => 16, _ => 0 };
             if (block == 0) throw new InvalidDataException("DDS con compresión no soportada: " + four);
@@ -210,7 +210,7 @@ namespace KerbinMaps.Ksp
                 byte* src = (byte*)bd.Scan0;
                 for (int y = 0; y < h; y++)
                 {
-                    byte* row = src + (long)(h - 1 - y) * bd.Stride;      // de abajo arriba
+                    byte* row = src + (long)(h - 1 - y) * bd.Stride;      // bottom to top
                     int o = y * w * 4;
                     for (int x = 0; x < w; x++)
                     {

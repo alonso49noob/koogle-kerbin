@@ -2,8 +2,9 @@ using System;
 
 namespace KerbinMaps.Core
 {
-    /* El cuerpo que se está viendo. Casi todo el visor habla de «el cuerpo» sin nombrarlo:
-       estas propiedades leen el seleccionado (Kerbin si no se elige otro). Todo en SI. */
+    /* The body being viewed. Almost the whole viewer talks about «the body» without naming it:
+       these properties read the selected one (Kerbin unless another is chosen). Everything in
+       SI. */
     public static class Body
     {
         public static BodyDef Current = SolarSystem.Home;
@@ -17,18 +18,18 @@ namespace KerbinMaps.Core
         public static double Atmosphere => Current.Atmosphere;     // m
         public static double Soi => Current.Soi;                   // m
 
-        // Altitud de una órbita síncrona, derivada de mu y del día sidéreo
+        // Altitude of a synchronous orbit, derived from mu and the sidereal day
         public static double SynchronousAlt =>
             Math.Cbrt(Mu * SiderealDay * SiderealDay / (4 * Math.PI * Math.PI)) - Radius;
     }
 
-    /* Dónde está el Sol visto desde el cuerpo actual.
+    /* Where the Sun is as seen from the current body.
 
-       La posición del cuerpo respecto a la estrella sale de su cadena de órbitas (una luna
-       suma la de su planeta), en el mismo marco inercial que usan las órbitas de las naves:
-       el Sol se ve en la dirección opuesta, y su longitud en el mapa es la inercial menos la
-       rotación del cuerpo, igual que la de una nave. La latitud subsolar ya no es siempre
-       cero: sale de la inclinación de la órbita. */
+       The body's position relative to the star comes from its chain of orbits (a moon adds its
+       planet's), in the same inertial frame used by vessel orbits: the Sun is seen in the
+       opposite direction, and its longitude on the map is the inertial one minus the body's
+       rotation, same as a vessel's. The subsolar latitude is no longer always zero: it comes
+       from the orbit's inclination. */
     public static class Sun
     {
         public readonly record struct Position(double Lat, double Lon, double AngularRadius, bool Exists);
@@ -46,10 +47,10 @@ namespace KerbinMaps.Core
             return new Position(lat, Geo.WrapLon(lonIner - rotation), star.Radius / r, true);
         }
 
-        /* Sin partida no hay con qué medir la rotación: la del juego al empezar. */
+        /* Without a save there's nothing to measure the rotation with: the game's at the start. */
         public static double DefaultRotation(double ut) => Body.Current.InitialRotation + 360 * ut / Body.SiderealDay;
 
-        /* Hora solar local (0 a 6 h, mediodía a las 3) en una longitud. */
+        /* Local solar time (0 to 6 h, noon at 3) at a longitude. */
         public static double LocalHours(double lon, double subsolarLon)
         {
             double f = ((lon - subsolarLon) / 360 + 0.5) % 1;
@@ -61,18 +62,18 @@ namespace KerbinMaps.Core
     public static class MapConfig
     {
         public const int MinZoom = 0;
-        public const int MaxZoom = 9;             // el de las teselas y las imágenes
-        /* El mapa se acerca más: de cerca lo pinta el suelo del vuelo en vista cenital
-           (ver MapView.Fondo), y a 16 ya se distinguen los edificios del KSC. */
+        public const int MaxZoom = 9;             // the one for tiles and images
+        /* The map zooms in further: up close the flight ground paints it in top-down view (see
+           MapView.Fondo), and at 16 the KSC buildings can be made out. */
         public const int MaxZoomVista = 16;
         public const double InitialZoom = 2;
         public const double InitialLat = 0, InitialLon = -74.5;
         public const int TileSize = 256;
     }
 
-    /* Rango con el que se traduce el gris de un heightmap a metros: gris 0 -> min,
-       gris 255 -> max. El terreno de Kerbin stock es procedural: sin calibrar contra
-       dos altitudes reales, las cifras que salgan no significan nada. */
+    /* Range used to translate the gray of a heightmap into meters: gray 0 -> min, gray 255 ->
+       max. Stock Kerbin terrain is procedural: without calibrating against two real altitudes,
+       the figures that come out mean nothing. */
     public static class HeightRange
     {
         public const double Min = -1000, Max = 6764;
@@ -81,8 +82,8 @@ namespace KerbinMaps.Core
     public static class BiomeConfig
     {
         public const double DefaultOpacity = 0.65;
-        /* Al listar la leyenda se ignoran los colores que ocupen menos de esto:
-           son el dentado de los bordes, no biomas de verdad. */
+        /* When listing the legend, colors covering less than this are ignored: they're the
+           jagged edges, not real biomes. */
         public const double MinAreaPct = 0.02;
     }
 }

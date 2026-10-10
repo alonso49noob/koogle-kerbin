@@ -5,17 +5,16 @@ using System.Linq;
 
 namespace KerbinMaps.Ksp
 {
-    /* Texturas de los datos del propio juego (KSP_x64_Data/sharedassets*.assets).
+    /* Textures from the game's own data (KSP_x64_Data/sharedassets*.assets).
 
-       Los edificios de Kerbal Konstructs reutilizan las texturas del KSC de serie: su .mu
-       pide «model_vab_exterior_tile_00» o «ksc_exterior_terrain_asphalt», que no están en
-       GameData sino dentro de los ficheros de Unity del juego, y KK las busca por nombre
-       entre las que el juego tiene cargadas. Aquí se hace lo mismo: se indexan por nombre
-       las Texture2D (clase 28) de esos ficheros y se leen cuando hacen falta, con sus bytes
-       en el .resS de al lado.
+       Kerbal Konstructs buildings reuse the stock KSC textures: their .mu asks for
+       «model_vab_exterior_tile_00» or «ksc_exterior_terrain_asphalt», which aren't in GameData
+       but inside the game's Unity files, and KK looks them up by name among the ones the game
+       has loaded. Here we do the same: the Texture2D objects (class 28) in those files are
+       indexed by name and read when needed, with their bytes in the .resS next to them.
 
-       Algunos .mu guardan el nombre como lo exportó una herramienta de extracción:
-       «nombre-sharedassets9.assets-478.mbm». Ese sufijo dice fichero y objeto exactos. */
+       Some .mu files store the name as an extraction tool exported it:
+       «name-sharedassets9.assets-478.mbm». That suffix gives the exact file and object. */
     public sealed class StockAssets
     {
         static readonly Dictionary<string, StockAssets> porCarpeta = new(StringComparer.OrdinalIgnoreCase);
@@ -32,7 +31,7 @@ namespace KerbinMaps.Ksp
 
         public string Dir => dir;
 
-        /* La de una instalación, a partir de su GameData (KSP_x64_Data va al lado). */
+        /* The one for an installation, from its GameData (KSP_x64_Data sits next to it). */
         public static StockAssets For(string gameData)
         {
             if (gameData == null) return null;
@@ -47,14 +46,14 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* Clave de una textura por el nombre que trae el .mu, o null si el juego no la tiene. */
+        /* Key of a texture by the name the .mu carries, or null if the game doesn't have it. */
         public string Find(string nombre)
         {
             if (string.IsNullOrEmpty(nombre)) return null;
             string bare = Path.GetFileNameWithoutExtension(nombre);
             lock (cerrojo)
             {
-                // «nombre-sharedassets9.assets-478»: fichero y objeto exactos
+                // «name-sharedassets9.assets-478»: exact file and object
                 int guion = bare.LastIndexOf('-');
                 if (guion > 0 && long.TryParse(bare.Substring(guion + 1), out long id))
                 {
@@ -73,8 +72,8 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* La textura tal cual viene (formato de Unity y bytes), sin convertir: para las de
-           formatos que hay que descomprimir en otro sitio, como BC7. */
+        /* The texture as it comes (Unity format and bytes), unconverted: for those in formats
+           that have to be decompressed elsewhere, like BC7. */
         public UnitySerialized.Textura LoadCruda(string clave)
         {
             if (clave == null || !clave.StartsWith(Prefijo, StringComparison.Ordinal)) return null;
@@ -98,7 +97,7 @@ namespace KerbinMaps.Ksp
             return rf?.Read(off, size);
         }
 
-        /* Los ficheros sharedassets del juego, por nombre. */
+        /* The game's sharedassets files, by name. */
         public IEnumerable<string> Ficheros()
         {
             try { return Directory.EnumerateFiles(dir, "sharedassets*.assets").Select(Path.GetFileName).ToList(); }
@@ -128,7 +127,7 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* Bytes del fichero de recursos (.resS) de al lado, por la ruta que trae el objeto. */
+        /* Bytes of the resource file (.resS) next to it, by the path the object carries. */
         public byte[] LeerRecurso(string ruta, long off, int size)
         {
             lock (cerrojo)
@@ -143,7 +142,7 @@ namespace KerbinMaps.Ksp
             }
         }
 
-        /* El nombre del fichero de un serializado ya abierto. */
+        /* The file name of an already-open serialized file. */
         public string NombreDe(UnitySerialized x)
         {
             lock (cerrojo) return ficheros.FirstOrDefault(kv => kv.Value.S == x).Key;
@@ -178,8 +177,8 @@ namespace KerbinMaps.Ksp
             return s;
         }
 
-        /* Todas las texturas de los sharedassets, por nombre. Si dos se llaman igual gana la
-           más grande, que suele ser la buena (las pequeñas son iconos o versiones lejanas). */
+        /* All the textures in the sharedassets, by name. If two have the same name the larger
+           one wins, which is usually the right one (the small ones are icons or far versions). */
         void Indexar()
         {
             if (porNombre != null) return;

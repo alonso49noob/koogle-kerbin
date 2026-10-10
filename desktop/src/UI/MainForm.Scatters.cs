@@ -8,15 +8,15 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Scatters de Parallax (hierba, arbustos, árboles, cactus, rocas) en el vuelo y en la
-       vista del cielo. Se cargan por cuerpo, de la instalación de KSP o de lo que bajó el
-       instalador: sus configuraciones, sus modelos .mu y sus texturas, leídas del paquete
-       de Unity del mod. Dónde va cada uno lo decide ScatterField con el mismo mapa de
-       alturas que dibuja el suelo, para que queden apoyados en él. */
+    /* Parallax scatters (grass, bushes, trees, cacti, rocks) in flight and sky views. Loaded
+       per body, from the KSP installation or from what the installer downloaded: their
+       configurations, their .mu models and their textures, read from the mod's Unity bundle.
+       Where each one goes is decided by ScatterField with the same height map that draws the
+       ground, so they rest on it. */
     public sealed partial class MainForm
     {
         string scattersDe;
-        object[] campoFirma;                      // con qué mapas se hizo el reparto actual
+        object[] campoFirma;                      // which maps the current distribution was made with
         long ultimoPintadoScatters;
 
         async Task CargarScatters()
@@ -33,7 +33,7 @@ namespace KerbinMaps.UI
                 try { return ParallaxScatters.Load(gd, cuerpo); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[scatters] " + ex.Message); return null; }
             });
-            if (cuerpo != Body.Name || scattersDe != clave) return;          // se cambió de cuerpo mientras tanto
+            if (cuerpo != Body.Name || scattersDe != clave) return;          // the body was changed in the meantime
             if (a == null || !glOk || !surface.MakeCurrent()) { RenderVueloInfo(); return; }
 
             globe.ScatterGpu = ScatterGpu.Upload(a);
@@ -41,9 +41,9 @@ namespace KerbinMaps.UI
             CrearCampoScatters();
         }
 
-        /* El reparto trabaja en otro hilo, así que se le da una copia fija de lo que
-           necesita (los mapas, su calibración, los nombres de biomas) en vez de dejarle leer
-           lo que la ventana puede estar cambiando. Si los mapas cambian, se rehace. */
+        /* The distribution runs on another thread, so it's given a fixed copy of what it needs
+           (the maps, their calibration, the biome names) instead of letting it read what the
+           window may be changing. If the maps change, it's redone. */
         void CrearCampoScatters()
         {
             if (globe.ScatterGpu == null) return;
@@ -53,7 +53,7 @@ namespace KerbinMaps.UI
             var col = MapImg("color");
             var bio = MapImg("biome");
             var (hmin, hmax) = RangoAltura();
-            // enteros, como los recibe el shader (ver SyncGlobe): si no, el suelo y la hierba no coinciden
+            // integers, as the shader receives them (see SyncGlobe): otherwise the ground and the grass don't line up
             double hOff = (int)HeightOffNow, cOff = (int)ColorOffNow, bOff = (int)BiomeOffNow;
             string cuerpo = Body.Name;
             var nombres = new Dictionary<string, string>(biomeNames, StringComparer.OrdinalIgnoreCase);
@@ -71,8 +71,8 @@ namespace KerbinMaps.UI
                 },
                 Excluir = (la, lo) => Aplanado.Dentro(llanos, la, lo, radio),
                 Color = (la, lo) => col == null ? (1f, 1f, 1f) : col.SampleBilinear(la, Geo.WrapLon(lo), cOff),
-                /* Con los nombres del juego («Grasslands», «Deserts»...), que son los que usan
-                   las listas de Parallax; si no se conocen, los que les haya puesto el usuario. */
+                /* With the game's names («Grasslands», «Deserts»...), which are the ones
+                   Parallax's lists use; if they aren't known, the ones the user gave them. */
                 Bioma = (la, lo) =>
                 {
                     string hex = bio?.BiomeHex(la, Geo.WrapLon(lo), bOff);
@@ -82,7 +82,7 @@ namespace KerbinMaps.UI
             };
             campo.Changed = () =>
             {
-                // desde el hilo que genera: se pinta otra vez, sin pasarse de 20 por segundo
+                // from the generating thread: paint again, without going over 20 per second
                 long ahora = Environment.TickCount64;
                 if (ahora - ultimoPintadoScatters < 50) return;
                 ultimoPintadoScatters = ahora;
@@ -100,7 +100,7 @@ namespace KerbinMaps.UI
             Body.Name, MapImg("height"), MapImg("color"), MapImg("biome"), HMinNow, HMaxNow, HeightOffNow, ColorOffNow, BiomeOffNow, aplanados, tesela,
         };
 
-        /* Se llama al cambiar los mapas: si el reparto se hizo con otros, se rehace. */
+        /* Called when the maps change: if the distribution was made with others, it's redone. */
         void ActualizarCampoScatters()
         {
             if (globe.ScatterGpu == null || campoFirma == null) return;

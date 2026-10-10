@@ -6,15 +6,15 @@ namespace KerbinMaps.Core
 {
     public readonly record struct LatLon(double Lat, double Lon);
 
-    /* Proyección y geodesia sobre Kerbin. El mapa es equirectangular (plate carrée),
-       la misma proyección de las texturas de KSP: una imagen 2:1 se pega tal cual. */
+    /* Projection and geodesy on Kerbin. The map is equirectangular (plate carrée), the same
+       projection as KSP's textures: a 2:1 image is pasted as is. */
     public static class Geo
     {
         public const double D2R = Math.PI / 180, R2D = 180 / Math.PI;
         static double R => Body.Radius;
         public static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        /* Distancia sobre el gran círculo, en metros. */
+        /* Great-circle distance, in meters. */
         public static double Distance(double lat1, double lon1, double lat2, double lon2)
         {
             double p1 = lat1 * D2R, p2 = lat2 * D2R;
@@ -23,7 +23,7 @@ namespace KerbinMaps.Core
             return 2 * R * Math.Asin(Math.Min(1, Math.Sqrt(h)));
         }
 
-        /* Rumbo inicial de A a B, en grados desde el norte. */
+        /* Initial bearing from A to B, in degrees from north. */
         public static double Bearing(double lat1, double lon1, double lat2, double lon2)
         {
             double p1 = lat1 * D2R, p2 = lat2 * D2R, dl = (lon2 - lon1) * D2R;
@@ -32,7 +32,7 @@ namespace KerbinMaps.Core
             return (Math.Atan2(y, x) * R2D + 360) % 360;
         }
 
-        /* Punto a distancia `dist` (m) y rumbo `brg` (°) desde un origen. */
+        /* Point at distance `dist` (m) and bearing `brg` (°) from an origin. */
         public static LatLon Destination(double lat, double lon, double brg, double dist)
         {
             double d = dist / R, t = brg * D2R, p1 = lat * D2R, l1 = lon * D2R;
@@ -42,8 +42,8 @@ namespace KerbinMaps.Core
             return new LatLon(p2 * R2D, WrapLon(l2 * R2D));
         }
 
-        /* Interpolación sobre el gran círculo: en equirectangular la recta entre dos
-           puntos NO es el camino más corto, así que hay que trocearla. */
+        /* Great-circle interpolation: in equirectangular the straight line between two points
+           is NOT the shortest path, so it has to be split up. */
         public static List<LatLon> GreatCircle(double lat1, double lon1, double lat2, double lon2, int steps = 0)
         {
             double d = Distance(lat1, lon1, lat2, lon2) / R;
@@ -64,8 +64,8 @@ namespace KerbinMaps.Core
             return output;
         }
 
-        /* Círculo de radio constante sobre la superficie (p. ej. el horizonte visible
-           desde una altitud dada). */
+        /* Circle of constant radius on the surface (e.g. the visible horizon from a given
+           altitude). */
         public static List<LatLon> Circle(double lat, double lon, double radiusM, int steps = 180)
         {
             var pts = new List<LatLon>(steps + 1);
@@ -73,7 +73,7 @@ namespace KerbinMaps.Core
             return pts;
         }
 
-        /* Radio sobre la superficie del casquete visible desde una altitud h. */
+        /* Surface radius of the cap visible from an altitude h. */
         public static double HorizonRadius(double h) => R * Math.Acos(R / (R + h));
 
         public static double WrapLon(double lon)
@@ -83,8 +83,8 @@ namespace KerbinMaps.Core
             return x - 180;
         }
 
-        /* Una polilínea que cruza ±180° se dibujaría como una raya de lado a lado. La
-           partimos en tramos y calculamos la latitud del cruce por interpolación. */
+        /* A polyline that crosses ±180° would be drawn as a stripe from side to side. We split
+           it into pieces and compute the crossing latitude by interpolation. */
         public static List<List<LatLon>> SplitAntimeridian(IReadOnlyList<LatLon> points)
         {
             var segs = new List<List<LatLon>>();
@@ -112,8 +112,8 @@ namespace KerbinMaps.Core
             return segs;
         }
 
-        /* Deshace los saltos de ±360° entre puntos consecutivos: la línea queda
-           continua en longitud y el mapa la pinta en cada copia del mundo. */
+        /* Undoes the ±360° jumps between consecutive points: the line stays continuous in
+           longitude and the map paints it on every copy of the world. */
         public static List<LatLon> Unwrap(IReadOnlyList<LatLon> points)
         {
             var output = new List<LatLon>(points.Count);
@@ -130,7 +130,7 @@ namespace KerbinMaps.Core
             return output;
         }
 
-        /* ---------- formato ---------- */
+        /* ---------- formatting ---------- */
 
         public static string F(double v, int dec) => v.ToString("F" + dec, Inv);
 
@@ -146,10 +146,10 @@ namespace KerbinMaps.Core
 
         public static string FmtAlt(double m) => (m >= 0 ? "+" : "") + F(m, 0) + " m";
 
-        /* Segundos -> d/h/m/s con el día solar de Kerbin (6 h). */
+        /* Seconds -> d/h/m/s with Kerbin's solar day (6 h). */
         public static string FmtTime(double s)
         {
-            double day = SolarSystem.Home.SolarDay;      // el calendario es siempre el del planeta de origen
+            double day = SolarSystem.Home.SolarDay;      // the calendar is always the home planet's
             double d = Math.Floor(s / day); s -= d * day;
             double h = Math.Floor(s / 3600); s -= h * 3600;
             double m = Math.Floor(s / 60); s -= m * 60;
@@ -157,8 +157,8 @@ namespace KerbinMaps.Core
             return (d != 0 ? ((long)d).ToString(Inv) + "d " : "") + P(h) + ":" + P(m) + ":" + P(Math.Floor(s));
         }
 
-        /* Número entero con separador de miles al estilo español: igual que
-           toLocaleString('es'), no agrupa por debajo de 10 000. */
+        /* Integer with a thousands separator in Spanish style: like toLocaleString('es'), it
+           doesn't group below 10 000. */
         public static string FmtIntEs(long n)
         {
             string s = Math.Abs(n).ToString(Inv), sep = Lang.Code == "es" ? "." : ",";
@@ -167,7 +167,7 @@ namespace KerbinMaps.Core
             return (n < 0 ? "-" : "") + s;
         }
 
-        /* Calendario del juego: días de 6 h y años de 426 días, desde el año 1, día 1. */
+        /* The game's calendar: 6 h days and 426-day years, from year 1, day 1. */
         public static string FechaKerbal(double t)
         {
             double DIA = SolarSystem.Home.SolarDay, ANIO = 426 * DIA;
@@ -178,7 +178,7 @@ namespace KerbinMaps.Core
                 P(sg / 3600) + ":" + P((sg % 3600) / 60) + ":" + P(sg % 60));
         }
 
-        /* La misma fecha sin reloj, para listas estrechas. */
+        /* The same date without the clock, for narrow lists. */
         public static string FechaCorta(double t)
         {
             double DIA = SolarSystem.Home.SolarDay, ANIO = 426 * DIA;
@@ -186,7 +186,7 @@ namespace KerbinMaps.Core
             return Lang.F("Año {0} · día {1}", (long)y + 1, (long)d + 1);
         }
 
-        /* Acepta «-0.0972, -74.5577», «-0.0972 -74.5577» y «0.09 S 74.55 W». */
+        /* Accepts «-0.0972, -74.5577», «-0.0972 -74.5577» and «0.09 S 74.55 W». */
         public static LatLon? ParseCoords(string s)
         {
             string t = (s ?? "").Trim();

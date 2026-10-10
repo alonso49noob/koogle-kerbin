@@ -1,28 +1,28 @@
-/* Instalador de Koogle Kerbin.
+/* Koogle Kerbin installer.
 
-   Un asistente propio en WinForms sobre .NET Framework 4.8, que ya viene con Windows 10 y
-   11: así arranca aunque falte .NET 10, que es justo lo que tiene que comprobar. Los
-   ficheros de la aplicación van dentro del .exe, en un zip incrustado.
+   A custom WinForms wizard on .NET Framework 4.8, which already ships with Windows 10 and
+   11: that way it starts even when .NET 10 is missing, which is exactly what it has to
+   check. The application files go inside the .exe, in an embedded zip.
 
-   Se instala para el usuario actual, sin permisos de administrador, en
-   %LOCALAPPDATA%\Programs\Koogle Kerbin, con accesos directos y su entrada en
-   «Aplicaciones». El propio instalador se queda en la carpeta como desinstalar.exe, y
-   una lista (instalacion.txt) apunta lo instalado: al desinstalar solo se borra eso.
+   It installs for the current user, without administrator rights, in
+   %LOCALAPPDATA%\Programs\Koogle Kerbin, with shortcuts and its entry in
+   «Apps». The installer itself stays in the folder as desinstalar.exe, and a
+   list (instalacion.txt) records what was installed: uninstalling deletes only that.
 
-   Opciones de línea de órdenes:
-     /silent          sin ventanas. Códigos de salida: 0 bien, 1 falta .NET 10, 2 error,
-                      3 cancelado, 4 la aplicación está abierta
-     /update          actualización automática desde la propia aplicación: como /silent, pero
-                      espera a que la aplicación se cierre, conserva los accesos directos que
-                      hubiera y vuelve a abrirla al terminar
-     /dir=<carpeta>   carpeta de instalación
-     /noshortcuts     sin accesos directos
-     /noregistry      sin entrada en «Aplicaciones»
-     /nolaunch        no proponer abrir la aplicación al terminar
-     /texturas=planetas,suelo,scatters   bajar también las texturas de Parallax (ver Extras)
-     /uninstall       desinstalar
+   Command-line options:
+     /silent          no windows. Exit codes: 0 ok, 1 .NET 10 missing, 2 error,
+                      3 cancelled, 4 the application is open
+     /update          automatic update from the application itself: like /silent, but
+                      waits for the application to close, keeps whatever shortcuts there
+                      were and opens it again when done
+     /dir=<folder>    installation folder
+     /noshortcuts     no shortcuts
+     /noregistry      no entry in «Apps»
+     /nolaunch        don't offer to open the application at the end
+     /texturas=planetas,suelo,scatters   also download the Parallax textures (see Extras)
+     /uninstall       uninstall
 
-   Está escrito en C# 7.3 para compilar con cualquier Roslyn contra .NET Framework. */
+   It's written in C# 7.3 so it compiles with any Roslyn against .NET Framework. */
 
 using System;
 using System.Collections.Generic;
@@ -91,9 +91,9 @@ namespace KoogleKerbinSetup
         }
     }
 
-    /* Idioma del asistente. Va dentro del ejecutable porque el instalador no tiene todavía
-       carpeta de datos: la clave es el texto en español y lo que falte se queda en español.
-       Al empezar se toma el idioma de Windows, y el asistente deja cambiarlo. */
+    /* Wizard language. It lives inside the executable because the installer has no data folder
+       yet: the key is the Spanish text, and anything missing stays in Spanish. It starts with
+       the Windows language, and the wizard lets you change it. */
     static class L
     {
         public static string Code = "es";
@@ -228,7 +228,7 @@ namespace KoogleKerbinSetup
         {
             var o = Options.Parse(args);
             L.Detect(o.Lang);
-            // desinstalar.exe es este mismo ejecutable: abierto con doble clic, desinstala
+            // desinstalar.exe is this same executable: opened with a double click, it uninstalls
             string self = Path.GetFileName(Assembly.GetExecutingAssembly().Location);
             if (string.Equals(self, App.Uninstaller, StringComparison.OrdinalIgnoreCase)) o.Uninstall = true;
 
@@ -244,7 +244,7 @@ namespace KoogleKerbinSetup
                 }
                 if (o.Update) return UpdateInstall(o);
                 if (o.Silent) return SilentInstall(o);
-                // cambiar de idioma rehace el asistente: los textos se traducen al crear los controles
+                // changing language rebuilds the wizard: texts are translated when the controls are created
                 while (true)
                 {
                     var w = new Wizard(o);
@@ -262,9 +262,9 @@ namespace KoogleKerbinSetup
             }
         }
 
-        /* La aplicación lanza este instalador y se cierra: se espera a que termine (hasta un
-           minuto) y se instala encima. Si algo falla, se vuelve a abrir la versión que había,
-           para que quien actualizó no se quede sin visor. */
+        /* The application launches this installer and closes: we wait for it to finish (up to a
+           minute) and install on top. If something fails, the previous version is reopened, so
+           whoever updated isn't left without a viewer. */
         static int UpdateInstall(Options o)
         {
             string dir = Path.GetFullPath(o.Dir ?? Registration.InstalledDir() ?? App.DefaultDir);
@@ -279,7 +279,7 @@ namespace KoogleKerbinSetup
                     if (Util.RunningIn(dir).Count > 0) code = 4;
                     else
                     {
-                        // los accesos directos que tenía se rehacen; los que no, no se inventan
+                        // the shortcuts it had are recreated; the ones it didn't have aren't invented
                         var old = InstallManifest.Read(dir);
                         string desk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
                         string prog = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
@@ -316,7 +316,7 @@ namespace KoogleKerbinSetup
                     var e = nt == "planetas" ? Extras.Planetas : nt == "suelo" ? Extras.Suelo : nt == "scatters" ? Extras.Scatters : null;
                     if (e == null) continue;
                     try { Extras.Instalar(e, (a, b) => { }, t => { }); }
-                    catch (Exception ex) { Util.Log(ex); codigo = 5; }   // 5: instalado, pero sin alguna textura
+                    catch (Exception ex) { Util.Log(ex); codigo = 5; }   // 5: installed, but missing some texture
                 }
                 return codigo;
             }
@@ -328,15 +328,15 @@ namespace KoogleKerbinSetup
         }
     }
 
-    /* ------------------------------------------------------------------ requisitos */
+    /* ------------------------------------------------------------------ requirements */
 
     static class Requirements
     {
         public static bool Os64 { get { return Environment.Is64BitOperatingSystem; } }
 
-        /* La versión más alta del runtime de escritorio de .NET 10 (Microsoft.WindowsDesktop.App),
-           buscada donde la busca el propio lanzador de .NET: la carpeta registrada, DOTNET_ROOT
-           y Archivos de programa\dotnet. Null si no está. */
+        /* The highest version of the .NET 10 desktop runtime (Microsoft.WindowsDesktop.App),
+           searched where the .NET launcher itself looks: the registered folder, DOTNET_ROOT and
+           Program Files\dotnet. Null if it isn't there. */
         public static Version DesktopRuntime()
         {
             Version best = null;
@@ -379,7 +379,7 @@ namespace KoogleKerbinSetup
         }
     }
 
-    /* ------------------------------------------------------------------ instalación */
+    /* ------------------------------------------------------------------ installation */
 
     static class Payload
     {
@@ -398,7 +398,7 @@ namespace KoogleKerbinSetup
         }
     }
 
-    /* Lo que instaló una versión: ficheros relativos a la carpeta y accesos directos. */
+    /* What a version installed: files relative to the folder, and shortcuts. */
     sealed class InstallManifest
     {
         public readonly List<string> Files = new List<string>();
@@ -462,7 +462,7 @@ namespace KoogleKerbinSetup
                 }
             }
 
-            // el instalador se queda como desinstalador
+            // the installer stays behind as the uninstaller
             string self = Path.GetFullPath(Assembly.GetExecutingAssembly().Location);
             string un = Path.Combine(dir, App.Uninstaller);
             if (!string.Equals(self, un, StringComparison.OrdinalIgnoreCase))
@@ -473,7 +473,7 @@ namespace KoogleKerbinSetup
             }
             files.Add(App.Uninstaller);
 
-            // lo que dejó una versión anterior y esta ya no trae; los accesos directos se rehacen
+            // what a previous version left and this one no longer ships; shortcuts are recreated
             foreach (var rel in old.Files)
                 if (!files.Contains(rel, StringComparer.OrdinalIgnoreCase) && rel != App.Manifest && Util.Inside(dir, Path.Combine(dir, rel)))
                     Util.TryDelete(Path.Combine(dir, rel));
@@ -487,7 +487,7 @@ namespace KoogleKerbinSetup
             if (StartMenu) shortcuts.Add(Shortcut.Create(Environment.GetFolderPath(Environment.SpecialFolder.Programs), exe));
             InstallManifest.Write(dir, files, shortcuts);
 
-            // la primera vez, el visor arranca en el idioma que se eligió aquí
+            // the first time, the viewer starts in the language chosen here
             try
             {
                 string cfg = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KoogleKerbin", "settings.json");
@@ -561,7 +561,7 @@ namespace KoogleKerbinSetup
         public static string InstalledDir() { return Get("InstallLocation"); }
         public static string InstalledVersion() { return Get("DisplayVersion"); }
 
-        /* Solo si la entrada es de esta carpeta: otra instalación conserva la suya. */
+        /* Only if the entry belongs to this folder: another installation keeps its own. */
         public static void DeleteIf(string dir)
         {
             string loc = InstalledDir();
@@ -572,8 +572,8 @@ namespace KoogleKerbinSetup
 
     static class Shortcut
     {
-        /* Acceso directo con WScript.Shell, por reflexión para no depender de un ensamblado
-           de interoperabilidad. */
+        /* Shortcut through WScript.Shell, via reflection so as not to depend on an interop
+           assembly. */
         public static string Create(string folder, string target)
         {
             try
@@ -632,7 +632,7 @@ namespace KoogleKerbinSetup
             return Path.GetFullPath(path).StartsWith(d, StringComparison.OrdinalIgnoreCase);
         }
 
-        /* Procesos de la aplicación que se ejecutan desde esa carpeta. */
+        /* Application processes running from that folder. */
         public static List<Process> RunningIn(string dir)
         {
             var r = new List<Process>();
@@ -687,24 +687,24 @@ namespace KoogleKerbinSetup
         }
     }
 
-    /* ------------------------------------------------------------------ desinstalación */
+    /* ------------------------------------------------------------------ uninstall */
 
-    /* ------------------------------------------------------------ texturas extra */
+    /* ------------------------------------------------------------ extra textures */
 
-    /* Texturas de Parallax, para quien no las tenga en su KSP.
+    /* Parallax textures, for those who don't have them in their KSP.
 
-       Son de su autor (Gameslinx) y en su repositorio dice «All Rights Reserved», así que
-       no van dentro de este instalador ni se suben a ningún otro sitio: se bajan en el
-       equipo de cada uno desde la página oficial del autor, igual que haría un gestor de
-       mods, y se quedan para uso local en %LOCALAPPDATA%\KoogleKerbin\parallax. De cada zip
-       solo se guarda lo que la aplicación lee: los paquetes de Unity y su configuración.
+       Their author owns them (Gameslinx) and the repository says «All Rights Reserved», so they
+       don't go inside this installer and aren't uploaded anywhere else: they're downloaded on
+       each user's machine from the author's official page, just like a mod manager would, and
+       kept for local use in %LOCALAPPDATA%\KoogleKerbin\parallax. From each zip we keep only
+       what the application reads: the Unity bundles and their configuration.
 
-       Las nubes no se ofrecen: son de un mod de pago. */
+       Clouds aren't offered: they come from a paid mod. */
     sealed class Extra
     {
         public string Nombre, Carpeta, Url;
-        public long Tam;                          // lo que pesa el zip, para avisar antes
-        // lo que se guarda del zip: los paquetes de Unity y la configuración, y los modelos si los hay
+        public long Tam;                          // the size of the zip, to warn beforehand
+        // what we keep from the zip: the Unity bundles and the configuration, plus the models if any
         public string[] Guardar = { ".unity3d", ".cfg" };
     }
 
@@ -717,7 +717,7 @@ namespace KoogleKerbinSetup
         {
             Nombre = "Mapas de los planetas",
             Carpeta = "Parallax_StockPlanetTextures",
-            // la variable de entorno solo sirve para probar el instalador contra un zip local
+            // the environment variable is only for testing the installer against a local zip
             Url = Environment.GetEnvironmentVariable("KOOGLE_EXTRAS_PLANETAS") ??
                   "https://github.com/Gameslinx/Parallax-Continued/releases/download/1.0.3/ParallaxContinued_StockPlanetTextures-1.0.3.zip",
             Tam = 245859412L,
@@ -732,8 +732,8 @@ namespace KoogleKerbinSetup
             Tam = 1990694985L,
         };
 
-        /* Hierba, flores, arbustos, árboles y rocas: además del paquete de texturas hacen
-           falta los modelos .mu de cada uno. */
+        /* Grass, flowers, bushes, trees and rocks: besides the texture bundle they need each
+           one's .mu models. */
         public static readonly Extra Scatters = new Extra
         {
             Nombre = "Vegetación y rocas",
@@ -757,8 +757,9 @@ namespace KoogleKerbinSetup
             return Directory.Exists(d) && Directory.GetFiles(d, "*.unity3d").Length > 0;
         }
 
-        /* ¿Lo tiene ya en su KSP? Se mira la carpeta de KSP elegida en la aplicación y todas
-           las bibliotecas de Steam; si está, bajarlo otra vez no aporta nada. */
+        /* Does the user already have it in their KSP? We look at the KSP folder chosen in the
+           application and at every Steam library; if it's there, downloading it again adds
+           nothing. */
         public static bool EnKsp(Extra e)
         {
             foreach (var gd in GameDatas())
@@ -769,11 +770,11 @@ namespace KoogleKerbinSetup
             return false;
         }
 
-        /* Dónde puede estar KSP: la carpeta elegida en la aplicación («Carpeta de KSP…», en
-           sus ajustes) y, con Steam, su carpeta y todas sus bibliotecas, que Steam apunta en
-           steamapps\libraryfolders.vdf. Mirando solo la carpeta de Steam no se encontraba
-           un KSP instalado en otra biblioteca (D:\SteamLibrary...). La aplicación busca
-           igual (Core/Steam.cs). */
+        /* Where KSP can be: the folder chosen in the application («KSP folder…», in its
+           settings) and, with Steam, its folder and all its libraries, which Steam lists in
+           steamapps\libraryfolders.vdf. Looking only at the Steam folder missed a KSP installed
+           in another library (D:\SteamLibrary...). The application searches the same way
+           (Core/Steam.cs). */
         static IEnumerable<string> GameDatas()
         {
             var res = new List<string>();
@@ -825,7 +826,7 @@ namespace KoogleKerbinSetup
             return res.Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
-        /* Baja el zip a un temporal, con progreso, y se queda solo con lo que hace falta. */
+        /* Downloads the zip to a temp file, with progress, and keeps only what's needed. */
         public static void Instalar(Extra e, Action<long, long> progreso, Action<string> estado)
         {
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
@@ -862,9 +863,9 @@ namespace KoogleKerbinSetup
             }
         }
 
-        /* Del zip del autor se guarda lo que lee la aplicación (paquetes de Unity, .cfg y, de
-           los scatters, sus modelos) dentro de la carpeta del mod y con su estructura; el
-           resto se deja. */
+        /* From the author's zip we keep what the application reads (Unity bundles, .cfg and,
+           for the scatters, their models) inside the mod folder and with its structure; the
+           rest is left out. */
         static void Extraer(string zip, string carpeta, string[] guardar)
         {
             string raizMod = Path.Combine(Destino, carpeta);
@@ -881,9 +882,9 @@ namespace KoogleKerbinSetup
                     string ext = Path.GetExtension(rel).ToLowerInvariant();
                     if (Array.IndexOf(guardar, ext) < 0) continue;
                     string dest = Path.GetFullPath(Path.Combine(raizMod, rel.Replace('/', '\\')));
-                    if (!Util.Inside(raizMod, dest)) continue;          // nada fuera de la carpeta
+                    if (!Util.Inside(raizMod, dest)) continue;          // nothing outside the folder
                     Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                    // sin ExtractToFile, que vive en otra biblioteca: se copia el flujo a mano
+                    // no ExtractToFile, which lives in another library: the stream is copied by hand
                     using (var src = ent.Open())
                     using (var dst = File.Create(dest)) src.CopyTo(dst, 1 << 16);
                     guardados++;
@@ -904,7 +905,7 @@ namespace KoogleKerbinSetup
 
             if (!o.FromTemp)
             {
-                // un ejecutable no puede borrarse a sí mismo: trabaja una copia desde %TEMP%
+                // an executable can't delete itself: a copy works from %TEMP%
                 string tmp = Path.Combine(Path.GetTempPath(), "KoogleKerbin-desinstalar-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".exe");
                 File.Copy(self, tmp, true);
                 string args = "/uninstall /fromtemp \"/dir=" + dir + "\"" + (o.Silent ? " /silent" : "") + (o.NoRegistry ? " /noregistry" : "");
@@ -948,14 +949,14 @@ namespace KoogleKerbinSetup
                 string path = Path.Combine(dir, rel);
                 if (!Util.Inside(dir, path)) continue;
                 Util.TryDelete(path);
-                // desinstalar.exe sigue en uso mientras su proceso espera a esta copia: se borra al terminar
+                // desinstalar.exe is still in use while its process waits for this copy: it's deleted at the end
                 if (File.Exists(path)) pending.Add(path);
             }
             foreach (var lnk in man.Shortcuts)
                 if (lnk.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) Util.TryDelete(lnk);
             Util.RemoveEmptyDirs(dir, false);
             if (!o.NoRegistry) Registration.DeleteIf(dir);
-            // las texturas que bajó el instalador: son parte de la aplicación, no datos tuyos
+            // the textures the installer downloaded: they're part of the application, not your data
             Extras.Borrar();
 
             if (deleteData)
@@ -976,8 +977,8 @@ namespace KoogleKerbinSetup
             return 0;
         }
 
-        /* Lo que aún está en uso (esta copia de %TEMP% y el desinstalar.exe que la lanzó) se
-           borra en cuanto terminan los dos procesos, y con ello la carpeta si ha quedado vacía. */
+        /* Whatever is still in use (this %TEMP% copy and the desinstalar.exe that launched it) is
+           deleted as soon as both processes end, and with it the folder if it's left empty. */
         static void DeleteLater(List<string> files, string dir)
         {
             try
@@ -994,7 +995,7 @@ namespace KoogleKerbinSetup
         }
     }
 
-    /* ------------------------------------------------------------------ interfaz */
+    /* ------------------------------------------------------------------ interface */
 
     static class Ui
     {
@@ -1082,7 +1083,7 @@ namespace KoogleKerbinSetup
         int page;
         bool reqOk, installing, finished, failed;
         string installedDir;
-        public string NuevoIdioma;               // el asistente se rehace en ese idioma
+        public string NuevoIdioma;               // the wizard is rebuilt in that language
 
         int S(double v) { return (int)Math.Round(v * k); }
 
@@ -1106,7 +1107,7 @@ namespace KoogleKerbinSetup
             Font = new Font("Segoe UI", 9.5f);
             Icon = Util.AppIcon(0);
             DoubleBuffered = true;
-            // del .png: los marcos grandes del .ico van comprimidos en PNG y Icon.ToBitmap no los entiende
+            // from the .png: the large frames of the .ico are PNG-compressed and Icon.ToBitmap doesn't understand them
             using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("app.png"))
                 if (s != null) sideIcon = new Bitmap(s);
 
@@ -1118,7 +1119,7 @@ namespace KoogleKerbinSetup
             side.Paint += PaintSide;
             Controls.Add(side);
 
-            // idioma: al cambiarlo se rehace el asistente, porque los textos se traducen al crear los controles
+            // language: changing it rebuilds the wizard, because texts are translated when the controls are created
             var bEs = Ui.Btn("Español", L.Code == "es", k);
             var bEn = Ui.Btn("English", L.Code == "en", k);
             bEs.Size = bEn.Size = new Size(S(76), S(26));
@@ -1145,7 +1146,7 @@ namespace KoogleKerbinSetup
             Controls.AddRange(new Control[] { back, next, cancel });
             AcceptButton = next;
 
-            /* Bienvenida */
+            /* Welcome */
             pWelcome = NewPage();
             int y = Para(pWelcome, L.F("Este asistente instala {0} {1}, un visor de los mundos de Kerbal Space Program: mapa plano, " +
                                        "globo 3D, vista del cielo, vuelo libre a ras de suelo con día y noche, y las naves de tu partida con sus órbitas y sus modelos.",
@@ -1157,7 +1158,7 @@ namespace KoogleKerbinSetup
                                "el runtime de escritorio de .NET 10, que se comprueba en el paso siguiente.", y, Ui.Dim).Bottom + S(14);
             Para(pWelcome, L.F("{0} es un proyecto de aficionados, sin relación con Squad ni con Take-Two.", App.Name), y, Ui.Dim);
 
-            /* Requisitos */
+            /* Requirements */
             pReq = NewPage();
             reqOs = Para(pReq, " ", 0, null, 10.5f);
             reqNet = Para(pReq, " ", S(32), null, 10.5f);
@@ -1176,7 +1177,7 @@ namespace KoogleKerbinSetup
             reqTimer = new System.Windows.Forms.Timer { Interval = 2500 };
             reqTimer.Tick += (s, e) => { if (!reqOk) CheckRequirements(); };
 
-            /* Opciones */
+            /* Options */
             pOptions = NewPage();
             var lbl = Para(pOptions, "Carpeta de instalación", 0, null, 9.5f, FontStyle.Bold);
             dirBox = new TextBox
@@ -1198,7 +1199,7 @@ namespace KoogleKerbinSetup
             dirBox.TextChanged += (s, e) => UpdateSpace();
             UpdateSpace();
 
-            /* Texturas extra */
+            /* Extra textures */
             pTex = NewPage();
             int ty = Para(pTex, "Con Parallax, el vuelo y los mapas de los planetas ganan mucho. Si ya lo tienes en tu KSP, " +
                                 "la aplicación lo usa directamente y no hace falta bajarlo.",
@@ -1224,7 +1225,7 @@ namespace KoogleKerbinSetup
             verPagina.LinkClicked += (s, e) => Util.OpenUrl(Extras.Pagina);
             pTex.Controls.Add(verPagina);
 
-            /* Progreso */
+            /* Progress */
             pProgress = NewPage();
             var pl = Para(pProgress, L.F("Copiando los ficheros de {0}…", App.Name), 0);
             bar = new ProgressBar
@@ -1235,7 +1236,7 @@ namespace KoogleKerbinSetup
             pProgress.Controls.Add(bar);
             barFile = Para(pProgress, " ", bar.Bottom + S(10), Ui.Dim, 9f);
 
-            /* Final */
+            /* Finish */
             pDone = NewPage();
             doneText = Para(pDone, " ", 0, null, 10f);
             chkLaunch = Ui.Check(pDone, L.F("Abrir {0} ahora", App.Name), 0, S(80), !o.NoLaunch);
@@ -1274,10 +1275,10 @@ namespace KoogleKerbinSetup
             if (i == 4) StartInstall();
         }
 
-        /* Qué hay ya de cada paquete: en el KSP, bajado antes o nada. */
+        /* What there already is of each bundle: in KSP, downloaded before, or nothing. */
         static string EstadoExtra(Extra e, string para)
         {
-            // en una sola línea: con tres paquetes la página no da para más
+            // on a single line: with three bundles the page has no room for more
             if (Extras.EnKsp(e)) return L.F("{0} · ya está en tu KSP", L.T(para));
             if (Extras.Bajadas(e)) return L.F("{0} · ya bajado antes", L.T(para));
             return L.T(para);
@@ -1356,7 +1357,7 @@ namespace KoogleKerbinSetup
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 string chosen = d.SelectedPath;
-                // una carpeta con otras cosas recibe su propia subcarpeta, para no mezclar ficheros
+                // a folder with other things in it gets its own subfolder, so files don't get mixed
                 bool ours = string.Equals(Path.GetFileName(chosen.TrimEnd('\\')), App.Name, StringComparison.OrdinalIgnoreCase) || File.Exists(Path.Combine(chosen, App.Manifest));
                 if (!ours && Directory.Exists(chosen) && Directory.EnumerateFileSystemEntries(chosen).Any()) chosen = Path.Combine(chosen, App.Name);
                 dirBox.Text = chosen;
@@ -1367,7 +1368,7 @@ namespace KoogleKerbinSetup
         {
             if (installing || code == L.Code) return;
             NuevoIdioma = code;
-            finished = true;                      // no preguntar si se sale
+            finished = true;                      // don't ask when leaving
             Close();
         }
 
@@ -1401,7 +1402,7 @@ namespace KoogleKerbinSetup
                     Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return false;
 
-            // que se pueda escribir ahí: Archivos de programa, por ejemplo, pide administrador
+            // that it's writable: Program Files, for example, needs administrator
             try
             {
                 Directory.CreateDirectory(dir);
@@ -1462,9 +1463,9 @@ namespace KoogleKerbinSetup
                 Exception error = null;
                 try { inst.Run(); }
                 catch (Exception ex) { error = ex; Util.Log(ex); }
-                /* Las texturas van después y aparte: si una descarga falla, la aplicación ya
-                   está instalada y funciona igual, así que se avisa sin dar la instalación
-                   por fallida. */
+                /* Textures come afterwards and separately: if a download fails, the application
+                   is already installed and works the same, so we warn without treating the
+                   installation as failed. */
                 if (error == null)
                     foreach (var e in extras)
                     {
@@ -1508,7 +1509,7 @@ namespace KoogleKerbinSetup
             }
             ShowPage(5);
             if (failed) title.Text = L.T("No se pudo instalar");
-            // la etiqueta solo se mide bien con la página ya visible; y otra vez cuando termina de ajustarse
+            // the label only measures correctly once the page is visible; and again when it finishes adjusting
             pDone.PerformLayout();
             LayoutDone();
             BeginInvoke((Action)LayoutDone);

@@ -6,21 +6,21 @@ using System.Linq;
 
 namespace KerbinMaps.Ksp
 {
-    /* Material de un scatter de Parallax: la textura, el color por el que se multiplica y
-       las palabras clave del shader que cambian cómo se pinta (recorte por alfa, dos caras,
-       siempre de cara a la cámara...). */
+    /* Material of a Parallax scatter: the texture, the color it's multiplied by and the shader
+       keywords that change how it's painted (alpha cutout, two-sided, always facing the
+       camera...). */
     public sealed class ScatterMaterial
     {
         public string Shader = "Custom/ParallaxInstancedSolid";
         public string MainTex;
         public float[] Color = { 1, 1, 1 };
         public float Cutoff = 0.5f;
-        public float Tiling = 1;                      // solo el biplanar: repeticiones por metro
+        public float Tiling = 1;                      // biplanar only: repeats per meter
         public float[] SubsurfaceColor = { 0, 0, 0 };
         public float SubsurfaceIntensity, SubsurfacePower = 1;
         public int CullMode = 2;
-        /* Viento: un mapa que se desplaza con el tiempo y empuja los vértices según su altura
-           en el modelo (ver GlobeView.Scatters). */
+        /* Wind: a map that scrolls over time and pushes vertices according to their height in
+           the model (see GlobeView.Scatters). */
         public string WindMap;
         public float WindScale = 0.05f, WindHeightStart = 0.05f, WindHeightFactor = 0.05f, WindSpeed = 0.05f, WindIntensity = 0.05f;
         public HashSet<string> Keywords = new(StringComparer.OrdinalIgnoreCase);
@@ -32,7 +32,7 @@ namespace KerbinMaps.Ksp
         public bool Subsurface => Keywords.Contains("SUBSURFACE_SCATTERING") || Keywords.Contains("SUBSURFACE_USE_THICKNESS_TEXTURE");
         public bool Wind => Keywords.Contains("WIND") && WindMap != null;
         public bool Biplanar => Shader.Contains("Biplanar", StringComparison.OrdinalIgnoreCase);
-        // las burbujas de Eve refractan lo que tienen detrás: eso no se reproduce
+        // Eve's bubbles refract what's behind them: that isn't reproduced
         public bool Unsupported => Shader.Contains("Bubble", StringComparison.OrdinalIgnoreCase);
 
         public ScatterMaterial Clone()
@@ -44,8 +44,8 @@ namespace KerbinMaps.Ksp
             return m;
         }
 
-        /* Aplica lo que diga el nodo; lo que no diga se queda. Así sirve igual para un
-           material completo que para un MaterialOverride. */
+        /* Applies whatever the node says; whatever it doesn't say stays. That way it works the
+           same for a full material as for a MaterialOverride. */
         public void Apply(ConfigNode n)
         {
             if (n == null) return;
@@ -83,18 +83,18 @@ namespace KerbinMaps.Ksp
         }
     }
 
-    /* Un nivel de detalle: qué modelo se pinta desde qué distancia, y con qué material. */
+    /* A level of detail: which model is painted from which distance, and with which material. */
     public sealed class ScatterLevel
     {
         public string Model;
-        public double From;                           // metros desde los que se usa
+        public double From;                           // meters from which it's used
         public ScatterMaterial Material;
     }
 
-    /* Un scatter de Parallax para un cuerpo: la hierba, un tipo de árbol, unas rocas. Cómo
-       se reparte lo dice su nodo Distribution; los números se usan como los usa el mod
-       (ver ScatterField). Un SharedScatter no tiene reparto propio: va en los mismos
-       sitios que su padre (las copas de los árboles, sobre sus troncos). */
+    /* A Parallax scatter for a body: the grass, a kind of tree, some rocks. How it's spread is
+       set by its Distribution node; the numbers are used as the mod uses them (see
+       ScatterField). A SharedScatter has no distribution of its own: it goes in the same places
+       as its parent (tree crowns, on top of their trunks). */
     public sealed class ScatterDef
     {
         public string Name, Parent;
@@ -118,16 +118,16 @@ namespace KerbinMaps.Ksp
         public bool Shared => Parent != null;
     }
 
-    /* Malla de un modelo de scatter, lista para subir: posiciones, normales y UV en el marco
-       de Unity (y hacia arriba), con los índices de todas sus submallas juntos. */
+    /* Mesh of a scatter model, ready to upload: positions, normals and UVs in Unity's frame (Y
+       up), with the indices of all its submeshes together. */
     public sealed class ScatterMesh
     {
         public float[] Pos, Nrm, Uv;
         public int[] Idx;
-        public float Radius, Top;                     // radio en planta y altura, sin escalar
+        public float Radius, Top;                     // radius in plan and height, unscaled
     }
 
-    /* Todo lo que hace falta para pintar los scatters de un cuerpo. */
+    /* Everything needed to paint a body's scatters. */
     public sealed class ScatterAssets
     {
         public List<ScatterDef> Defs = new();
@@ -139,21 +139,21 @@ namespace KerbinMaps.Ksp
     {
         public const string Carpeta = "Parallax_StockScatterTextures";
 
-        /* La carpeta del mod, en el KSP del jugador o en lo que haya bajado el instalador. */
+        /* The mod's folder, in the player's KSP or in whatever the installer downloaded. */
         public static string FindDir(string gameData) =>
             ParallaxPlanets.GameDatas(gameData)
                 .Select(gd => Path.Combine(gd, Carpeta))
                 .FirstOrDefault(d => Directory.Exists(Path.Combine(d, "Configs")) && Directory.GetFiles(d, "*.unity3d").Length > 0);
 
-        /* Lee las definiciones del cuerpo y carga sus modelos y texturas. Devuelve null si
-           el mod no está o ese cuerpo no tiene scatters. */
+        /* Reads the body's definitions and loads its models and textures. Returns null if the
+           mod isn't there or that body has no scatters. */
         public static ScatterAssets Load(string gameData, string body, int maxAncho = 1024)
         {
             string dir = FindDir(gameData);
             if (dir == null) return null;
             var defs = Defs(dir, body);
             if (defs.Count == 0) return null;
-            string raiz = Path.GetDirectoryName(dir);         // el GameData donde está el mod
+            string raiz = Path.GetDirectoryName(dir);         // the GameData where the mod is
             var a = new ScatterAssets { Defs = defs };
 
             foreach (var lv in defs.SelectMany(d => d.Levels))
@@ -193,7 +193,7 @@ namespace KerbinMaps.Ksp
             return a;
         }
 
-        /* Las definiciones de un cuerpo, de todos los .cfg del mod. */
+        /* A body's definitions, from all the mod's .cfg files. */
         public static List<ScatterDef> Defs(string dir, string body)
         {
             var res = new List<ScatterDef>();
@@ -215,7 +215,7 @@ namespace KerbinMaps.Ksp
                         }
                     }
             }
-            // los compartidos heredan del padre el reparto y las distancias de los niveles
+            // shared ones inherit the distribution and level distances from their parent
             foreach (var d in res.Where(d => d.Shared).ToList())
             {
                 var p = res.FirstOrDefault(x => !x.Shared && x.Name == d.Parent);
@@ -226,7 +226,7 @@ namespace KerbinMaps.Ksp
             return res;
         }
 
-        // el primer nodo de algunos ficheros lleva delante la marca de orden de bytes
+        // the first node of some files is preceded by the byte order mark
         static IEnumerable<ConfigNode> Todos(ConfigNode n, string nombre)
         {
             if (n.Name != null && n.Name.Trim('﻿', ' ') == nombre) yield return n;
@@ -268,7 +268,7 @@ namespace KerbinMaps.Ksp
                 foreach (var lods in dist.Children("LODs"))
                     foreach (var lod in lods.Children("LOD"))
                     {
-                        // un Material completo sustituye al base; un MaterialOverride lo retoca
+                        // a full Material replaces the base one; a MaterialOverride tweaks it
                         var m = mat.Clone();
                         var full = lod.Children("Material").FirstOrDefault();
                         if (full != null) { m = new ScatterMaterial(); m.Apply(full); }
@@ -303,9 +303,9 @@ namespace KerbinMaps.Ksp
 
         static bool B(ConfigNode n, string k) => string.Equals(n.Get(k)?.Trim(), "true", StringComparison.OrdinalIgnoreCase);
 
-        /* Todas las mallas del modelo en una. La raíz se deja en el origen (Parallax coloca
-           el modelo por su malla, no por dónde quedó el objeto al exportarlo); los hijos, con
-           su posición, giro y escala respecto a ella. */
+        /* All the model's meshes in one. The root is left at the origin (Parallax places the
+           model by its mesh, not by where the object ended up when exported); the children,
+           with their position, rotation and scale relative to it. */
         static ScatterMesh Malla(MuFile mu)
         {
             var pos = new List<float>(); var nrm = new List<float>(); var uv = new List<float>(); var idx = new List<int>();

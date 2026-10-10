@@ -9,14 +9,14 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Rutas: cuánto se tarda de un punto a otro en avión, en barco y en vehículo de tierra
-       (ver MallaRutas). El origen y el destino se pinchan en el mapa o en el globo, o se
-       eligen entre los marcadores; las tres rutas se dibujan a la vez y la más rápida se
-       marca, como en un navegador de coche. */
+    /* Routes: how long it takes from one point to another by plane, by ship and by ground
+       vehicle (see MallaRutas). Origin and destination are picked on the map or the globe, or
+       chosen among the markers; the three routes are drawn at once and the fastest is
+       highlighted, like in a car navigator. */
     public sealed partial class MainForm
     {
         Task<MallaRutas> mallaTask;
-        object mallaDe;                           // de qué mapas sale la rejilla
+        object mallaDe;                           // which maps the grid comes from
         LatLon? rutaA, rutaB;
         string rutaANombre, rutaBNombre;
         Ruta[] rutasHechas;
@@ -106,7 +106,7 @@ namespace KerbinMaps.UI
             CalcularRutas();
         }
 
-        /* ------------------------------------------------------------ puntos */
+        /* ------------------------------------------------------------ points */
 
         string RutaHint() => rutaA == null || rutaB != null ? "Haz clic en el origen. Esc para terminar." : "Ahora haz clic en el destino.";
 
@@ -150,9 +150,9 @@ namespace KerbinMaps.UI
             RenderRutaInfo();
         }
 
-        /* ------------------------------------------------------------ cálculo */
+        /* ------------------------------------------------------------ calculation */
 
-        /* La rejilla de los mapas que se ven, hecha una sola vez por combinación de mapas. */
+        /* The grid for the maps being shown, built only once per combination of maps. */
         Task<MallaRutas> MallaActual()
         {
             var alt = MapImg("height");
@@ -214,10 +214,10 @@ namespace KerbinMaps.UI
 
         static bool AireVale => Body.Current.Atmosphere > 0;
 
-        /* La más rápida de las que se pueden hacer. */
+        /* The fastest of the ones that can be done. */
         Ruta MasRapida() => rutasHechas?.Where(r => r.Ok && (r.Medio != Medio.Aire || AireVale)).OrderBy(r => r.Tiempo).FirstOrDefault();
 
-        /* ------------------------------------------------------------ dibujo */
+        /* ------------------------------------------------------------ drawing */
 
         void DibujarRutas()
         {
@@ -225,7 +225,7 @@ namespace KerbinMaps.UI
             var globo = new List<(IReadOnlyList<LatLon>, ColorF)>();
             var rapida = MasRapida();
             if (rutasHechas != null)
-                foreach (var r in rutasHechas.Where(r => r.Ok).OrderBy(r => r == rapida))   // la más rápida, encima
+                foreach (var r in rutasHechas.Where(r => r.Ok).OrderBy(r => r == rapida))   // the fastest one, on top
                 {
                     bool aireMuerto = r.Medio == Medio.Aire && !AireVale;
                     var col = ColorF.Hex(ColorDe(r.Medio), r == rapida ? 1f : aireMuerto ? 0.4f : 0.75f);

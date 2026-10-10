@@ -4,22 +4,22 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* Luz y atmósfera con base física, compartidas por el globo y la vista del cielo.
+    /* Physically based light and atmosphere, shared by the globe and the sky view.
 
-       Dispersión simple de Rayleigh (el azul del cielo, el rojo de los atardeceres) y de
-       Mie (la bruma y el halo alrededor del Sol), integrada a lo largo de cada rayo. La
-       profundidad óptica hacia el Sol no se integra: sale de la aproximación de Schüler a
-       la función de Chapman, que además da la sombra del planeta con su penumbra rojiza
-       en el terminador. Todo en radios de Kerbin: 70 km de atmósfera, escalas de altura
-       de 6 km (Rayleigh) y 1,2 km (Mie), coeficientes de la Tierra al nivel del mar.
+       Single scattering of Rayleigh (the blue of the sky, the red of sunsets) and Mie (the haze
+       and the halo around the Sun), integrated along each ray. The optical depth toward the Sun
+       isn't integrated: it comes from Schüler's approximation to the Chapman function, which
+       also gives the planet's shadow with its reddish penumbra at the terminator. Everything in
+       Kerbin radii: 70 km of atmosphere, scale heights of 6 km (Rayleigh) and 1.2 km (Mie),
+       Earth's coefficients at sea level.
 
-       El suelo recibe el Sol filtrado por el aire y la luz azulada del cielo; el agua,
-       además, el brillo especular del Sol con Fresnel. El resultado va en luz lineal y
-       se comprime con un tonemapping filmic (ACES) antes de pasar a sRGB. */
+       The ground gets the Sun filtered by the air and the bluish light of the sky; water also
+       gets the Sun's specular glint with Fresnel. The result is in linear light and is
+       compressed with filmic tonemapping (ACES) before going to sRGB. */
     public sealed partial class GlobeView
     {
-        /* Irradiancia del Sol y exposición: con ellas el suelo a pleno Sol queda en tonos
-           medios y ni el cielo ni el reflejo del mar se queman. */
+        /* Sun irradiance and exposure: with them the ground in full Sun sits in the midtones
+           and neither the sky nor the sea reflection blows out. */
         public double SunIntensity = 20, Exposure = 1.0;
 
         ShaderProgram starProg;
@@ -29,19 +29,19 @@ namespace KerbinMaps.Views
 
         const string AtmosphereGlsl = @"
 const float PI = 3.14159265;
-/* El aire del cuerpo que se está viendo, en radios del cuerpo: coeficientes de Rayleigh y
-   Mie al nivel del suelo, escalas de altura y techo de la atmósfera. */
+/* The air of the body being viewed, in body radii: Rayleigh and Mie coefficients at ground
+   level, scale heights and top of the atmosphere. */
 uniform vec3 BETA_R;
 uniform float BETA_M, BETA_ME, HR, HM, ATM_TOP;
 uniform float uSunI, uExposure;
-/* 0 = el planeta visto desde fuera; 1 = a ras de suelo (cielo y vuelo). Desde fuera
-   manda la bruma y el ajuste de siempre funciona; a ras de suelo manda el Sol directo, y
-   con ese mismo ajuste el suelo de mediodía se lavaba. */
+/* 0 = the planet seen from outside; 1 = at ground level (sky and flight). From outside the haze
+   rules and the usual setting works; at ground level direct sunlight rules, and with that same
+   setting midday ground got washed out. */
 uniform float uCerca;
 uniform int uAtmos, uSteps;
 
-/* Distancias de entrada y salida del rayo en la esfera. Si no la toca, las dos
-   negativas: así «x > 0» significa de verdad que el rayo choca por delante. */
+/* Entry and exit distances of the ray through the sphere. If it misses, both negative: that way
+   «x > 0» really means the ray hits in front. */
 vec2 raySphere(vec3 o, vec3 d, float r) {
   float b = dot(o, d), c = dot(o, o) - r * r, h = b * b - c;
   if (h < 0.0) return vec2(-1.0, -1.0);
@@ -49,10 +49,10 @@ vec2 raySphere(vec3 o, vec3 d, float r) {
   return vec2(-b - h, -b + h);
 }
 
-/* Espesor óptico hacia el infinito desde la altura h (en escalas de altura) con el
-   ángulo cenital chi, sobre un planeta de radio X (también en escalas de altura), ya
-   multiplicado por la densidad del punto. Por debajo del horizonte el rayo roza o
-   atraviesa el planeta: ahí crece muy deprisa, y eso es la sombra. */
+/* Optical depth toward infinity from height h (in scale heights) with zenith angle chi, over a
+   planet of radius X (also in scale heights), already multiplied by the point's density. Below
+   the horizon the ray grazes or crosses the planet: there it grows very fast, and that's the
+   shadow. */
 float chapman(float X, float h, float cosChi) {
   float c = sqrt(X + h);
   if (cosChi >= 0.0) return c / (c * cosChi + 1.0) * exp(-h);
@@ -62,7 +62,7 @@ float chapman(float X, float h, float cosChi) {
   return max(2.0 * c0 * exp(X - x0) - c / (1.0 - c * cosChi) * exp(-h), 0.0);
 }
 
-/* Cuánta luz del Sol llega a un punto, por canal. */
+/* How much sunlight reaches a point, per channel. */
 vec3 sunTransmittance(vec3 p, vec3 s) {
   float len = length(p);
   float cosChi = dot(p, s) / len;
@@ -81,12 +81,12 @@ float phaseM(float mu) {
   return 3.0 / (8.0 * PI) * ((1.0 - g2) * (1.0 + mu * mu)) / ((2.0 + g2) * pow(1.0 + g2 - 2.0 * g * mu, 1.5));
 }
 
-/* Ruido de gradiente entrelazado: desplaza las muestras de cada píxel para que el
-   escalonado de pocas muestras se vea como un grano fino y no como bandas. */
+/* Interleaved gradient noise: offsets each pixel's samples so the banding of few samples looks
+   like fine grain and not like stripes. */
 float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
 
-/* Luz dispersada hacia el observador a lo largo del tramo [t0, t1] del rayo o + d·t, y
-   la transmitancia del tramo (lo que queda de lo que hay detrás). */
+/* Light scattered toward the observer along the segment [t0, t1] of the ray o + d·t, and the
+   segment's transmittance (what's left of whatever is behind). */
 vec3 inscatterN(vec3 o, vec3 d, float t0, float t1, vec3 s, float jitter, int pasos, out vec3 trans) {
   float ds = max(t1 - t0, 0.0) / float(pasos);
   float odR = 0.0, odM = 0.0;
@@ -110,39 +110,39 @@ vec3 inscatter(vec3 o, vec3 d, float t0, float t1, vec3 s, float jitter, out vec
   return inscatterN(o, d, t0, t1, s, jitter, uSteps, trans);
 }
 
-/* En el mapa 2D visto desde arriba, sin el brillo del Sol en el agua: mirando en
-   vertical, con el Sol alto, todo el mar caía dentro del brillo y salía blanco. */
+/* On the 2D map seen from above, without the sun glint on the water: looking straight down,
+   with the Sun high, the whole sea fell inside the glint and came out white. */
 uniform int uSinBrillo;
 
-/* Luz que sale de un punto del suelo hacia el observador (v, unitario hacia él). */
+/* Light leaving a ground point toward the observer (v, unit vector toward it). */
 vec3 shadeGround(vec3 p, vec3 n, vec3 v, vec3 s, vec3 albedo, float water) {
-  /* Los mapas de color de Kerbin ya vienen «iluminados»: tomados como albedo, la tierra a
-     pleno Sol sale más clara que el cielo. Se rebajan a un albedo creíble. A ras de suelo
-     algo más: con 0,5 el suelo de mediodía se iba a la parte alta de la curva y perdía el
-     color. La luz ambiente se compensa para que el crepúsculo quede igual. */
+  /* Kerbin's color maps already come «lit»: taken as albedo, land in full Sun comes out
+     brighter than the sky. They're toned down to a believable albedo. At ground level a bit
+     more: with 0.5 midday ground went to the top of the curve and lost its color. Ambient light
+     is compensated so twilight stays the same. */
   float alb = mix(0.5, 0.36, uCerca);
   float comp = 0.5 / alb;
   albedo *= alb;
   vec3 up = normalize(p);
   vec3 sun = uSunI * sunTransmittance(p, s);
-  // el cielo como luz ambiente: azulada, y más débil cuanto más bajo está el Sol
-  // (sin aire no hay cielo que ilumine: queda un resto neutro para no ver las sombras negras del todo)
+  // the sky as ambient light: bluish, and weaker the lower the Sun is
+  // (without air there's no sky to light things: a neutral remainder is left so shadows aren't completely black)
   vec3 skyE = uSunI * (uAtmos != 0 ? vec3(0.05, 0.085, 0.16) : vec3(0.012)) * smoothstep(-0.12, 0.4, dot(up, s));
-  // de noche, un resto de luz fría para adivinar el terreno
+  // at night, a bit of cold light to make out the terrain
   const vec3 nightE = vec3(0.35, 0.42, 0.62);
   vec3 L = albedo / PI * (sun * max(dot(n, s), 0.0) + (skyE * (0.75 + 0.25 * dot(n, up)) + nightE) * comp);
   if (water > 0.0) {
-    // el agua es lisa: refleja el cielo según Fresnel y el Sol como un brillo concentrado
+    // water is smooth: it reflects the sky according to Fresnel and the Sun as a concentrated glint
     float cosV = clamp(dot(up, v), 0.0, 1.0);
     float F = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);
     vec3 h = normalize(s + v);
-    // a ras de suelo el brillo del Sol en el agua es más concentrado y menos intenso:
-    // si no, a mediodía todo el mar sale blanco
+    // at ground level the Sun's glint on the water is more concentrated and less intense:
+    // otherwise, at noon the whole sea comes out white
     float SP = mix(900.0, 1500.0, uCerca);
     float spec = uSinBrillo != 0 ? 0.0 : (SP + 8.0) / (8.0 * PI) * pow(max(dot(up, h), 0.0), SP);
     float Fh = 0.02 + 0.98 * pow(1.0 - clamp(dot(h, v), 0.0, 1.0), 5.0);
     float cosS = max(dot(up, s), 0.0);
-    // el agua absorbe casi todo lo que entra: su color del mapa, más oscuro que el de la tierra
+    // water absorbs almost everything that goes in: its map color, darker than the land's
     vec3 W = albedo * 0.7 / PI * (sun * cosS + (skyE + nightE) * comp) * (1.0 - F) + skyE / PI * 1.4 * F + sun * spec * Fh * cosS * mix(0.5, 0.32, uCerca);
     L = mix(L, W, water);
   }
@@ -151,18 +151,17 @@ vec3 shadeGround(vec3 p, vec3 n, vec3 v, vec3 s, vec3 albedo, float water) {
 
 float aces(float x) { return (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14); }
 
-/* A ras de suelo la curva va sobre todo sobre la luminancia, conservando el color.
-   Aplicada canal a canal, a pleno Sol el suelo se lavaba: la arena de un mapa
-   (200,180,140) salía casi blanca, con la quinta parte de su viveza. Se deja una parte
-   por canal porque lo muy brillante sí tiende a blanco, como en una película. Desde
-   fuera se queda canal a canal: conservar el azul de la bruma volvía el planeta más
-   velado. */
+/* At ground level the curve works mostly on luminance, keeping the color. Applied channel by
+   channel, in full Sun the ground got washed out: a map's sand (200,180,140) came out almost
+   white, with a fifth of its vividness. Part is left per channel because very bright things do
+   tend to white, as in film. From outside it stays channel by channel: keeping the blue of the
+   haze made the planet look more veiled. */
 vec3 toneMap(vec3 c) {
   c *= uExposure;
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   vec3 porLum = l > 1e-6 ? c * (aces(l) / l) : vec3(0.0);
-  /* Conservar la luminancia puede dejar un canal por encima de 1 (la arena, en rojo):
-     recortarlo cambia el tono, así que se escala el color entero. */
+  /* Keeping luminance can leave a channel above 1 (sand, in red): clipping it changes the hue,
+     so the whole color is scaled. */
   porLum /= max(1.0, max(porLum.r, max(porLum.g, porLum.b)));
   vec3 porCanal = vec3(aces(c.r), aces(c.g), aces(c.b));
   return pow(clamp(mix(porLum, porCanal, mix(1.0, 0.4, uCerca)), 0.0, 1.0), vec3(1.0 / 2.2));
@@ -173,10 +172,9 @@ vec3 toneMap(vec3 c) {
 float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
 vec3 hash33(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
 
-/* Estrellas fijas en el espacio: giran con Kerbin igual que los anillos de las órbitas.
-   Cada celda de una rejilla sobre la esfera tiene o no una estrella; se miran también
-   las vecinas, porque con un campo de visión amplio una estrella ocupa más que su celda
-   y sin ellas sale cortada en rayas. */
+/* Stars fixed in space: they rotate with Kerbin just like the orbit rings. Each cell of a grid
+   on the sphere has a star or not; the neighbors are checked too, because with a wide field of
+   view a star takes up more than its cell and without them it comes out sliced into stripes. */
 vec3 starField(vec3 d, float pix, float shift) {
   float c = cos(shift), s = sin(shift);
   vec3 ds = vec3(d.x * c + d.z * s, d.y, -d.x * s + d.z * c);
@@ -211,9 +209,9 @@ void main() {
   frag = vec4(min(starField(d, uPix, uStarShift), vec3(1.0)), 1.0);
 }";
 
-        /* El aire del cuerpo actual. Los coeficientes se dan por metro al nivel del suelo y se
-           pasan a radios del cuerpo; la escala de altura sale del grosor de la atmósfera (en
-           Kerbin, 70 km dan 6 km). Con Kerbin salen los valores con los que se ajustó el cielo. */
+        /* The current body's air. Coefficients are given per meter at ground level and converted
+           to body radii; the scale height comes from the atmosphere's thickness (on Kerbin, 70 km
+           gives 6 km). With Kerbin, the values the sky was tuned with come out. */
         void AtmosUniforms(ShaderProgram p, int steps, bool sunOn = true)
         {
             var b = Body.Current;
@@ -222,14 +220,14 @@ void main() {
             double hr = h / 11.67;
             var c = b.AirColor ?? new[] { 5.802, 13.558, 33.1 };
             double k = 1e-6 * R * b.AirDensity;
-            /* En un gigante gaseoso, cientos de km de aire con los coeficientes de la Tierra lo
-               dejan todo blanco: la profundidad óptica vertical se limita (Kerbin ronda 0,2 y no
-               llega al tope). */
+            /* On a gas giant, hundreds of km of air with Earth's coefficients turn everything
+               white: the vertical optical depth is capped (Kerbin is around 0.2 and doesn't
+               reach the cap). */
             double tau = Math.Max(c[0], Math.Max(c[1], c[2])) * k * hr / R;
             if (tau > 0.25) k *= 0.15 / tau;
             p.Float("uSunI", sunOn ? SunIntensity : 0);
             p.Float("uExposure", Exposure);
-            p.Float("uCerca", 0);                 // desde fuera; el cielo y el vuelo lo cambian
+            p.Float("uCerca", 0);                 // from outside; the sky and flight views change it
             p.Int("uSteps", steps);
             p.Int("uAtmos", Atmosphere && b.HasAir ? 1 : 0);
             p.Vec3("BETA_R", c[0] * k, c[1] * k, c[2] * k);
@@ -241,7 +239,7 @@ void main() {
             p.Vec3("uTint", b.Tint[0], b.Tint[1], b.Tint[2]);
         }
 
-        /* El fondo de estrellas del globo, detrás de todo. */
+        /* The globe's star background, behind everything. */
         void DrawStars()
         {
             starProg ??= new ShaderProgram(SkyVS, StarFS);

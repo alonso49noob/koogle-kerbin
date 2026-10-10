@@ -4,42 +4,41 @@ using System.Linq;
 
 namespace KerbinMaps.Core
 {
-    /* Una ventana de lanzamiento: cuándo salir, cuánto cuesta y cuándo se llega. */
+    /* A launch window: when to leave, how much it costs and when you arrive. */
     public sealed class TransferWindow
     {
         public double DepartUT, ArriveUT, Tof;
-        public double DvSalida, DvLlegada, Dv;      // eyección, captura y total
-        public double VinfSalida, VinfLlegada;      // velocidad hiperbólica de exceso
+        public double DvSalida, DvLlegada, Dv;      // ejection, capture and total
+        public double VinfSalida, VinfLlegada;      // hyperbolic excess velocity
         public double C3 => VinfSalida * VinfSalida;
-        public double AnguloFase;                   // origen→destino visto desde el centro, en la salida
-        public double AnguloEyeccion;               // desde el prógrado del cuerpo de salida
-        public bool Directo = true;                 // sin correcciones a medio camino
+        public double AnguloFase;                   // origin→destination seen from the center, at departure
+        public double AnguloEyeccion;               // from the departure body's prograde
+        public bool Directo = true;                 // no mid-course corrections
     }
 
     public sealed class TransferPlan
     {
         public bool Ok;
         public string Problema;
-        public string Central;                      // alrededor de qué se hace la transferencia
-        public bool Luna;                           // el destino orbita el cuerpo de salida
+        public string Central;                      // what the transfer is made around
+        public bool Luna;                           // the destination orbits the departure body
         public double ParkAlt, CaptureAlt;
         public List<TransferWindow> Ventanas = new();
     }
 
-    /* Trayectorias entre cuerpos y sus ventanas de lanzamiento.
+    /* Trajectories between bodies and their launch windows.
 
-       Se calcula con cónicas parcheadas, que es justo lo que hace KSP: la nave sale de la
-       esfera de influencia del cuerpo de salida con una velocidad de exceso, recorre una
-       elipse alrededor del cuerpo central y llega a la del destino. La transferencia se
-       resuelve con Lambert entre las dos posiciones y el tiempo de vuelo, así que es
-       <b>balística</b>: una sola quemada de salida, sin correcciones a medio camino.
+       It's computed with patched conics, which is exactly what KSP does: the vessel leaves the
+       departure body's sphere of influence with an excess velocity, travels an ellipse around
+       the central body and reaches the destination's. The transfer is solved with Lambert
+       between the two positions and the flight time, so it's <b>ballistic</b>: a single
+       departure burn, with no mid-course corrections.
 
-       Lo que sale de aquí es lo mismo que pide el juego para montarla: instante de salida,
-       Δv, tiempo de vuelo, ángulo de fase entre los dos cuerpos y ángulo de eyección
-       respecto al prógrado. */
+       What comes out of here is the same thing the game needs to set it up: departure time, Δv,
+       flight time, phase angle between the two bodies and ejection angle relative to prograde. */
     public static class Transfer
     {
-        /* Estado de un cuerpo respecto a otro (que tiene que ser un ancestro suyo). */
+        /* State of a body relative to another (which has to be one of its ancestors). */
         public static (V3 R, V3 V) Estado(BodyDef b, BodyDef central, double ut)
         {
             V3 r = default, v = default;
@@ -97,9 +96,9 @@ namespace KerbinMaps.Core
             return 1.0 / 6 - z / 120 + z * z / 5040;
         }
 
-        /* Problema de Lambert por variables universales (Bate-Mueller-White): dadas dos
-           posiciones y el tiempo entre ellas, la órbita que las une. El tiempo crece con z
-           de forma monótona, así que basta bisecar. */
+        /* Lambert's problem with universal variables (Bate-Mueller-White): given two positions
+           and the time between them, the orbit that joins them. Time grows monotonically with
+           z, so bisecting is enough. */
         public static (V3 V1, V3 V2)? Lambert(V3 r1, V3 r2, double dt, double mu, bool prograde)
         {
             double R1 = r1.Len, R2 = r2.Len;
@@ -128,9 +127,9 @@ namespace KerbinMaps.Core
                 return (x * x * x * StumpffS(z) + A * Math.Sqrt(y)) / Math.Sqrt(mu);
             }
 
-            // el rango útil de z va de casi -4π² (hipérbolas) a 4π² (una vuelta entera)
+            // the useful range of z goes from almost -4π² (hyperbolas) to 4π² (a full revolution)
             double lo = -4 * Math.PI * Math.PI + 1e-3, hi = 4 * Math.PI * Math.PI - 1e-3;
-            // con A > 0 hay un z mínimo por debajo del cual y < 0
+            // with A > 0 there's a minimum z below which y < 0
             for (int i = 0; i < 200 && (double.IsNaN(Tiempo(lo)) || Tiempo(lo) > dt); i++) lo += 0.5;
             if (double.IsNaN(Tiempo(lo))) return null;
             if (Tiempo(hi) < dt) return null;
@@ -154,9 +153,9 @@ namespace KerbinMaps.Core
             return (v1, v2);
         }
 
-        /* ---------------------------------------------------------------- búsqueda */
+        /* ---------------------------------------------------------------- search */
 
-        /* El cuerpo alrededor del cual se hace la transferencia: el ancestro común. */
+        /* The body the transfer is made around: the common ancestor. */
         public static BodyDef Comun(BodyDef a, BodyDef b)
         {
             var cadena = new List<BodyDef>();
@@ -166,7 +165,7 @@ namespace KerbinMaps.Core
             return null;
         }
 
-        /* Δv para salir de una órbita circular de aparcamiento con esa velocidad de exceso. */
+        /* Δv to leave a circular parking orbit with that excess velocity. */
         public static double DvEyeccion(BodyDef cuerpo, double altParking, double vinf)
         {
             double r = cuerpo.Radius + altParking;
@@ -174,7 +173,7 @@ namespace KerbinMaps.Core
             return Math.Sqrt(vinf * vinf + 2 * cuerpo.Mu / r) - vPark;
         }
 
-        /* Δv para frenar de la hipérbola de llegada a una órbita circular. */
+        /* Δv to brake from the arrival hyperbola into a circular orbit. */
         public static double DvCaptura(BodyDef cuerpo, double altCaptura, double vinf)
         {
             double r = cuerpo.Radius + altCaptura;
@@ -196,7 +195,7 @@ namespace KerbinMaps.Core
             plan.Central = central.Label;
             plan.Luna = central == origen;
 
-            // de la Luna al planeta y al revés: el «origen» es la propia órbita de aparcamiento
+            // from the Moon to the planet and back: the «origin» is the parking orbit itself
             BodyDef salida = plan.Luna ? origen : Ascender(origen, central);
             BodyDef llegada = plan.Luna ? destino : Ascender(destino, central);
             if (salida == null || llegada == null) { plan.Problema = "No sé encadenar esas dos órbitas."; return plan; }
@@ -228,7 +227,7 @@ namespace KerbinMaps.Core
                     if (!double.IsFinite(vinfOut) || !double.IsFinite(vinfIn)) continue;
 
                     double dvOut = plan.Luna
-                        ? Math.Abs((sol.Value.V1 - v1cuerpo).Len)      // ya se está en órbita del central
+                        ? Math.Abs((sol.Value.V1 - v1cuerpo).Len)      // already in orbit around the central body
                         : DvEyeccion(origen, parkAlt, vinfOut);
                     double dvIn = capturar ? DvCaptura(destino, captureAlt, vinfIn) : 0;
 
@@ -245,8 +244,8 @@ namespace KerbinMaps.Core
 
             if (rejilla.Count == 0) { plan.Problema = "No sale ninguna trayectoria directa en ese plazo."; return plan; }
 
-            /* Las mejores, separadas entre sí: si no, salen veinte variantes de la misma
-               ventana con minutos de diferencia. */
+            /* The best ones, spaced apart: otherwise twenty variants of the same window come
+               out minutes apart. */
             double separacion = Math.Max(tofHohmann * 0.5, span / 12);
             foreach (var w in rejilla.OrderBy(w => w.Dv))
             {
@@ -259,7 +258,7 @@ namespace KerbinMaps.Core
             return plan;
         }
 
-        /* El ancestro del cuerpo que orbita directamente al central. */
+        /* The ancestor of the body that directly orbits the central one. */
         static BodyDef Ascender(BodyDef b, BodyDef central)
         {
             for (var c = b; c != null; c = c.Parent)
@@ -267,13 +266,13 @@ namespace KerbinMaps.Core
             return null;
         }
 
-        /* Un punto de la órbita de aparcamiento: se toma el que va por delante del cuerpo,
-           que es de donde sale una transferencia hacia fuera. */
+        /* A point on the parking orbit: we take the one ahead of the body, which is where an
+           outward transfer departs from. */
         static (V3 R, V3 V) Aparcamiento(BodyDef cuerpo, BodyDef central, double alt, double ut)
         {
             double r = cuerpo.Radius + alt;
             double v = Math.Sqrt(cuerpo.Mu / r);
-            // la órbita se supone ecuatorial y prógrada, que es lo normal para una transferencia
+            // the orbit is assumed equatorial and prograde, which is normal for a transfer
             double ang = 2 * Math.PI * (ut / (2 * Math.PI * Math.Sqrt(r * r * r / cuerpo.Mu)));
             return (new V3(r * Math.Cos(ang), r * Math.Sin(ang), 0), new V3(-v * Math.Sin(ang), v * Math.Cos(ang), 0));
         }

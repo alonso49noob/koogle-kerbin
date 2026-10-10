@@ -2,23 +2,23 @@ using System;
 
 namespace KerbinMaps.Core
 {
-    /* El color del mar, sin la costa.
+    /* The color of the sea, without the coast.
 
-       Cerca del suelo manda el relieve: es mar lo que queda bajo el nivel del mar. Pero el
-       mapa de color es de 1 km por texel, y sus texeles de costa mezclan el azul con la
-       arena y la hierba. El agua que el relieve pone junto a la orilla tomaba ese color y
-       salía como un anillo más oscuro y, más allá, un halo arenoso siguiendo toda la costa.
+       Near the ground the terrain rules: sea is whatever is below sea level. But the color map
+       is 1 km per texel, and its coastal texels mix the blue with sand and grass. The water the
+       terrain puts next to the shore took that color and showed up as a darker ring and, beyond
+       it, a sandy halo following the whole coast.
 
-       Aquí se hace un mapa aparte, de medio grado, con solo el mar abierto: la media de los
-       texeles que son azules en el mapa de color y están a más de 30 m de profundidad en el
-       de alturas. Las celdas sin mar se rellenan con las vecinas, así que junto a la costa
-       queda el color del mar de al lado. */
+       Here we build a separate map, at half a degree, with only the open sea: the average of
+       the texels that are blue in the color map and more than 30 m deep in the height map.
+       Cells without sea are filled from their neighbors, so next to the coast you get the color
+       of the nearby sea. */
     public static class MapaDelMar
     {
         public const int Ancho = 720, Alto = 360;
 
-        /* RGBA de Ancho×Alto (la fila 0 es el norte y la columna 0 los 180° oeste), o null
-           si el cuerpo no tiene mar en esos mapas. `media` es el color medio de todo su mar. */
+        /* RGBA of Ancho×Alto (row 0 is north and column 0 is 180° west), or null if the body
+           has no sea in those maps. `media` is the average color of all its sea. */
         public static byte[] Construir(ImageData color, ImageData altura, double hmin, double hmax,
                                        double colorOff, double alturaOff, out float[] media)
         {
@@ -36,7 +36,7 @@ namespace KerbinMaps.Core
                         double lon = -180 + (x + 0.25 + 0.5 * (s & 1)) * 360.0 / Ancho;
                         if (altura.Height_(lat, lon, hmin, hmax, alturaOff) > -30) continue;
                         var c = color.SampleBilinear(lat, lon, colorOff);
-                        if (c.B - Math.Max(c.R, c.G) < 0.06f) continue;       // no es azul: costa o hielo
+                        if (c.B - Math.Max(c.R, c.G) < 0.06f) continue;       // not blue: coast or ice
                         int i = y * Ancho + x;
                         suma[i * 3] += c.R; suma[i * 3 + 1] += c.G; suma[i * 3 + 2] += c.B;
                         n[i]++;
@@ -54,7 +54,7 @@ namespace KerbinMaps.Core
                     for (int k = 0; k < 3; k++) rgb[i * 3 + k] = (float)(suma[i * 3 + k] / n[i]);
                 }
 
-            // las celdas de tierra, con la media de sus vecinas ya rellenas, en varias pasadas
+            // land cells, with the average of their already-filled neighbors, over several passes
             for (int pasada = 0; pasada < 48; pasada++)
             {
                 var nuevas = new System.Collections.Generic.List<(int I, float R, float G, float B)>();

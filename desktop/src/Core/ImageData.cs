@@ -24,20 +24,20 @@ namespace KerbinMaps.Core
 
     public readonly record struct OffsetMatch(int Shift, double Pct, double Media);
 
-    /* Una imagen equirectangular decodificada a RGBA en memoria. En escritorio no hay
-       que andar dibujando en un canvas de 1x1 para leer un píxel: se lee del array. */
+    /* An equirectangular image decoded to RGBA in memory. On the desktop there's no need to
+       draw on a 1x1 canvas to read a pixel: it's read from the array. */
     public sealed class ImageData
     {
         public int Width { get; private set; }
         public int Height { get; private set; }
         public byte[] Rgba { get; private set; }
 
-        byte[] mask;            // silueta tierra/agua a 1° por celda, calculada una vez
+        byte[] mask;            // land/water silhouette at 1° per cell, computed once
 
-        /* A partir de píxeles RGBA ya en memoria (texturas de paquetes de Unity, por ejemplo). */
+        /* From RGBA pixels already in memory (textures from Unity bundles, for example). */
         public static ImageData FromRgba(byte[] rgba, int w, int h) => new ImageData { Width = w, Height = h, Rgba = rgba };
 
-        /* Volteo vertical in situ: Unity y OpenGL guardan la primera fila abajo. */
+        /* Vertical flip in place: Unity and OpenGL store the first row at the bottom. */
         public ImageData FlipY()
         {
             int fila = Width * 4;
@@ -89,8 +89,8 @@ namespace KerbinMaps.Core
             return new ImageData { Width = w, Height = h, Rgba = data };
         }
 
-        /* Espejo en horizontal, in situ. Las texturas de los cuerpos que guarda KSP están
-           así respecto a un mapa equirectangular al uso: la longitud crece al revés. */
+        /* Horizontal mirror, in place. The body textures KSP stores are like this relative to a
+           usual equirectangular map: longitude grows the other way. */
         public ImageData MirrorX()
         {
             int w = Width, h = Height;
@@ -107,7 +107,7 @@ namespace KerbinMaps.Core
             return this;
         }
 
-        /* Píxel bajo una coordenada, con el desfase de longitud de su ranura. */
+        /* Pixel under a coordinate, with its slot's longitude offset. */
         public bool Sample(double lat, double lon, double lonOffset, out byte r, out byte g, out byte b, out byte a)
         {
             int sx = (int)Math.Floor(((Geo.WrapLon(lon + lonOffset) + 180) / 360) * Width);
@@ -121,19 +121,19 @@ namespace KerbinMaps.Core
 
         public static double Luminance(byte r, byte g, byte b) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 
-        /* Altura en metros a partir del gris. Se usa luminancia por si el PNG trae un
-           leve tinte de color. */
+        /* Height in meters from the gray. Luminance is used in case the PNG has a slight color
+           tint. */
         public double Height_(double lat, double lon, double min, double max, double lonOffset)
         {
             Sample(lat, lon, lonOffset, out var r, out var g, out var b, out _);
             return min + Luminance(r, g, b) * (max - min);
         }
 
-        /* Altura interpolada exactamente como la interpola el shader del vuelo (grisSuave):
-           entre los cuatro texeles vecinos con curva quíntica, la longitud dando la vuelta y
-           la latitud recortada. Lo que se coloque en el suelo (la cámara, la hierba, los
-           árboles) tiene que usar esta y no la del píxel más cercano: en Kerbin un texel son
-           460 m y la diferencia entre las dos llega a decenas de metros. */
+        /* Height interpolated exactly as the flight shader interpolates it (grisSuave): between
+           the four neighboring texels with a quintic curve, longitude wrapping around and
+           latitude clamped. Whatever is placed on the ground (the camera, the grass, the trees)
+           has to use this one and not the nearest pixel's: on Kerbin a texel is 460 m and the
+           difference between the two reaches tens of meters. */
         public double HeightSmooth(double lat, double lon, double min, double max, double lonOffset)
         {
             double u = (Geo.WrapLon(lon + lonOffset) + 180) / 360;
@@ -158,9 +158,9 @@ namespace KerbinMaps.Core
 
         static double Lerp(double a, double b, double t) => a + (b - a) * t;
 
-        /* Color interpolado entre los cuatro texeles vecinos, de 0 a 1. Para teñir la hierba
-           con el color del suelo: con el píxel más cercano, cada texel de cientos de metros
-           se vería como un parche de otro color. */
+        /* Color interpolated between the four neighboring texels, from 0 to 1. For tinting the
+           grass with the ground color: with the nearest pixel, each texel hundreds of meters
+           wide would show as a patch of another color. */
         public (float R, float G, float B) SampleBilinear(double lat, double lon, double lonOffset)
         {
             double tx = (Geo.WrapLon(lon + lonOffset) + 180) / 360 * Width - 0.5;
@@ -180,7 +180,7 @@ namespace KerbinMaps.Core
             return (r / 255f, g / 255f, b / 255f);
         }
 
-        /* Color crudo del mapa de biomas; null si el píxel es transparente. */
+        /* Raw color of the biome map; null if the pixel is transparent. */
         public string BiomeHex(double lat, double lon, double lonOffset)
         {
             Sample(lat, lon, lonOffset, out var r, out var g, out var b, out var a);
@@ -188,7 +188,7 @@ namespace KerbinMaps.Core
             return "#" + r.ToString("x2") + g.ToString("x2") + b.ToString("x2");
         }
 
-        /* Reescalado sin interpolar, como drawImage con imageSmoothingEnabled = false. */
+        /* Rescale without interpolation, like drawImage with imageSmoothingEnabled = false. */
         long SrcIndex(int x, int y, int w, int h)
         {
             int sx = Math.Min(Width - 1, (int)((x + 0.5) * Width / w));
@@ -196,10 +196,9 @@ namespace KerbinMaps.Core
             return ((long)sy * Width + sx) * 4;
         }
 
-        /* Todos los colores del mapa de biomas con la superficie real de cada uno.
-           Sin interpolar, porque un color promediado no es ningún bioma; y cada fila
-           pesa cos(lat), porque cerca del polo una fila de píxeles es mucha menos
-           superficie que en el ecuador. */
+        /* All the colors of the biome map with the real area of each one. No interpolation,
+           because an averaged color isn't any biome; and each row weighs cos(lat), because near
+           the pole a row of pixels is much less area than at the equator. */
         public PaletteResult Palette(int maxW = 1024, double minPct = BiomeConfig.MinAreaPct)
         {
             double scale = Math.Min(1, (double)maxW / Width);
@@ -237,9 +236,8 @@ namespace KerbinMaps.Core
             };
         }
 
-        /* Saturación media. Pilla el error de cargar como heightmap una figura
-           coloreada por paleta: un gris de verdad da ~0 y una paleta azul-verde-
-           amarillo-rojo se va muy por encima. */
+        /* Mean saturation. Catches the mistake of loading a palette-colored figure as a
+           heightmap: a real gray gives ~0, and a blue-green-yellow-red palette goes far above. */
         public double? Saturation(int maxW = 256)
         {
             int w = Math.Max(1, Math.Min(maxW, Width));
@@ -257,8 +255,8 @@ namespace KerbinMaps.Core
             return n > 0 ? sum / n : null;
         }
 
-        /* El gris más claro de la imagen. Un volcado de las texturas del juego se queda en
-           el 145 (ver BodyMaps.GrisTope); un export de SCANsat llega al 255. */
+        /* The lightest gray in the image. A dump of the game's textures stops at 145 (see
+           BodyMaps.GrisTope); a SCANsat export reaches 255. */
         public int MaxGray()
         {
             int mx = 0;
@@ -270,7 +268,7 @@ namespace KerbinMaps.Core
             return mx;
         }
 
-        /* Máscara tierra/agua a 1° por celda, en el espacio de la propia imagen. */
+        /* Land/water mask at 1° per cell, in the image's own space. */
         public byte[] LandMask()
         {
             if (mask != null) return mask;
@@ -281,14 +279,14 @@ namespace KerbinMaps.Core
                 {
                     long i = SrcIndex(x, y, W, H);
                     int r = Rgba[i], g = Rgba[i + 1], b = Rgba[i + 2];
-                    m[y * W + x] = (byte)((b > r + 20 && b > g + 10) ? 0 : 1);   // azul dominante = agua
+                    m[y * W + x] = (byte)((b > r + 20 && b > g + 10) ? 0 : 1);   // dominant blue = water
                 }
             return mask = m;
         }
 
-        /* Busca el giro en longitud que hace que dos mapas del mismo planeta encajen.
-           Compara siluetas de continentes, así que funciona aunque las paletas no
-           tengan nada que ver entre sí. */
+        /* Finds the longitude rotation that makes two maps of the same planet line up. It
+           compares continent silhouettes, so it works even if the palettes have nothing to do
+           with each other. */
         public static OffsetMatch DetectOffset(ImageData a, ImageData b, int offB)
         {
             const int W = 360, H = 180;
@@ -301,7 +299,7 @@ namespace KerbinMaps.Core
             Parallel.For(0, W, s =>
             {
                 int ok = 0, tot = 0;
-                for (int y = 20; y < H - 20; y++)            // los casquetes no distinguen nada
+                for (int y = 20; y < H - 20; y++)            // the polar caps don't tell anything apart
                     for (int i = 0; i < W; i++)
                     {
                         if (A[y * W + (i + s) % W] == B[y * W + (i + offB) % W]) ok++;
@@ -317,8 +315,8 @@ namespace KerbinMaps.Core
             return new OffsetMatch(bestShift, bestPct, sum / W);
         }
 
-        /* El giro solo se da por bueno si destaca claramente sobre el promedio: si no,
-           no son el mismo planeta o una de las dos no es equirectangular. */
+        /* The rotation is only accepted if it clearly stands out over the average: otherwise
+           they aren't the same planet, or one of the two isn't equirectangular. */
         public static bool IsClearMatch(OffsetMatch m) => m.Pct >= 75 && m.Pct - m.Media >= 15;
     }
 }

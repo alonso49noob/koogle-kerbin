@@ -8,7 +8,7 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.Views
 {
-    /* Mallas y texturas de los scatters de un cuerpo, ya en la GPU. */
+    /* Meshes and textures of a body's scatters, already on the GPU. */
     public sealed class ScatterGpu : IDisposable
     {
         public sealed class Mesh
@@ -22,7 +22,7 @@ namespace KerbinMaps.Views
         public readonly Dictionary<string, Texture> Textures = new(StringComparer.OrdinalIgnoreCase);
         public List<ScatterDef> Defs;
 
-        /* Sube lo cargado. Se llama con el contexto de OpenGL activo. */
+        /* Uploads what was loaded. Called with the OpenGL context active. */
         public static ScatterGpu Upload(ScatterAssets a)
         {
             var g = new ScatterGpu { Defs = a.Defs };
@@ -53,7 +53,7 @@ namespace KerbinMaps.Views
                 {
                     g.Textures[k] = t.CompressedFormat != 0
                         ? Texture.FromCompressed(t.CompressedFormat, t.Width, t.Height, t.Levels)
-                        : Texture.FromRgba(t.Levels[0], t.Width, t.Height, TexFilter.Mipmap, true, true);   // el viento se lee fuera de [0, 1]
+                        : Texture.FromRgba(t.Levels[0], t.Width, t.Height, TexFilter.Mipmap, true, true);   // the wind is read outside [0, 1]
                 }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[scatters] textura " + k + ": " + ex.Message); }
             }
@@ -69,19 +69,19 @@ namespace KerbinMaps.Views
         }
     }
 
-    /* Scatters de Parallax en la vista de vuelo y en la del cielo: hierba, flores,
-       arbustos, árboles, cactus y rocas, con los modelos y las texturas del mod.
+    /* Parallax scatters in the flight and sky views: grass, flowers, bushes, trees, cacti and
+       rocks, with the mod's models and textures.
 
-       El suelo se traza por rayos y no tiene malla ni búfer de profundidad propio, así que
-       el shader del cielo escribe en él la distancia a la que choca cada rayo y los modelos
-       se pintan encima con prueba de profundidad: una colina tapa los árboles de detrás. La
-       profundidad va en escala logarítmica en los dos sitios; con la lineal habitual, a diez
-       kilómetros el búfer de 24 bits no distingue 30 m, y aquí distingue milímetros.
+       The ground is ray traced and has no mesh or depth buffer of its own, so the sky shader
+       writes into it the distance at which each ray hits, and the models are painted on top
+       with depth testing: a hill hides the trees behind it. Depth is on a logarithmic scale in
+       both places; with the usual linear one, at ten kilometers the 24-bit buffer can't tell 30
+       m apart, and here it tells millimeters.
 
-       Cada fotograma se eligen, de lo que ha generado ScatterField, los objetos que caen en
-       el campo de visión y a qué distancia están, para pintar cada nivel de detalle con su
-       modelo: la hierba de cerca con todas sus briznas, la de lejos como un cartel. Los
-       límites de objetos por nivel son los del propio mod. */
+       Every frame, out of what ScatterField generated, the objects that fall in the field of
+       view are picked along with their distance, to paint each level of detail with its model:
+       nearby grass with all its blades, faraway grass as a billboard. The object limits per
+       level are the mod's own. */
     public sealed partial class GlobeView
     {
         public ScatterField ScatterField;
@@ -89,19 +89,19 @@ namespace KerbinMaps.Views
         public bool Scatters = true;
         public double ScatterDensity = 1;
         public int ScatterVisible { get; private set; }
-        public int MsaaSamples;                   // muestras del antialias: el alfa se vuelve cobertura
+        public int MsaaSamples;                   // antialiasing samples: alpha becomes coverage
         public bool Wind = true;
 
-        /* Con viento hay que pintar sin parar mientras se vea algo que se mueva. */
+        /* With wind, painting has to go on nonstop while something moving is visible. */
         public bool WindAnimating => Wind && ScattersActive && ScatterWindy > 0;
-        int ScatterWindy;                         // de los visibles, los que mueve el viento
+        int ScatterWindy;                         // of the visible ones, those the wind moves
 
         static readonly System.Diagnostics.Stopwatch relojViento = System.Diagnostics.Stopwatch.StartNew();
 
-        /* Hasta dónde llega la escala de profundidad (el scatter más lejano de Kerbin, los
-           icebergs, llega a 20 km) y, con el ajuste de «distancia de dibujado» del panel,
-           también de los edificios de Kerbal Konstructs y las naves en el suelo (ver
-           GlobeView.Statics.cs): los tres comparten la misma cuenta de la cámara. */
+        /* How far the depth scale reaches (Kerbin's farthest scatter, the icebergs, reaches 20
+           km) and, with the panel's «draw distance» setting, also the Kerbal Konstructs
+           buildings and landed vessels (see GlobeView.Statics.cs): all three share the same
+           camera math. */
         public double ScatterFar = 25000;
         const double ScatterNear = 0.05;
 
@@ -124,19 +124,19 @@ namespace KerbinMaps.Views
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNrm;
 layout(location = 2) in vec2 aUv;
-layout(location = 3) in vec4 aI0;       // posición respecto al ojo (m) y giro (grados)
-layout(location = 4) in vec4 aI1;       // eje vertical y tamaño (0..1)
-layout(location = 5) in vec4 aI2;       // color del terreno
+layout(location = 3) in vec4 aI0;       // position relative to the eye (m) and rotation (degrees)
+layout(location = 4) in vec4 aI1;       // vertical axis and size (0..1)
+layout(location = 5) in vec4 aI2;       // terrain color
 uniform vec3 uF, uR, uU, uEyeR, uSun;
 uniform float uTan, uAspect, uNear, uFar, uRadiusM;
 uniform vec3 uMinScale, uMaxScale;
-uniform int uBillboard;                 // 0 no; 1 cartel; 2 cartel con las normales de la malla
-/* Viento, como lo hace Parallax (Wind en ParallaxScatterUtils.cginc): un mapa que se
-   desplaza con el tiempo, leído en los tres planos del mundo segun la vertical, empuja
-   cada vertice en horizontal (y un poco en vertical) segun su altura en el modelo. */
+uniform int uBillboard;                 // 0 no; 1 billboard; 2 billboard with the mesh's normals
+/* Wind, the way Parallax does it (Wind in ParallaxScatterUtils.cginc): a map that scrolls over
+   time, read on the three world planes according to the vertical, pushes each vertex
+   horizontally (and a little vertically) according to its height in the model. */
 uniform int uWind;
 uniform sampler2D uWindMap;
-uniform vec3 uWindEye;                  // posicion del ojo por la escala del viento, sin la parte entera
+uniform vec3 uWindEye;                  // eye position times the wind scale, without the integer part
 uniform float uWindScale, uWindSpeed, uWindIntensity, uWindHS, uWindHF, uTime;
 out vec2 vUv;
 out vec3 vN, vRel, vCol, vIns, vTr, vLocal, vNLocal;
@@ -150,12 +150,12 @@ void main() {
   vec3 t2 = cross(up, t1);
   float a = radians(aI0.w);
   vec3 X = cos(a) * t1 + sin(a) * t2;
-  // el modelo viene de Unity, con ejes a izquierdas: así no sale en espejo
+  // the model comes from Unity, with left-handed axes: this way it isn't mirrored
   vec3 Z = cross(up, X);
   vec3 lp = aPos * sc;
   vec3 ln = aNrm / max(sc, vec3(1e-4));
   if (uBillboard != 0) {
-    // de cara a la cámara pero de pie, como hace Parallax con los carteles
+    // facing the camera but upright, as Parallax does with billboards
     vec3 f = -(uF - up * dot(uF, up));
     f = length(f) > 1e-5 ? normalize(f) : t2;
     X = normalize(cross(up, f));
@@ -185,7 +185,7 @@ void main() {
   vZ = vz;
   gl_Position = vec4(vx / (uTan * uAspect), vy / uTan, (vz * (uFar + uNear) - 2.0 * uFar * uNear) / (uFar - uNear), vz);
 
-  // el aire entre el ojo y el objeto, como en el suelo (por vértice: a esta escala basta)
+  // the air between the eye and the object, as on the ground (per vertex: at this scale it's enough)
   vTr = vec3(1.0); vIns = vec3(0.0);
   float dist = length(w);
   if (uAtmos != 0 && dist > 1.0) {
@@ -202,10 +202,10 @@ uniform vec3 uEyeR, uSun;
 uniform float uRadiusM, uFar;
 uniform sampler2D uTex;
 uniform vec3 uColor;
-uniform float uCutoff;                  // < 0: sin recorte por alfa
+uniform float uCutoff;                  // < 0: no alpha cutout
 uniform int uTwoSided, uBiplanar, uA2C;
 uniform float uTiling;
-uniform vec4 uSub;                      // translucidez: color e intensidad
+uniform vec4 uSub;                      // translucency: color and intensity
 uniform float uSubPow;
 in vec2 vUv;
 in vec3 vN, vRel, vCol, vIns, vTr, vLocal, vNLocal;
@@ -215,7 +215,7 @@ out vec4 frag;
 void main() {
   vec4 tex;
   if (uBiplanar != 0) {
-    // las rocas y los icebergs no traen UV útiles: la textura se proyecta por los tres ejes
+    // rocks and icebergs don't come with useful UVs: the texture is projected along the three axes
     vec3 b = abs(normalize(vNLocal));
     b = pow(b, vec3(4.0));
     b /= max(b.x + b.y + b.z, 1e-4);
@@ -225,7 +225,7 @@ void main() {
   float alpha = 1.0;
   if (uCutoff >= 0.0) {
     if (uA2C != 0) {
-      // borde nítido y sin dientes: el alfa se convierte en cobertura de las muestras
+      // sharp, jaggy-free edge: alpha is turned into sample coverage
       alpha = clamp((tex.a - uCutoff) / max(fwidth(tex.a), 1e-4) + 0.5, 0.0, 1.0);
       if (alpha <= 0.0) discard;
     } else if (tex.a < uCutoff) discard;
@@ -239,12 +239,12 @@ void main() {
   vec3 L = shadeGround(pR, n, v, uSun, albLin, 0.0);
   vec3 sol = uSunI * sunTransmittance(pR, uSun);
   if (uTwoSided != 0) {
-    // hojas y briznas finas: la luz que les da por detras las atraviesa en parte, y la
-    // cara en sombra no se queda negra
+    // leaves and thin blades: light hitting them from behind partly goes through, and the
+    // shaded side doesn't go black
     L += albLin * 0.36 / PI * sol * max(-dot(n, uSun), 0.0) * 0.6;
   }
   if (uSub.w > 0.0) {
-    // la luz que atraviesa las hojas cuando se mira hacia el Sol
+    // the light that goes through the leaves when looking toward the Sun
     float t = pow(clamp(dot(-v, uSun), 0.0, 1.0), uSubPow);
     L += albLin * 0.36 * uSub.rgb * uSub.w * t * uSunI * sunTransmittance(pR, uSun) / PI;
   }
@@ -253,7 +253,7 @@ void main() {
   gl_FragDepth = clamp(log2(1.0 + max(vZ, 0.0)) / log2(1.0 + uFar), 0.0, 1.0);
 }";
 
-        /* Pinta los scatters encima del suelo ya trazado. `eye` en radios del cuerpo. */
+        /* Paints the scatters on top of the already-traced ground. `eye` in body radii. */
         void DrawScatters(double[] eye, double[] right, double[] camUp, double tan, double lat, double lon)
         {
             var field = ScatterField;
@@ -270,7 +270,7 @@ void main() {
             double ux = camUp[0], uy = camUp[1], uz = camUp[2];
             double densidad = Math.Clamp(ScatterDensity, 0, 1);
 
-            // qué capa usa qué malla en cada nivel, y con qué tamaño máximo (para recortar)
+            // which layer uses which mesh at each level, and with what maximum size (for culling)
             var capas = field.Layers.Where(l => gpu.Meshes.Count > 0).ToArray();
             var llenos = new (Lote[] lotes, int[] n)[capas.Length];
             for (int c = 0; c < capas.Length; c++)
@@ -295,7 +295,7 @@ void main() {
                 var fuente = (l.Parent ?? l).Cells;
                 var arr = llenos[c].lotes;
                 if (arr.All(x => x == null)) return;
-                // los compartidos (las copas) van con el tamaño de su padre (el tronco)
+                // shared ones (the crowns) go with their parent's size (the trunk)
                 var esc = (l.Parent ?? l).Def;
                 float smax = Math.Max(esc.MaxScale[0], Math.Max(esc.MaxScale[1], esc.MaxScale[2]));
                 var radio = new double[arr.Length];
@@ -315,7 +315,7 @@ void main() {
                         double x = it.X - ex, y = it.Y - ey, z = it.Z - ez;
                         double dist = Math.Sqrt(x * x + y * y + z * z);
                         if (dist > range) continue;
-                        // lejos hay menos (el terreno de KSP es más basto), y cerca del límite se aclaran
+                        // far away there are fewer (KSP's terrain is coarser), and near the limit they thin out
                         if (it.Rank >= ScatterField.DensidadEn(dist) * densidad) continue;
                         double nd = dist / range;
                         if (nd > 0.8 && Frac(it.Rank * 7.31) < (nd - 0.8) / 0.2) continue;
@@ -323,7 +323,7 @@ void main() {
                         while (k > 0 && dist < d.Levels[k].From) k--;
                         var lote = arr[k];
                         if (lote == null) continue;
-                        // fuera del campo de visión (con el tamaño del objeto de margen)
+                        // outside the field of view (with the object's size as margin)
                         double r = radio[k];
                         double vz = x * fx + y * fy + z * fz;
                         if (vz < -r) continue;
@@ -339,7 +339,7 @@ void main() {
                         lote.N++;
                     }
                 }
-                // el límite de objetos por nivel del propio mod: se aclara al azar, de forma estable
+                // the mod's own object limit per level: thinned at random, in a stable way
                 for (int k = 0; k < arr.Length; k++)
                 {
                     var lote = arr[k];
@@ -468,7 +468,7 @@ void main() {
         Texture blancoScatter;
         Texture BlancoScatter() => blancoScatter ??= Texture.FromRgba(new byte[] { 255, 255, 255, 255 }, 1, 1, TexFilter.Linear, true);
 
-        /* Al cambiar de cuerpo o apagar los scatters: fuera los búferes de cada lote. */
+        /* When changing body or turning scatters off: away with each batch's buffers. */
         public void DisposeScatterBatches()
         {
             foreach (var l in lotes.Values)

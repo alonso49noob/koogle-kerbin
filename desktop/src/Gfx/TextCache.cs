@@ -11,16 +11,16 @@ namespace KerbinMaps.Gfx
     {
         public Texture Tex;
         public int W, H, Pad;
-        /* Tamaño del texto en sí, sin el margen de la textura. */
+        /* Size of the text itself, without the texture's margin. */
         public int TextW, TextH;
         public long Used;
     }
 
     public readonly record struct TextStyle(string Family, float Px, bool Bold, int Argb, bool Shadow);
 
-    /* Rótulos del mapa y del globo: cada texto se rasteriza una vez con GDI+ y se
-       sube como textura. Los nombres cambian poco, así que la caché casi siempre
-       acierta; si crece demasiado se tiran los menos usados. */
+    /* Map and globe labels: each text is rasterized once with GDI+ and uploaded as a texture.
+       Names change little, so the cache almost always hits; if it grows too much the least used
+       ones are dropped. */
     public sealed class TextCache : IDisposable
     {
         readonly Dictionary<(string, TextStyle), TextTex> map = new();
@@ -81,8 +81,8 @@ namespace KerbinMaps.Gfx
                 g.TextRenderingHint = TextRenderingHint.AntiAlias;
                 if (st.Shadow)
                 {
-                    /* text-shadow: 0 1px 3px negro casi opaco. Un desenfoque de verdad no
-                       compensa aquí: unas pocas copias desplazadas dan el mismo halo. */
+                    /* text-shadow: 0 1px 3px nearly opaque black. A real blur isn't worth it
+                       here: a few offset copies give the same halo. */
                     using var sb = new SolidBrush(Color.FromArgb(62, 0, 0, 0));
                     for (int dy = -1; dy <= 3; dy++)
                         for (int dx = -2; dx <= 2; dx++)

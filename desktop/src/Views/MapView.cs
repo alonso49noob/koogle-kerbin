@@ -1,39 +1,40 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using KerbinMaps.Core;
 using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* Mapa plano equirectangular, el equivalente al Leaflet con EPSG:4326 de la web:
-       a zoom z, 180° de latitud ocupan 256·2^z píxeles. El centro y el zoom son
-       continuos; el mundo se repite a izquierda y derecha. */
+    /* Flat equirectangular map, the equivalent of the web's Leaflet with EPSG:4326: at zoom z,
+       180° of latitude take 256·2^z pixels. Center and zoom are continuous; the world repeats
+       left and right. */
     public sealed class MapView : IDisposable
     {
         public double CenterLat = MapConfig.InitialLat, CenterLon = MapConfig.InitialLon;
         public double Zoom = MapConfig.InitialZoom, TargetZoom = MapConfig.InitialZoom;
         public int W = 1, H = 1;
-        public float S = 1;                       // píxeles de pantalla por píxel CSS
+        public float S = 1;                       // screen pixels per CSS pixel
 
-        // lo que se pinta, lo fija la ventana principal
+        // what gets painted, set by the main window
         public string BaseKind = "grid";          // grid | image | xyz | none
         public Texture BaseTex;
         public double BaseOffset, BaseOpacity = 1;
         public TileLayer Tiles;
         public Texture BiomeTex;
         public double BiomeOffset, BiomeOpacity;
-        public Texture ScanTex;                   // cobertura de SCANsat: lo no escaneado, tapado
+        public Texture ScanTex;                   // SCANsat coverage: what's unscanned, covered
         public double ScanOpacity;
-        public Texture AltTex;                    // filtro de altimetría sobre el mapa de alturas
+        public Texture AltTex;                    // altimetry filter over the height map
         public double AltOffset, AltOpacity, AltHMin, AltHMax, AltMin, AltMax;
         public bool Grid = true;
-        public float[] Tint = { 0.45f, 0.45f, 0.45f };   // color del cuerpo, para el fondo sin imagen
-        // la mitad del planeta de noche, con el punto subsolar
+        public float[] Tint = { 0.45f, 0.45f, 0.45f };   // the body's color, for the background without an image
+        // the night half of the planet, with the subsolar point
         public bool DayNight = true;
         public double SunLat, SunLon;
         public readonly List<MapLayer> Layers = new();
-        /* El mapa político (ver FaccionesGlsl): la rejilla con sus colores y, para recortar por
-           la costa, el mapa de alturas y el de color con sus desfases. */
+        /* The political map (see FaccionesGlsl): the grid with its colors and, for clipping at
+           the coast, the height map and the color map with their offsets. */
         public Texture FacTex;
         public float[] FacColores;
         public double FacRelleno = 0.45;
@@ -42,13 +43,13 @@ namespace KerbinMaps.Views
         public double FacAlturaOff, FacColorOff, FacHMin, FacHMax;
         public readonly List<MapEtiqueta> Etiquetas = new();
         public MapDot Hover;
-        public int TopLabelOffset = 52;           // bajo la barra superior, en píxeles CSS
-        /* De cerca, el suelo lo pinta otro (el renderizador del vuelo en vista cenital, con
-           el relieve, las texturas del juego y los edificios): si lo hace, devuelve true y
-           el mapa base se desvanece encima (ver FondoDesde). */
+        public int TopLabelOffset = 12;           // top margin of the labels, in CSS pixels
+        /* Up close, the ground is painted by someone else (the flight renderer in top-down
+           view, with the relief, the game textures and the buildings): if it does so, it
+           returns true and the base map fades out on top (see FondoDesde). */
         public Func<bool> Fondo;
-        /* Entre estos zooms el mapa plano se desvanece sobre ese suelo, en lugar de cambiar
-           de golpe. */
+        /* Between these zooms the flat map fades over that ground, instead of switching at
+           once. */
         public double FondoDesde = 9.5, FondoHasta = 10.5;
 
         double anchorX, anchorY;
@@ -62,9 +63,8 @@ namespace KerbinMaps.Views
         public int TileZoom => Math.Clamp((int)Math.Round(Zoom), MapConfig.MinZoom, MapConfig.MaxZoom);
         int GridZoom => Math.Clamp((int)Math.Round(Zoom), MapConfig.MinZoom, MapConfig.MaxZoomVista);
 
-        /* El zoom más alejado con el que los 180° de latitud aún llenan el alto de la
-           ventana: más allá se verían franjas vacías por encima del polo norte y por
-           debajo del sur. */
+        /* The farthest zoom at which the 180° of latitude still fill the window's height:
+           beyond it, empty strips would show above the north pole and below the south. */
         public double MinZoomFit => Math.Min(MapConfig.MaxZoom, Math.Max(MapConfig.MinZoom, Math.Log2(H / (256.0 * S))));
         public bool Animating => zoomAnim;
 
@@ -79,16 +79,16 @@ namespace KerbinMaps.Views
         public static string FmtDeg(double v, double step)
         {
             int dec = step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
-            if (Math.Abs(v) < 0.5 * Math.Pow(10, -dec)) v = 0;          // sin «-0°»
+            if (Math.Abs(v) < 0.5 * Math.Pow(10, -dec)) v = 0;          // no «-0°»
             return Geo.F(v, dec) + "°";
         }
 
-        /* ------------------------------------------------------------ cámara */
+        /* ------------------------------------------------------------ camera */
 
         public (double x, double y) Project(double lat, double lon) =>
             (W / 2.0 + (lon - CenterLon) * Ppd, H / 2.0 - (lat - CenterLat) * Ppd);
 
-        /* Proyecta en la copia del mundo más cercana al centro de la vista. */
+        /* Projects onto the copy of the world closest to the center of the view. */
         public (double x, double y) ProjectNear(double lat, double lon)
         {
             double dl = lon - CenterLon;
@@ -110,7 +110,7 @@ namespace KerbinMaps.Views
         public void Resize(int w, int h, float s)
         {
             W = Math.Max(1, w); H = Math.Max(1, h); S = s;
-            // al agrandar la ventana, el zoom mínimo sube
+            // when the window grows, the minimum zoom rises
             double min = MinZoomFit;
             if (TargetZoom < min) TargetZoom = min;
             if (Zoom < min) Zoom = min;
@@ -125,7 +125,7 @@ namespace KerbinMaps.Views
             Clamp();
         }
 
-        /* Recentra sin tocar el zoom ni cortar su animación (seguir a una nave). */
+        /* Recenters without touching the zoom or cutting its animation (following a vessel). */
         public void CenterOn(double lat, double lon)
         {
             CenterLat = lat; CenterLon = lon;
@@ -141,12 +141,12 @@ namespace KerbinMaps.Views
             Clamp();
         }
 
-        /* La rueda va de nivel en nivel, como Leaflet, pero con el paso animado y
-           manteniendo quieto el punto bajo el cursor. */
+        /* The wheel goes level by level, like Leaflet, but with an animated step and keeping
+           the point under the cursor still. */
         public void ZoomAt(double delta, double x, double y)
         {
-            /* Por niveles enteros, salvo el tope de alejarse, que depende del alto de la
-               ventana: al volver a acercarse desde él se retoma el nivel entero. */
+            /* By whole levels, except the zoom-out limit, which depends on the window height:
+               zooming back in from it picks the whole level up again. */
             double min = MinZoomFit;
             double next = Math.Round(TargetZoom + delta);
             if (delta > 0 && TargetZoom <= min + 1e-6) next = Math.Floor(min) + Math.Max(1, Math.Round(delta));
@@ -168,7 +168,7 @@ namespace KerbinMaps.Views
             return true;
         }
 
-        /* Lo que hay bajo el cursor: primero los sitios, que van por encima. */
+        /* What's under the cursor: sites first, since they're on top. */
         public MapDot HitTest(double x, double y)
         {
             for (int li = Layers.Count - 1; li >= 0; li--)
@@ -207,8 +207,8 @@ namespace KerbinMaps.Views
 const vec2 P[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
 void main() { gl_Position = vec4(P[gl_VertexID], 0.0, 1.0); }";
 
-        /* Cada píxel calcula su lon/lat y lee la textura. La u no se envuelve: con
-           REPEAT, las copias del mundo y el desfase salen solos y no hay costura. */
+        /* Each pixel computes its lon/lat and reads the texture. u isn't wrapped: with REPEAT,
+           the copies of the world and the offset come out on their own and there's no seam. */
         const string ImgFS = @"#version 330 core
 uniform vec2 uView;
 uniform vec2 uCenter;
@@ -219,8 +219,8 @@ uniform vec3 uTint;
 uniform sampler2D uTex;
 out vec4 frag;
 
-/* Paleta de altimetría, al gusto de SCANsat: azul abajo, verde en las llanuras,
-   amarillo y marrón arriba y blanco en las cumbres. */
+/* Altimetry palette, in SCANsat's style: blue at the bottom, green on the plains, yellow and
+   brown higher up and white on the peaks. */
 vec3 altPalette(float t) {
   t = clamp(t, 0.0, 1.0);
   vec3 c0 = vec3(0.13, 0.25, 0.55), c1 = vec3(0.10, 0.55, 0.62), c2 = vec3(0.25, 0.62, 0.29);
@@ -240,15 +240,15 @@ void main() {
   float lat = uCenter.y - (py - uView.y * 0.5) / uPpd;
   if (lat > 90.0 || lat < -90.0) discard;
   if (uMode == 2) {
-    /* Noche: el coseno del ángulo al punto subsolar (en el ecuador). Un margen de unos
-       grados a cada lado del terminador hace de crepúsculo. */
+    /* Night: the cosine of the angle to the subsolar point (at the equator). A margin of a few
+       degrees on each side of the terminator acts as twilight. */
     float dl = mod(lon - uSunLon + 540.0, 360.0) - 180.0;
     float mu = sin(radians(lat)) * sin(radians(uSunLat)) + cos(radians(lat)) * cos(radians(uSunLat)) * cos(radians(dl));
     float night = 1.0 - smoothstep(-0.09, 0.07, mu);
     float dusk = exp(-mu * mu / 0.004) * 0.10;
     vec4 c = vec4(vec3(0.0, 0.012, 0.04) * night * 0.66, night * 0.66);
     c = vec4(c.rgb + vec3(1.0, 0.45, 0.15) * dusk, c.a + dusk * 0.2);
-    // el Sol: un disco en el punto subsolar
+    // the Sun: a disc at the subsolar point
     float d = length(vec2(dl, lat - uSunLat)) * uPpd;
     float rad = 7.0 * uS;
     float disc = 1.0 - smoothstep(rad - 1.0, rad + 0.5, d);
@@ -261,8 +261,8 @@ void main() {
     return;
   }
   if (uMode == 1) {
-    // sin imagen, el fondo lleva un punto del color del cuerpo: Duna se ve rojiza y
-    // Jool verdosa aunque no haya mapa
+    // without an image, the background gets a touch of the body's color: Duna looks reddish and
+    // Jool greenish even without a map
     vec3 c = mix(vec3(13.0, 20.0, 29.0) / 255.0, uTint * 0.42, 0.85);
     float ix = floor((lon + 180.0) / uCell), iy = floor((90.0 - lat) / uCell);
     if (mod(ix + iy, 2.0) < 0.5) c = mix(c, vec3(1.0), 0.012);
@@ -271,7 +271,7 @@ void main() {
   }
   vec4 t = texture(uTex, vec2((lon + uOff + 180.0) / 360.0, (90.0 - lat) / 180.0));
   if (uMode == 3) {
-    // filtro de altimetría: el gris del mapa de alturas pasa a metros con la calibración
+    // altimetry filter: the height map's gray goes to meters with the calibration
     float lum = dot(t.rgb, vec3(0.2126, 0.7152, 0.0722));
     float alt = uHMin + lum * (uHMax - uHMin);
     if (alt < uAltMin || alt > uAltMax) { frag = vec4(vec3(0.015, 0.02, 0.035) * 0.78, 0.78); return; }
@@ -281,16 +281,16 @@ void main() {
   frag = vec4(t.rgb * t.a, t.a) * uOpacity;
 }";
 
-        /* El mapa político encima del terreno. La costa se recorta con el mapa de alturas, que
-           es la que se ve de cerca; de lejos, con el de color si es el que hace de mapa base (los
-           dos pueden no casar del todo y un par de texeles de color son decenas de píxeles). */
+        /* The political map over the terrain. The coast is clipped with the height map, which is
+           the one seen up close; from afar, with the color map if it's the one acting as base map
+           (the two may not match perfectly and a couple of color texels are tens of pixels). */
         const string FacFS = @"#version 330 core
 uniform vec2 uView, uCenter;
 uniform float uPpd;
 uniform sampler2D uAltTex, uColTex;
 uniform vec2 uAltSize;
 uniform float uAltOff, uColOff, uHMin, uHMax, uMezcla;
-uniform int uMascara;           // 1: con alturas; 2: con color; 3: las dos
+uniform int uMascara;           // 1: with heights; 2: with color; 3: both
 " + FaccionesGlsl.Codigo + @"
 out vec4 frag;
 
@@ -301,7 +301,7 @@ float gris(ivec2 p) {
   return dot(texelFetch(uAltTex, p, 0).rgb, vec3(0.2126, 0.7152, 0.0722));
 }
 
-// la misma interpolación que el suelo de cerca (grisSuave), para que la costa case
+// the same interpolation as the nearby ground (grisSuave), so the coast matches
 float alturaEn(vec2 uv) {
   vec2 t = uv * uAltSize - 0.5;
   ivec2 i = ivec2(floor(t));
@@ -343,7 +343,7 @@ void main() {
             int mascara = 0;
             if (FacConMar && FacAltura != null) mascara |= 1;
             if (FacConMar && FacColor != null) mascara |= 2;
-            // el de color solo si es el que se ve de mapa base, y solo de lejos
+            // the color one only if it's the visible base map, and only from afar
             bool colorDeBase = BaseKind == "image" && BaseTex == FacColor;
             if (!colorDeBase && (mascara & 1) != 0) mascara = 1;
             facProg.Int("uMascara", mascara);
@@ -370,8 +370,8 @@ void main() {
 
         static readonly float[] TamanosEtiqueta = { 11, 13, 15, 18, 22, 27, 32 };
 
-        /* El nombre de cada territorio, centrado en su punto más hondo, con un tamaño según lo
-           que ocupe en pantalla (por escalones, para no rasterizar un texto por cada zoom). */
+        /* Each territory's name, centered on its deepest point, with a size according to how
+           much it takes on screen (in steps, so as not to rasterize a text for every zoom). */
         void DrawEtiquetas(Batch2D b, TextCache tc)
         {
             double pxPorM = Ppd / (Body.Radius * Geo.D2R);
@@ -391,7 +391,7 @@ void main() {
             }
         }
 
-        /* El color de una facción aclarado hacia el blanco, para escribir encima de ella. */
+        /* A faction's color lightened toward white, for writing on top of it. */
         public static int ArgbClaro(ColorF c)
         {
             int Canal(float v) => Math.Clamp((int)(255 * (v * 0.45 + 0.55)), 0, 255);
@@ -436,13 +436,14 @@ void main() {
         {
             EnsureGl();
             GL.Viewport(0, 0, W, H);
-            GL.ClearColor(7 / 255f, 11 / 255f, 17 / 255f, 1);
+            var fondoMapa = UI.Theme.MapBg;
+            GL.ClearColor(fondoMapa.R / 255f, fondoMapa.G / 255f, fondoMapa.B / 255f, 1);
             GL.Clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
             bool fondo = Fondo?.Invoke() == true;
             GL.Viewport(0, 0, W, H);
             b.Begin(W, H);
 
-            // mapa base: sin suelo de cerca, entero; con él, desvaneciéndose encima
+            // base map: without nearby ground, whole; with it, fading out on top
             double plano = 1;
             if (fondo)
             {
@@ -463,23 +464,23 @@ void main() {
                     DrawTiles(b);
                     break;
             }
-            // lo pendiente del lote va antes: los biomas se pintan directamente y lo taparían
+            // whatever is pending in the batch goes first: biomes are painted directly and would cover it
             b.Flush();
 
-            // biomas encima del relieve, debajo de trazas y marcadores
+            // biomes over the relief, under tracks and markers
             if (BiomeTex != null && BiomeOpacity > 0) DrawImage(0, BiomeTex, BiomeOffset, BiomeOpacity);
 
-            // el filtro de altimetría tapa el terreno, así que va antes de la cobertura
+            // the altimetry filter covers the terrain, so it goes before the coverage
             if (AltTex != null && AltOpacity > 0) DrawImage(3, AltTex, AltOffset, AltOpacity);
 
-            // lo que la partida no ha escaneado, tapado: va sobre el terreno y los biomas
+            // what the save hasn't scanned, covered: it goes over the terrain and the biomes
             if (ScanTex != null && ScanOpacity > 0) DrawImage(0, ScanTex, 0, ScanOpacity);
 
-            // la noche va sobre el terreno y debajo de la retícula, las trazas y los marcadores
-            // la noche, igual con o sin el suelo de cerca (que se ilumina como un mapa)
+            // night goes over the terrain and under the grid, the tracks and the markers
+            // night, the same with or without the nearby ground (which is lit like a map)
             if (DayNight) DrawImage(2, null, 0, 1);
 
-            // los territorios, encima de la noche: un mapa político se tiene que leer siempre
+            // territories, on top of the night: a political map always has to be readable
             DrawFacciones(plano);
 
             if (Grid) DrawGraticule(b);
@@ -588,13 +589,13 @@ void main() {
             int z = GridZoom;
             double step = StepForZoom(z);
             var (lonMin, lonMax, latMin, latMax) = ViewBounds();
-            var style = new TextStyle(UI.Theme.MonoFamily, 10 * S, false, unchecked((int)0xD9C8DEF5), false);
+            var style = new TextStyle(UI.Theme.MonoFamily, 10 * S, false, Color.FromArgb(217, UI.Theme.Fg).ToArgb(), false);
 
             void GridChip(string text, double cx, double cy)
             {
                 var t = tc.Get(text, style);
                 if (t == null) return;
-                b.Rect(cx - 3 * S, cy - 8 * S, t.TextW + 6 * S, 16 * S, ColorF.Rgba(11, 16, 23, 0.78f));
+                b.Rect(cx - 3 * S, cy - 8 * S, t.TextW + 6 * S, 16 * S, Tema(UI.Theme.Bg2, 0.8f));
                 b.Text(t, cx, cy - t.TextH / 2.0);
             }
 
@@ -620,17 +621,20 @@ void main() {
             }
         }
 
-        /* Rótulo con fondo, el .km-label de la web. */
+        /* Labels over the map use the interface theme's colors. */
+        static ColorF Tema(Color c, float a) => ColorF.Rgba(c.R, c.G, c.B, a);
+
+        /* Label with a background, the web's .km-label. */
         public void Chip(Batch2D b, TextCache tc, string text, double x, double cy)
         {
-            var t = tc.Get(text, new TextStyle(UI.Theme.MonoFamily, 10.5f * S, false, unchecked((int)0xFFDBE6F2), false));
+            var t = tc.Get(text, new TextStyle(UI.Theme.MonoFamily, 10.5f * S, false, UI.Theme.Fg.ToArgb(), false));
             if (t == null) return;
             double padX = 5 * S, padY = 2 * S;
             double w = t.TextW + padX * 2, h = t.TextH + padY * 2;
             double y = Math.Round(cy - h / 2);
             x = Math.Round(x);
-            b.Rect(x, y, w, h, ColorF.Rgba(11, 16, 23, 0.85f));
-            b.RectOutline(x, y, w, h, Math.Max(1, Math.Round(S)), ColorF.Hex("#263444"));
+            b.Rect(x, y, w, h, Tema(UI.Theme.Bg2, 0.9f));
+            b.RectOutline(x, y, w, h, Math.Max(1, Math.Round(S)), Tema(UI.Theme.Line, 1));
             b.Text(t, x + padX, y + padY);
         }
 
@@ -671,7 +675,7 @@ void main() {
                 switch (d.Style)
                 {
                     case DotStyle.Pin:
-                        // .km-pin: 11 px, borde blanco de 2 px y un filo oscuro alrededor
+                        // .km-pin: 11 px, 2 px white border and a dark edge around it
                         b.Circle(x, y, 7.5 * S, ColorF.Rgba(0, 0, 0, 0.25f));
                         b.Circle(x, y, 6.5 * S, ColorF.Rgba(0, 0, 0, 0.6f));
                         b.Circle(x, y, 5.5 * S, ColorF.White);
@@ -691,8 +695,8 @@ void main() {
             }
         }
 
-        /* Escala métrica abajo a la izquierda, como L.control.scale: la distancia de
-           180 px a la latitud del centro, redondeada a 1-2-3-5. */
+        /* Metric scale at the bottom left, like L.control.scale: the distance of 180 px at the
+           center's latitude, rounded to 1-2-3-5. */
         void DrawScale(Batch2D b, TextCache tc)
         {
             double maxW = 180 * S;
@@ -708,12 +712,12 @@ void main() {
             double w = Math.Round(maxW * nice / meters);
             string label = nice < 1000 ? nice.ToString(Geo.Inv) + " m" : (nice / 1000).ToString(Geo.Inv) + " km";
 
-            var t = tc.Get(label, new TextStyle(UI.Theme.MonoFamily, 11 * S, false, unchecked((int)0xFFDBE6F2), false));
+            var t = tc.Get(label, new TextStyle(UI.Theme.MonoFamily, 11 * S, false, UI.Theme.Fg.ToArgb(), false));
             double h = (t?.TextH ?? 14) + 4 * S;
             double x = 10 * S, top = H - 10 * S - h;
             double bw = 2 * S;
-            b.Rect(x, top, w, h, ColorF.Rgba(18, 26, 37, 0.9f));
-            var line = ColorF.Hex("#8a9bb0");
+            b.Rect(x, top, w, h, Tema(UI.Theme.Bg2, 0.9f));
+            var line = Tema(UI.Theme.FgDim, 1);
             b.Rect(x, top, bw, h, line);
             b.Rect(x + w - bw, top, bw, h, line);
             b.Rect(x, top + h - bw, w, bw, line);
@@ -723,10 +727,10 @@ void main() {
         void DrawAttribution(Batch2D b, TextCache tc)
         {
             var t = tc.Get(Lang.T("Visor no oficial · Kerbal Space Program es de Squad / Private Division"),
-                           new TextStyle("Segoe UI", 10.5f * S, false, unchecked((int)0xFF8A9BB0), false));
+                           new TextStyle(UI.Theme.UIFamily, 10.5f * S, false, UI.Theme.FgDim.ToArgb(), false));
             if (t == null) return;
             double w = t.TextW + 10 * S, h = t.TextH + 2 * S;
-            b.Rect(W - w, H - h, w, h, ColorF.Rgba(18, 26, 37, 0.85f));
+            b.Rect(W - w, H - h, w, h, Tema(UI.Theme.Bg2, 0.85f));
             b.Text(t, W - w + 5 * S, H - h + 1 * S);
         }
 

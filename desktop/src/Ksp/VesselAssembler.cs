@@ -6,44 +6,44 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.Ksp
 {
-    /* Un trozo de malla con su material, colocado en el marco de la nave (metros, marco
-       de mano izquierda de Unity, con la pieza raíz en el origen). */
+    /* A piece of mesh with its material, placed in the vessel's frame (meters, Unity's
+       left-handed frame, with the root part at the origin). */
     public sealed class DrawItem
     {
         public MuMesh Mesh;
         public int Submesh;
         public string Part, Node, Shader;
-        public double[] M;                        // 4x4 por columnas
+        public double[] M;                        // 4x4 column-major
         public string TexturePath;
         public float[] Color, TexScale, TexOffset;
         public bool Cutout, Transparent;
-        public GroundMat Ground;                  // suelo del KSC: hierba y asfalto mezclados por una máscara
+        public GroundMat Ground;                  // KSC ground: grass and asphalt blended by a mask
     }
 
-    /* El shader «Diffuse Ground KSC» del juego: hierba repetida por la posición, teñida, y
-       asfalto por las UV, mezclados con una máscara que sigue las UV de la malla. */
+    /* The game's «Diffuse Ground KSC» shader: grass tiled by position, tinted, and asphalt by
+       UV, blended with a mask that follows the mesh's UVs. */
     public sealed class GroundMat
     {
         public string Grass, Tarmac, Mask;
         public float GrassTiling = 0.3f;
         public float[] GrassColor = { 0.58f, 0.61f, 0.39f, 1 }, TarmacColor = { 1, 1, 1, 1 }, TarmacScale = { 1, 1 }, TarmacOffset = { 0, 0 };
-        public float[] MaskScale = { 1, 1, 0, 0 };        // escala y desfase de la máscara
+        public float[] MaskScale = { 1, 1, 0, 0 };        // mask scale and offset
     }
 
     public sealed class AssembledVessel
     {
         public readonly List<DrawItem> Items = new();
-        public double Radius;                    // radio de la esfera que la envuelve, desde el centro de masas
+        public double Radius;                    // radius of the enclosing sphere, from the center of mass
         public double[] CoM = { 0, 0, 0 };
         public double[] Rot = { 0, 0, 0, 1 };
         public int PartsTotal, PartsDrawn;
         public readonly List<string> Missing = new();
-        // animaciones y giros de pivote aplicados según el estado guardado
+        // animations and pivot rotations applied according to the saved state
         public int AnimsApplied, PivotsApplied;
         public readonly List<string> AnimsMissing = new(), PivotsMissing = new();
-        /* Texturas ya leídas del disco, para que la subida a la GPU no tenga que tocarlo. */
+        /* Textures already read from disk, so the GPU upload doesn't have to touch it. */
         public Dictionary<string, TextureFile> Textures;
-        public StockAssets Stock;                 // para las texturas que están en los datos del juego
+        public StockAssets Stock;                 // for the textures that are in the game's data
 
         public void LoadTextures()
         {
@@ -57,16 +57,16 @@ namespace KerbinMaps.Ksp
                         ? Stock?.Load(path)
                         : TextureFile.Load(path);
                 }
-                catch { t[path] = null; }       // p. ej. las máscaras en Crunch, que aún no se leen
+                catch { t[path] = null; }       // e.g. the Crunch masks, which aren't read yet
             }
             Textures = t;
         }
     }
 
-    /* Monta una nave pieza a pieza, igual que la construye KSP al cargarla: cada pieza en
-       su posición y giro respecto a la raíz; dentro de ella, el objeto «model» escalado por
-       rescaleFactor; dentro, cada MODEL con su propia posición, giro y escala; y dentro, la
-       jerarquía del .mu. Las variantes apagan los objetos que no tocan. */
+    /* Assembles a vessel part by part, just as KSP builds it when loading: each part at its
+       position and rotation relative to the root; inside it, the «model» object scaled by
+       rescaleFactor; inside that, each MODEL with its own position, rotation and scale; and
+       inside, the .mu hierarchy. Variants turn off the objects that don't belong. */
     public sealed class VesselAssembler
     {
         readonly PartCatalog catalog;
@@ -88,7 +88,7 @@ namespace KerbinMaps.Ksp
                 {
                     if (!File.Exists(path))
                     {
-                        // «mesh = model.mu» con otro nombre: el primer .mu de la carpeta
+                        // «mesh = model.mu» with another name: the first .mu in the folder
                         string dir = Path.GetDirectoryName(path);
                         path = Directory.Exists(dir) ? Directory.EnumerateFiles(dir, "*.mu").FirstOrDefault() : null;
                     }
@@ -116,7 +116,7 @@ namespace KerbinMaps.Ksp
                 var def = catalog.Find(part.Name);
                 if (def == null) { result.Missing.Add(part.Name); continue; }
 
-                // qué objetos apagan o encienden las variantes de esta pieza
+                // which objects this part's variants turn off or on
                 var off = new HashSet<string>(StringComparer.Ordinal);
                 var on = new HashSet<string>(StringComparer.Ordinal);
                 string variant = part.Variant ?? def.BaseVariant;
@@ -134,7 +134,7 @@ namespace KerbinMaps.Ksp
                     foreach (var t in keep) { off.Remove(t); on.Add(t); }
                 }
 
-                // lo que el estado guardado oculta pase lo que pase con las variantes
+                // what the saved state hides regardless of the variants
                 var hide = new HashSet<string>(StringComparer.Ordinal);
                 var (anims, pivots) = SavedPose(def, part, hide);
 
@@ -152,7 +152,7 @@ namespace KerbinMaps.Ksp
                     double[] rootM = mr.HasTransform
                         ? Mat.Mul(modelM, Mat.Mul(Mat.Translate(mr.Pos), Mat.Mul(Mat.Rotate(Mat.Euler(mr.Euler)), Mat.Scale(mr.Scale[0], mr.Scale[1], mr.Scale[2]))))
                         : Mat.Mul(modelM, Trs(mu.Root, ov));
-                    // la raíz del .mu toma la transformación del nodo MODEL; sus hijos, la suya
+                    // the .mu root takes the MODEL node's transform; its children, their own
                     var world = WorldMatrices(mu.Root, rootM, ov);
                     Walk(mu, mu.Root, world, mr, muDir, off, on, hide, result, ref r2, ref any, isRoot: true);
                 }
@@ -166,9 +166,9 @@ namespace KerbinMaps.Ksp
             return result;
         }
 
-        /* Un modelo suelto, como los edificios de Kerbal Konstructs: la jerarquía del .mu con
-           la raíz en el origen. KK coloca y gira la raíz por su cuenta y solo conserva su
-           escala, así que de ella solo se toma eso. */
+        /* A standalone model, like Kerbal Konstructs buildings: the .mu hierarchy with the root
+           at the origin. KK places and rotates the root on its own and only keeps its scale, so
+           that's all that's taken from it. */
         public static AssembledVessel BuildModel(string muPath, StockAssets stock = null)
         {
             var mu = MuFile.Load(muPath);
@@ -201,10 +201,9 @@ namespace KerbinMaps.Ksp
             return double.IsFinite(n) && n > 0.5 ? q : null;
         }
 
-        /* La pose guardada de la pieza: qué animaciones van en qué punto (0 = recogida,
-           1 = desplegada) y qué pivotes están girados, como estaban al guardar.
-           Los módulos de la partida se emparejan con los de la configuración por nombre y
-           orden de aparición. */
+        /* The part's saved pose: which animations are at which point (0 = retracted, 1 =
+           deployed) and which pivots are rotated, as they were when saved. The save's modules
+           are matched with the configuration's by name and order of appearance. */
         static (List<(string Clip, double T)> anims, List<(string Node, double[] Q)> pivots) SavedPose(PartDef def, PartSnapshot part, HashSet<string> hide)
         {
             var anims = new List<(string, double)>();
@@ -221,8 +220,8 @@ namespace KerbinMaps.Ksp
                 {
                     case "ModuleJettison":
                     {
-                        /* La cubierta de un motor: desaparece al desecharla, y tampoco se ve
-                           si no hay nada enganchado debajo. */
+                        /* An engine shroud: it disappears when jettisoned, and also isn't shown
+                           if there's nothing attached below. */
                         var names = (cfg.GetValueOrDefault("jettisonName") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                         string active = saved.GetValueOrDefault("activejettisonName");
                         string bottom = cfg.GetValueOrDefault("bottomNodeName") ?? "bottom";
@@ -233,14 +232,14 @@ namespace KerbinMaps.Ksp
                         break;
                     }
                     case "ModuleStructuralNode":
-                        // estructuras de interetapa: solo existen si el juego las ha generado
+                        // interstage structures: they only exist if the game has generated them
                         if (cfg.TryGetValue("rootObject", out var ro) && ro.Length > 0 &&
                             (!True(saved.GetValueOrDefault("spawnState")) || saved.GetValueOrDefault("visibilityState") == "False"))
                             hide.Add(ro);
                         break;
                     case "ModuleDynamicNodes":
                     {
-                        // placas de motores: la malla del juego de nodos elegido y ninguna otra
+                        // engine plates: the mesh of the chosen node set and no other
                         var meshes = (cfg.GetValueOrDefault("__meshes") ?? "").Split(',');
                         int idx = (int)ParseD(saved.GetValueOrDefault("NodeSetIdx"), 0);
                         for (int i = 0; i < meshes.Length; i++)
@@ -252,9 +251,9 @@ namespace KerbinMaps.Ksp
                     case "ModuleParachute":
                     case "RealChuteFAR":
                     {
-                        /* El modelo trae la campana abierta. Plegado solo se ve la tapa; al
-                           abrirse la tapa sale despedida y la campana toma la pose de su
-                           animación; cortado no queda ninguna de las dos. */
+                        /* The model comes with the canopy open. Packed, only the cap shows; on
+                           opening the cap flies off and the canopy takes its animation pose;
+                           when cut, neither remains. */
                         string st = (saved.GetValueOrDefault("deploymentState") ?? saved.GetValueOrDefault("depState") ?? "STOWED").ToUpperInvariant();
                         string canopy = cfg.GetValueOrDefault("canopyName") ?? "canopy";
                         string cap = cfg.GetValueOrDefault("capName") ?? "cap";
@@ -276,7 +275,7 @@ namespace KerbinMaps.Ksp
                                 hide.Add(cap);
                                 hide.Add(canopy);
                                 break;
-                            default:                 // STOWED, ACTIVE: esperando para abrirse
+                            default:                 // STOWED, ACTIVE: waiting to open
                                 hide.Add(canopy);
                                 break;
                         }
@@ -296,7 +295,7 @@ namespace KerbinMaps.Ksp
                         break;
                     default:
                     {
-                        // paneles, antenas, radiadores, reflectores y demás ModuleDeployablePart
+                        // panels, antennas, radiators, reflectors and the rest of ModuleDeployablePart
                         string state = saved.GetValueOrDefault("deployState") ?? "RETRACTED";
                         double t = state switch
                         {
@@ -312,7 +311,7 @@ namespace KerbinMaps.Ksp
                             var q = ParseQuat(saved.GetValueOrDefault("currentRotation"));
                             if (pivot != null && q != null) pivots.Add((pivot, q));
                         }
-                        // un panel roto ha perdido la parte que se desprende
+                        // a broken panel has lost the part that breaks off
                         if (state == "BROKEN" && cfg.TryGetValue("breakName", out var br) && br.Length > 0) hide.Add(br);
                         break;
                     }
@@ -351,8 +350,8 @@ namespace KerbinMaps.Ksp
                 foreach (var d in AllNodes(c)) yield return d;
         }
 
-        /* Posición, giro y escala locales que cambian respecto al modelo en reposo: primero
-           las animaciones evaluadas en su punto, luego los pivotes con el giro guardado. */
+        /* Local position, rotation and scale that change relative to the model at rest: first
+           the animations evaluated at their point, then the pivots with their saved rotation. */
         static Dictionary<MuNode, float[]> Overrides(MuFile mu, List<(string Clip, double T)> anims, List<(string Node, double[] Q)> pivots,
                                                      HashSet<string> animsFound, HashSet<string> pivotsFound)
         {
@@ -422,16 +421,16 @@ namespace KerbinMaps.Ksp
         static double[] Trs(MuNode n, Dictionary<MuNode, float[]> ov)
         {
             if (!ov.TryGetValue(n, out var o)) return Mat.Trs(n);
-            // entre dos claves cada componente se interpola por separado: hay que renormalizar
+            // between two keys each component is interpolated separately: it has to be renormalized
             double qn = Math.Sqrt((double)o[3] * o[3] + (double)o[4] * o[4] + (double)o[5] * o[5] + (double)o[6] * o[6]);
             var q = qn > 1e-9 ? new[] { o[3] / qn, o[4] / qn, o[5] / qn, o[6] / qn } : new double[] { 0, 0, 0, 1 };
             return Mat.Mul(Mat.Translate(new double[] { o[0], o[1], o[2] }),
                    Mat.Mul(Mat.Rotate(q), Mat.Scale(o[7], o[8], o[9])));
         }
 
-        /* Matriz de cada objeto del modelo en el marco de la nave. Se calculan todas antes de
-           dibujar: una malla con esqueleto necesita las de sus huesos, que pueden colgar de
-           otra rama o de una que esté oculta. */
+        /* Matrix of each model object in the vessel's frame. They're all computed before
+           drawing: a skinned mesh needs its bones', which can hang from another branch or from
+           a hidden one. */
         static Dictionary<MuNode, double[]> WorldMatrices(MuNode root, double[] rootM, Dictionary<MuNode, float[]> ov)
         {
             var w = new Dictionary<MuNode, double[]>();
@@ -444,9 +443,9 @@ namespace KerbinMaps.Ksp
             return w;
         }
 
-        /* Malla con esqueleto (paneles que se despliegan doblándose, mástiles): cada vértice
-           se lleva con sus huesos como hace Unity, Σ peso · (hueso ahora × pose de enlace) ·
-           vértice, y sale ya en el marco de la nave. Las poses de enlace del .mu van por filas. */
+        /* Skinned mesh (panels that deploy by folding, masts): each vertex is carried by its bones
+           as Unity does, Σ weight · (bone now × bind pose) · vertex, and comes out already in the
+           vessel's frame. The .mu bind poses are row-major. */
         static MuMesh Skin(MuFile mu, MuNode node, Dictionary<MuNode, double[]> world)
         {
             var src = node.Mesh;
@@ -489,7 +488,7 @@ namespace KerbinMaps.Ksp
                 }
                 if (ws <= 1e-6)
                 {
-                    // sin pesos: se queda pegado al objeto
+                    // no weights: it stays attached to the object
                     var p = Mat.Apply(own, x, y, z);
                     px = p[0]; py = p[1]; pz = p[2];
                     nx = own[0] * nx0 + own[4] * ny0 + own[8] * nz0;
@@ -513,7 +512,7 @@ namespace KerbinMaps.Ksp
         void Walk(MuFile mu, MuNode node, Dictionary<MuNode, double[]> world, ModelRef mr, string muDir, HashSet<string> off, HashSet<string> on, HashSet<string> hide,
                   AssembledVessel result, ref double r2, ref bool any, bool isRoot)
         {
-            // lo etiquetado «Icon_Only» es la silueta del icono del editor (la cofia de muestra, por ejemplo)
+            // whatever is tagged «Icon_Only» is the silhouette for the editor icon (the sample fairing, for example)
             if (node.Tag == "Icon_Only") return;
             if (!isRoot && (hide.Contains(node.Name) || (off.Contains(node.Name) && !on.Contains(node.Name)))) return;
 
@@ -531,7 +530,7 @@ namespace KerbinMaps.Ksp
                 {
                     int mi = node.Materials.Length == 0 ? -1 : node.Materials[Math.Min(s, node.Materials.Length - 1)];
                     var mat = mi >= 0 && mi < mu.Materials.Count ? mu.Materials[mi] : null;
-                    if (mat != null && (mat.Shader ?? "").Contains("Particle")) continue;   // efectos, no casco
+                    if (mat != null && (mat.Shader ?? "").Contains("Particle")) continue;   // effects, not hull
                     if (mat != null && mat.Shader != null && (mat.Shader == "legacy14" || mat.Shader == "legacy15")) continue;
                     result.Items.Add(new DrawItem
                     {
@@ -572,7 +571,7 @@ namespace KerbinMaps.Ksp
                 if (mr.TextureSwap.TryGetValue(bare, out var swap))
                     found = TextureFile.Find(Path.Combine(catalog.GameData, swap.Replace('/', Path.DirectorySeparatorChar)));
                 found ??= TextureFile.Find(Path.Combine(muDir, bare));
-                // las del KSC de serie que reutilizan los edificios de Kerbal Konstructs
+                // the stock KSC ones that Kerbal Konstructs buildings reuse
                 found ??= stock?.Find(name);
                 texCache[key] = found;
                 return found;
@@ -580,7 +579,7 @@ namespace KerbinMaps.Ksp
         }
     }
 
-    /* Matrices 4x4 en doble precisión, por columnas, con la convención de Unity. */
+    /* 4x4 double-precision matrices, column-major, with Unity's convention. */
     public static class Mat
     {
         public static double[] Identity() => new double[] { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
@@ -619,7 +618,7 @@ namespace KerbinMaps.Ksp
             };
         }
 
-        /* Quaternion.Euler de Unity: primero Z, luego X, luego Y. */
+        /* Unity's Quaternion.Euler: first Z, then X, then Y. */
         public static double[] Euler(double[] deg)
         {
             double D = Math.PI / 360;
@@ -644,7 +643,7 @@ namespace KerbinMaps.Ksp
             Mul(Translate(new double[] { n.Pos[0], n.Pos[1], n.Pos[2] }),
                 Mul(Rotate(new double[] { n.Rot[0], n.Rot[1], n.Rot[2], n.Rot[3] }), Scale(n.Scale[0], n.Scale[1], n.Scale[2])));
 
-        /* Inversa general por cofactores (columnas, como todo aquí). */
+        /* General inverse by cofactors (column-major, like everything here). */
         public static double[] Inverse(double[] m)
         {
             var inv = new double[16];

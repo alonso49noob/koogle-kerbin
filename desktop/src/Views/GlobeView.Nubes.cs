@@ -4,36 +4,36 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* Nubes que se mueven y cambian de forma.
+    /* Clouds that move and change shape.
 
-       El mapa del mod de nubes es una foto fija. En el juego la capa gira alrededor del
-       planeta (Kerbin: 29,9 m/s en superficie según su clouds.cfg, una vuelta cada 35 h) y
-       cambia de forma con ruido animado. Aquí igual:
+       The cloud mod's map is a still photo. In the game the layer rotates around the planet
+       (Kerbin: 29.9 m/s at the surface according to its clouds.cfg, one turn every 35 h) and
+       changes shape with animated noise. Same here:
 
-       - Giro: un desfase en longitud que crece con el tiempo de las nubes.
-       - Forma: el mapa se muestrea desplazado por un ruido suave sobre la esfera que
-         evoluciona con el tiempo (unos 80 km de desplazamiento en celdas de 100 km), y su
-         cobertura sube y baja por zonas: los frentes se deforman, crecen y se deshacen.
-       - Detalle: de cerca, la textura de detalle del mod (detail1) rompe el mapa, que a
-         8192 de ancho sigue siendo de 5 km por texel.
+       - Rotation: a longitude offset that grows with cloud time.
+       - Shape: the map is sampled displaced by a smooth noise on the sphere that evolves over
+         time (about 80 km of displacement in 100 km cells), and its coverage rises and falls by
+         area: fronts deform, grow and break up.
+       - Detail: up close, the mod's detail texture (detail1) breaks up the map, which at 8192
+         wide is still 5 km per texel.
 
-       El tiempo de las nubes es el de la simulación más el reloj real, para que en pausa
-       sigan moviéndose al ritmo del juego a x1. */
+       Cloud time is simulation time plus the real clock, so that while paused they keep moving
+       at the game's x1 pace. */
     public sealed partial class GlobeView
     {
-        public double CloudTime;                  // segundos (simulación + reloj real)
-        public double CloudSpeed = 29.89;         // m/s en superficie, hacia el oeste
+        public double CloudTime;                  // seconds (simulation + real clock)
+        public double CloudSpeed = 29.89;         // m/s at the surface, westward
         public Texture CloudDetailTex;
 
-        /* Moviéndose se notan de cerca: a 30 m/s una nube a 2 km de altura cruza el cielo. */
+        /* Moving, they're noticeable up close: at 30 m/s a cloud 2 km up crosses the sky. */
         public bool CloudsAnimating => CloudTex != null && Clouds && CloudAmount > 0
                                        && (Mode == CamMode.Free || Mode == CamMode.Sky || PlanetaCerca);
 
         const string NubesGlsl = @"
-uniform float uNubeFase;        // tiempo de las nubes para el ruido, ya reducido
+uniform float uNubeFase;        // cloud time for the noise, already reduced
 uniform sampler2D uNubeDet;
 uniform int uHasNubeDet;
-uniform vec2 uNubeDetOff;       // desplazamiento del detalle, en metros ya reducidos
+uniform vec2 uNubeDetOff;       // detail offset, in meters already reduced
 
 float nHash(vec3 p) {
   p = fract(p * 0.3183099 + 0.1);
@@ -49,9 +49,9 @@ float nRuido(vec3 x) {
                  mix(nHash(i + vec3(0.0, 1.0, 1.0)), nHash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
 }
 
-/* El uv del mapa de nubes (ya girado), desplazado por el tiempo. n: la dirección desde el
-   centro del cuerpo. En longitud se divide por el coseno de la latitud para que el
-   desplazamiento mida lo mismo en km en todas partes. */
+/* The cloud map's uv (already rotated), displaced over time. n: the direction from the body's
+   center. In longitude it's divided by the cosine of latitude so the displacement measures the
+   same in km everywhere. */
 vec2 nubeUv(vec3 n, vec2 uv) {
   vec3 q = n * 6.0;
   vec3 tt = vec3(0.0, 0.0, uNubeFase);
@@ -62,38 +62,38 @@ vec2 nubeUv(vec3 n, vec2 uv) {
   return vec2(uv.x + w.x * 0.0035 / c, clamp(uv.y + w.y * 0.005, 0.0, 1.0));
 }
 
-/* Cuánta nube queda en cada zona: entre algo más de la mitad y algo más de la del mapa. */
+/* How much cloud is left in each zone: between a bit over half and a bit over the map's. */
 float nubeVida(vec3 n) {
   return 0.55 + 0.6 * smoothstep(0.15, 0.8, nRuido(n * 3.5 + vec3(0.0, 0.0, uNubeFase * 0.7 + 40.0)));
 }
 
-/* El detalle del mod de cerca: rompe los bordes y el interior de la nube. m: el punto en
-   metros sobre el plano local (x este, y norte); cerca: 1 a pocos km, 0 lejos. */
+/* The mod's detail up close: it breaks up the edges and the inside of the cloud. m: the point
+   in meters on the local plane (x east, y north); cerca: 1 within a few km, 0 far away. */
 float nubeDetalle(vec2 m, float cerca) {
   if (uHasNubeDet == 0 || cerca <= 0.0) return 1.0;
   vec2 p = (m + uNubeDetOff) / 3000.0;
-  // el detalle del mod es multiplicativo y de poco contraste (0,65 a 1, media 0,81)
+  // the mod's detail is multiplicative and low contrast (0.65 to 1, mean 0.81)
   float d = texture(uNubeDet, p).g * 0.6 + texture(uNubeDet, p * 3.7 + 0.37).g * 0.4;
   return mix(1.0, clamp(1.0 + (d - 0.81) * 3.5, 0.3, 1.6), cerca);
 }
 ";
 
-        /* Los uniformes de las nubes que dependen del tiempo, para el shader que las pinte. */
+        /* The time-dependent cloud uniforms, for the shader that paints them. */
         void NubeUniforms(ShaderProgram p, int unidadDetalle)
         {
             double horas = CloudTime / 3600;
-            // la fase del ruido: una celda cada ~7 h de juego; reducida para la precisión
+            // the noise phase: one cell every ~7 h of game time; reduced for precision
             p.Float("uNubeFase", horas * 0.15 % 1000.0);
-            // la unidad del detalle puede no existir en GPU modestas (el mínimo son 16)
+            // the detail texture unit may not exist on modest GPUs (the minimum is 16)
             bool det = CloudDetailTex != null && unidadDetalle >= 0 && unidadDetalle < GL.MaxTextureUnits;
             p.Int("uHasNubeDet", det ? 1 : 0);
             if (det) { BindTex(unidadDetalle, CloudDetailTex); p.Int("uNubeDet", unidadDetalle); }
-            // el detalle va con el viento algo más despacio que la capa (detailSpeed del mod: 6 m/s)
+            // the detail goes with the wind somewhat slower than the layer (the mod's detailSpeed: 6 m/s)
             double metros = CloudTime * 6.0 % 30000.0;
             p.Vec2("uNubeDetOff", -metros, 0);
         }
 
-        /* El giro de la capa, como fracción de vuelta: hacia el oeste, a CloudSpeed. */
+        /* The layer's rotation, as a fraction of a turn: westward, at CloudSpeed. */
         double NubeGiro()
         {
             double vuelta = 2 * Math.PI * Body.Radius;

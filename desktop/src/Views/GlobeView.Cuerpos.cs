@@ -4,27 +4,27 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* Los demás cuerpos del sistema vistos desde el globo: las lunas, los planetas y el Sol
-       en su sitio de verdad para el instante de la barra de tiempo, a escala real.
+    /* The other bodies of the system seen from the globe: moons, planets and the Sun in their
+       real place for the time on the time bar, at real scale.
 
-       Cada uno se pinta en un cuadrado de pantalla que lo envuelve, trazando el rayo contra
-       su esfera en el propio shader: así sale redondo a cualquier distancia, con la luz del
-       Sol de su lado (la Mun con sus fases) y con su mapa de color si lo hay. Las cuentas se
-       hacen divididas por su distancia, porque Jool o Eeloo están a decenas de miles de
-       radios de Kerbin y en float la intersección se quedaría sin precisión. Los que miden
-       menos de un par de píxeles salen como un punto, para que se encuentren en el cielo.
-       Kerbin los tapa cuando quedan detrás. */
+       Each one is painted in a screen square that encloses it, tracing the ray against its
+       sphere in the shader itself: that way it comes out round at any distance, with the Sun's
+       light on its side (the Mun with its phases) and with its color map if there is one. The
+       math is done divided by its distance, because Jool or Eeloo are tens of thousands of
+       Kerbin radii away and in float the intersection would run out of precision. Those smaller
+       than a couple of pixels show as a dot, so they can be found in the sky. Kerbin hides them
+       when they're behind it. */
     public sealed partial class GlobeView
     {
         public sealed class CuerpoEnElCielo
         {
             public string Nombre;
-            public double[] Pos;                  // centro, en el marco del globo y en radios del cuerpo que se ve
-            public double Radio;                  // en radios del cuerpo que se ve
-            public double[] Luz;                  // hacia la estrella, unitario, en el marco del globo
-            public double Giro;                   // fracción de vuelta entre su mapa y el marco del globo
+            public double[] Pos;                  // center, in the globe's frame and in radii of the viewed body
+            public double Radio;                  // in radii of the viewed body
+            public double[] Luz;                  // toward the star, unit vector, in the globe's frame
+            public double Giro;                   // fraction of a turn between its map and the globe's frame
             public float[] Tinte;
-            public Texture Mapa;                  // su mapa de color, o null
+            public Texture Mapa;                  // its color map, or null
             public bool Estrella;
         }
 
@@ -45,15 +45,15 @@ void main() {
   vec3 w = uCentro + (uDer * q.x + uArr * q.y) * uMedio;
   vDir = w;
   vec4 c = uProj * uRot * vec4(w, 1.0);
-  // sin profundidad: delante de todo lo que haya detrás; la ocultación la decide el shader
+  // no depth: in front of whatever is behind; the shader decides occlusion
   gl_Position = vec4(c.xy, 0.0, c.w);
 }";
 
         const string CuerpoFS = @"#version 330 core
 in vec3 vDir;
-uniform vec3 uCentro;          // unitario: todo va dividido por la distancia al cuerpo
-uniform float uR, uPix;        // su radio y lo que abarca un píxel, en esas unidades
-uniform vec3 uPlaneta;         // el cuerpo que se ve, en las mismas unidades
+uniform vec3 uCentro;          // unit: everything is divided by the distance to the body
+uniform float uR, uPix;        // its radius and what a pixel spans, in those units
+uniform vec3 uPlaneta;         // the viewed body, in the same units
 uniform float uRPlaneta;
 uniform vec3 uLuz, uTinte;
 uniform int uHasMapa, uEstrella;
@@ -62,7 +62,7 @@ uniform sampler2D uMapa;
 out vec4 frag;
 const float PI = 3.14159265;
 
-// la t de entrada de un rayo desde el origen en una esfera, o -1
+// the entry t of a ray from the origin into a sphere, or -1
 float entrada(vec3 d, vec3 c, float r) {
   float b = dot(d, c), h = b * b - (dot(c, c) - r * r);
   if (h < 0.0) return -1.0;
@@ -73,12 +73,12 @@ void main() {
   vec3 d = normalize(vDir);
   float ang = acos(clamp(dot(d, uCentro), -1.0, 1.0));
   float rMin = 1.6 * uPix;
-  // el planeta desde el que se mira tapa lo que quede detrás
+  // the planet you're looking from hides whatever is behind it
   float tp = entrada(d, uPlaneta, uRPlaneta);
   if (tp > 0.0 && tp < 1.0 - uR) discard;
 
   if (uR < rMin) {
-    // un punto: su brillo medio según la fase que se ve desde aquí
+    // a dot: its average brightness according to the phase seen from here
     float a = 1.0 - smoothstep(rMin * 0.5, rMin, ang);
     if (a <= 0.0) discard;
     float fase = uEstrella != 0 ? 1.0 : 0.25 + 0.75 * (0.5 + 0.5 * dot(uLuz, -uCentro));
@@ -87,7 +87,7 @@ void main() {
     return;
   }
 
-  // el borde, suavizado en un píxel
+  // the edge, smoothed over one pixel
   float borde = 1.0 - smoothstep(uR - uPix, uR + uPix * 0.5, ang);
   if (borde <= 0.0) discard;
   if (uEstrella != 0) { frag = vec4(1.0, 0.95, 0.82, borde); return; }
@@ -102,14 +102,14 @@ void main() {
   frag = vec4(pow(lin, vec3(1.0 / 2.2)), borde);
 }";
 
-        /* Pinta los cuerpos que tengan algo que pintar. `eye` en radios del cuerpo que se ve. */
+        /* Paints the bodies that have something to paint. `eye` in radii of the viewed body. */
         void DrawCuerpos(double[] eye)
         {
             if (!VerCuerpos || Cuerpos.Count == 0) return;
             cuerpoProg ??= new ShaderProgram(CuerpoVS, CuerpoFS);
             if (cuerpoVao == 0) cuerpoVao = GL.GenVertexArray();
 
-            // la vista sin la traslación: las posiciones ya van relativas al ojo
+            // the view without translation: positions are already relative to the eye
             var rot = (float[])view.Clone();
             rot[12] = rot[13] = rot[14] = 0;
             double tan = Math.Tan(fovL * D2R / 2);
@@ -126,13 +126,13 @@ void main() {
             p.Mat("uRot", rot);
             p.Int("uMapa", 0);
             GL.BindVertexArray(cuerpoVao);
-            // de lejos a cerca, por si uno pasa por delante de otro
+            // far to near, in case one passes in front of another
             var orden = new List<(double D, CuerpoEnElCielo C)>();
             foreach (var c in Cuerpos)
             {
                 var rel = Add(c.Pos, eye, -1);
                 double dist = Len(rel);
-                if (dist <= c.Radio * 1.01) continue;                // dentro de él: no se pinta
+                if (dist <= c.Radio * 1.01) continue;                // inside it: not painted
                 orden.Add((dist, c));
             }
             orden.Sort((a, b) => b.D.CompareTo(a.D));
@@ -141,7 +141,7 @@ void main() {
                 var rel = Add(c.Pos, eye, -1);
                 var u = Scale(rel, 1 / dist);
                 double r = c.Radio / dist;
-                // detrás de la cámara (con margen para lo que asoma por el borde)
+                // behind the camera (with a margin for whatever peeks in at the edge)
                 if (Dot(u, fwdL) < -r) continue;
                 double medio = Math.Max(r * 1.5, pix * 2.5);
                 p.Vec3("uCentro", u[0], u[1], u[2]);
@@ -165,7 +165,7 @@ void main() {
             GL.Disable(GL.BLEND);
         }
 
-        /* Sus nombres, como los marcadores: al lado del disco o del punto, salvo tapados. */
+        /* Their names, like markers: next to the disc or the dot, unless hidden. */
         void EtiquetasCuerpos(Batch2D b, TextCache tc, double[] eye)
         {
             if (!VerCuerpos || Cuerpos.Count == 0) return;

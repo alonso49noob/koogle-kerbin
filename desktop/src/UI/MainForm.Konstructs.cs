@@ -12,14 +12,14 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Edificios de Kerbal Konstructs: se leen de los .cfg de la instalación de KSP, sus
-       grupos salen como marcadores en el mapa y en el globo, y en el vuelo y el cielo se
-       ven con sus modelos y texturas (las del KSC de serie, de los datos del juego). */
+    /* Kerbal Konstructs buildings: read from the KSP installation's .cfg files, their groups
+       show up as markers on the map and the globe, and in flight and sky views they're seen
+       with their models and textures (the stock KSC ones, from the game's data). */
     public sealed partial class MainForm
     {
         KkDatabase kk;
-        string kkDe;                                // el GameData del que se leyó
-        object[] kkFirma;                           // con qué cuerpo y alturas se colocó
+        string kkDe;                                // the GameData it was read from
+        object[] kkFirma;                           // which body and heights it was placed with
         readonly Dictionary<KkModel, AssembledVessel> kkModelos = new();
         readonly HashSet<KkModel> kkCargando = new();
         readonly MapLayer kkLayer = new();
@@ -60,7 +60,7 @@ namespace KerbinMaps.UI
             RenderKKInfo();
         }
 
-        /* Lee (o vuelve a leer) la base de datos de KK de la instalación. */
+        /* Reads (or rereads) the installation's KK database. */
         async Task CargarKonstructs(bool forzar = false)
         {
             if (!state.ShowStatics) { AplicarKonstructs(); return; }
@@ -76,7 +76,7 @@ namespace KerbinMaps.UI
                 try { return KkDatabase.Load(gd, casa); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[kk] " + ex.Message); return null; }
             });
-            if (kkDe != gd) return;                 // entretanto se eligió otra carpeta
+            if (kkDe != gd) return;                 // another folder was chosen in the meantime
             QuitarModelosKK();
             SeleccionarKK(null);
             db?.NivelesKsc(NivelKsc);
@@ -88,11 +88,11 @@ namespace KerbinMaps.UI
             RenderKKSel();
         }
 
-        /* El nivel de una instalación del KSC en la partida cargada, o null (el más alto). */
+        /* The level of a KSC facility in the loaded save, or null (the highest). */
         double? NivelKsc(string instalacion) =>
             instalacion != null && extras != null && extras.NivelesKsc.TryGetValue(instalacion, out double v) ? v : null;
 
-        /* Al cargar otra partida: el KSC con sus niveles. */
+        /* When loading another save: the KSC with its levels. */
         void NivelesKscDePartida()
         {
             if (kk == null || !kk.NivelesKsc(NivelKsc)) return;
@@ -100,17 +100,17 @@ namespace KerbinMaps.UI
             AplicarKonstructs();
         }
 
-        /* Coloca los edificios del cuerpo que se ve y rehace marcadores, lista y globo. */
+        /* Places the buildings of the viewed body and rebuilds markers, list and globe. */
         void AplicarKonstructs()
         {
             ColocarKK();
             MarcadoresKK();
-            ColocarNavesEnSuelo();         // el terreno bajo las naves puede haber cambiado
+            ColocarNavesEnSuelo();         // the terrain under the vessels may have changed
             SyncGlobe();
         }
 
-        /* Los coloca otra vez si ha cambiado el cuerpo o el mapa de alturas (los grupos van
-           sobre el terreno). Dice si ha hecho algo. */
+        /* Places them again if the body or the height map changed (groups sit on the terrain).
+           Says whether it did anything. */
         bool ColocarKK()
         {
             bool on = state.ShowStatics && kk != null;
@@ -126,16 +126,16 @@ namespace KerbinMaps.UI
             return true;
         }
 
-        /* La explanada del KSC: plana a la altura de sus céspedes hasta 2 km del centro
-           (la pista mide 2,9) y fundida con el terreno hasta 3,5 km. Solo si se ven sus
-           edificios de serie, que es lo que la necesita. */
+        /* The KSC's leveled area: flat at the height of its lawns up to 2 km from the center
+           (the runway is 2.9) and blended into the terrain up to 3.5 km. Only if its stock
+           buildings are shown, which is what needs it. */
         Aplanado[] aplanados;
 
         Aplanado[] ExplanadaKsc()
         {
             if (kk == null || !kk.Groups.TryGetValue(Body.Name + "_KSC_Builtin", out var g) || !g.Builtin) return null;
             if (!kk.Instances.Any(i => i.DelJuego && i.Body == Body.Name)) return null;
-            // los céspedes van a 24,8 m sobre el centro del KSC, y este a su altura sobre el mar
+            // the lawns are 24.8 m above the KSC center, and that is at its height above the sea
             return new[] { Aplanado.En(g.Lat, g.Lon, 2000, 3500, g.RadiusOffset + 24.8 - 0.4) };
         }
 
@@ -200,8 +200,8 @@ namespace KerbinMaps.UI
             kkInfo.SetText(string.Join("\n", partes));
         }
 
-        /* El modelo montado de un edificio. La primera vez se pide en segundo plano y se
-           devuelve null; cuando está, se vuelve a pintar. */
+        /* The assembled model of a building. The first time it's requested in the background
+           and null is returned; once it's ready, it's painted again. */
         AssembledVessel ModeloKK(KkModel m)
         {
             if (kkModelos.TryGetValue(m, out var a)) return a;
@@ -228,7 +228,7 @@ namespace KerbinMaps.UI
                     {
                         BeginInvoke((Action)(() =>
                         {
-                            if (!kkCargando.Remove(m)) return;   // se descartó entretanto
+                            if (!kkCargando.Remove(m)) return;   // it was discarded in the meantime
                             kkModelos[m] = t.Result;
                             RenderKKInfo();
                             RequestRender();
@@ -247,7 +247,7 @@ namespace KerbinMaps.UI
             if (glOk && surface.MakeCurrent()) globe.DisposeStatics();
         }
 
-        /* ------------------------------------------------------------ lista */
+        /* ------------------------------------------------------------ list */
 
         void DrawKKRow(Graphics g, Rectangle r, object item, bool hover)
         {
@@ -286,7 +286,7 @@ namespace KerbinMaps.UI
                 ("Copiar coordenadas", b => CopyText(coords, b)));
         }
 
-        /* A la vista de vuelo, a medio kilómetro al sur del grupo y mirándolo. */
+        /* To the flight view, half a kilometer south of the group and looking at it. */
         void VolarAGrupo(KkGroup g)
         {
             if (!isFree) SetViewMode("free");

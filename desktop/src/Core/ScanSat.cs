@@ -3,8 +3,8 @@ using System.Collections.Generic;
 
 namespace KerbinMaps.Core
 {
-    /* Los sensores de SCANsat, con los valores que usa el mod (SCANsat.SCAN_Data.SCANtype).
-       Cada celda del mapa guarda la suma de los que ya han pasado por ahí. */
+    /* SCANsat's sensors, with the values the mod uses (SCANsat.SCAN_Data.SCANtype). Each map
+       cell stores the sum of those that have already passed over it. */
     [Flags]
     public enum ScanType
     {
@@ -22,20 +22,20 @@ namespace KerbinMaps.Core
         Todo = 511,
     }
 
-    /* Cobertura de SCANsat de un cuerpo: una celda por grado de latitud y longitud, con
-       los sensores que han pasado por ella.
+    /* SCANsat coverage of a body: one cell per degree of latitude and longitude, with the
+       sensors that have passed over it.
 
-       El mod la guarda en la partida como un Int16[360,180] comprimido con LZF y en
-       base64 con «/» cambiada por «-» y «=» por «_». Dentro del bloque comprimido hay
-       una serialización de .NET (BinaryFormatter) de un byte[], cuya cabecera son 27
-       bytes y cuyo cierre es uno más. */
+       The mod stores it in the save as an Int16[360,180] compressed with LZF and in base64 with
+       «/» changed to «-» and «=» to «_». Inside the compressed block there's a .NET
+       serialization (BinaryFormatter) of a byte[], whose header is 27 bytes and whose trailer
+       is one more. */
     public sealed class ScanCoverage
     {
         public const int W = 360, H = 180;
 
         public string Body;
-        public short[] Cells;                       // [lon+180, lat+90] en orden lon*180+lat
-        public double MinHeight = double.NaN, MaxHeight = double.NaN;   // el rango de la paleta del mod
+        public short[] Cells;                       // [lon+180, lat+90] in order lon*180+lat
+        public double MinHeight = double.NaN, MaxHeight = double.NaN;   // the range of the mod's palette
         public string Palette;
 
         public bool Empty
@@ -55,14 +55,14 @@ namespace KerbinMaps.Core
             return Cells[x * H + y];
         }
 
-        /* Como en el mod: basta con que la celda tenga alguno de los sensores pedidos.
-           «Altura» son dos (baja y alta) y con cualquiera de los dos ya hay altimetría. */
+        /* As in the mod: it's enough for the cell to have any of the requested sensors.
+           «Altura» is two (low and high) and either one already gives altimetry. */
         public bool Has(double lat, double lon, ScanType t) => ((ScanType)At(lat, lon) & t) != 0;
 
         public bool HasAll(double lat, double lon, ScanType t) => ((ScanType)At(lat, lon) & t) == t;
 
-        /* Porcentaje de superficie con ese sensor, pesado por cos(lat): en una rejilla de
-           grados las celdas del polo son minúsculas y sin pesar saldría muy inflado. */
+        /* Percentage of surface with that sensor, weighted by cos(lat): in a degree grid the
+           polar cells are tiny and without weighting it would come out heavily inflated. */
         public double Percent(ScanType t)
         {
             double tot = 0, ok = 0;
@@ -78,7 +78,7 @@ namespace KerbinMaps.Core
             return tot <= 0 ? 0 : ok / tot * 100;
         }
 
-        /* Los sensores que aparecen en alguna celda. */
+        /* The sensors that show up in some cell. */
         public ScanType Sensors()
         {
             int all = 0;
@@ -104,9 +104,9 @@ namespace KerbinMaps.Core
             return cov;
         }
 
-        /* Dónde empieza el byte[] dentro de la serialización de .NET. La cabecera normal
-           son 27 bytes (17 de cabecera de flujo + registro de array primitivo), pero si
-           no cuadra se busca por el final, que es lo único que de verdad importa. */
+        /* Where the byte[] starts inside the .NET serialization. The normal header is 27 bytes
+           (17 of stream header + primitive array record), but if that doesn't fit it's located
+           from the end, which is the only thing that really matters. */
         static int Payload(byte[] d)
         {
             const int n = W * H * 2;
@@ -116,9 +116,9 @@ namespace KerbinMaps.Core
         }
     }
 
-    /* LZF (liblzf), que es lo que usa SCANsat para comprimir la cobertura. Descomprimir
-       es leer bytes de control: menos de 32 significa «copia tantos literales»; el resto
-       es una referencia hacia atrás en lo ya escrito. */
+    /* LZF (liblzf), which is what SCANsat uses to compress the coverage. Decompressing means
+       reading control bytes: less than 32 means «copy that many literals»; the rest is a
+       back-reference into what's already written. */
     public static class Lzf
     {
         public static byte[] Decompress(byte[] input)

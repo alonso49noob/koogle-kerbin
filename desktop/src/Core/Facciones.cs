@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace KerbinMaps.Core
 {
-    /* Un país o facción: su nombre, su color y el número con el que se apunta en el mapa. */
+    /* A country or faction: its name, its color and the number it's recorded with on the map. */
     public sealed class Faccion
     {
         public int Id;
@@ -18,36 +18,36 @@ namespace KerbinMaps.Core
         public string Notas;
     }
 
-    /* Dónde poner el nombre de una facción: en lo más hondo de uno de sus territorios. */
+    /* Where to put a faction's name: at the deepest point of one of its territories. */
     public readonly record struct EtiquetaFaccion(int Id, double Lat, double Lon, double RadioM);
 
-    /* Mapa político de un cuerpo: de quién es cada trozo de superficie.
+    /* Political map of a body: who owns each piece of surface.
 
-       Es una rejilla equirectangular de 4096×2048 celdas (en Kerbin, 920 m por celda en el
-       ecuador) con el número de la facción en cada una, 0 para nadie. Se pinta con pincel,
-       relleno o polígono, y solo se ve sobre tierra: al dibujar, la costa la recorta el mapa
-       que se esté viendo (el de alturas de cerca, más fino que la rejilla). Lo que el pincel o
-       el polígono dejan sobre el mar se guarda pero no se ve; así, si se cambia de mapas y la
-       costa se mueve un poco, el territorio sigue llegando hasta el agua. Una máscara dice
-       cuánta tierra tiene cada celda: con ella el relleno sabe qué es una isla, y la superficie
-       y los nombres cuentan solo tierra. En un cuerpo sin mar todo es superficie.
+       It's an equirectangular grid of 4096×2048 cells (on Kerbin, 920 m per cell at the
+       equator) with the faction number in each one, 0 for nobody. It's painted with brush, fill
+       or polygon, and only shows over land: when drawing, the coast is clipped by whichever map
+       is being viewed (the height map up close, finer than the grid). What the brush or polygon
+       leaves over the sea is saved but not shown; that way, if the maps change and the coast
+       moves a little, the territory still reaches the water. A mask says how much land each
+       cell has: with it the fill knows what an island is, and area and names count only land.
+       On a body without sea everything is surface.
 
-       Cada pincelada se puede deshacer: se apunta qué había en cada celda que cambia. */
+       Every stroke can be undone: we record what was in each cell that changes. */
     public sealed class MapaPolitico
     {
         public const int Ancho = 4096, Alto = 2048;
-        public const int MaxFacciones = 63;       // los colores van en un vector de 64 en el shader
+        public const int MaxFacciones = 63;       // colors go in a 64-entry vector in the shader
 
         public readonly byte[] Celdas = new byte[Ancho * Alto];
         public readonly List<Faccion> Facciones = new();
         public string Cuerpo;
 
-        byte[] tierra;                            // fracción de tierra de cada celda, 0 a 255
+        byte[] tierra;                            // land fraction of each cell, 0 to 255
         public bool HayMascara => tierra != null;
 
-        /* Filas que han cambiado desde la última vez que se subió la rejilla a la GPU. */
+        /* Rows that have changed since the grid was last uploaded to the GPU. */
         public int SucioY0 = int.MaxValue, SucioY1 = -1;
-        public int Version;                       // sube con cada cambio, para guardar y medir
+        public int Version;                       // goes up with every change, for saving and measuring
 
         public static double LatDe(int y) => 90 - (y + 0.5) * 180.0 / Alto;
         public static double LonDe(int x) => -180 + (x + 0.5) * 360.0 / Ancho;
@@ -62,11 +62,11 @@ namespace KerbinMaps.Core
         public int IdEn(double lat, double lon) => Celdas[Fila(lat) * Ancho + Columna(lon)];
         public Faccion Buscar(int id) => id <= 0 ? null : Facciones.FirstOrDefault(f => f.Id == id);
 
-        /* ------------------------------------------------------------ tierra */
+        /* ------------------------------------------------------------ land */
 
         public void PonerTierra(byte[] t) => tierra = t;
 
-        /* Cuánta tierra hay en cada celda: cinco muestras (el centro cuenta doble). */
+        /* How much land there is in each cell: five samples (the center counts double). */
         public static byte[] ConstruirTierra(Func<double, double, bool> esTierra)
         {
             var t = new byte[Ancho * Alto];
@@ -86,14 +86,14 @@ namespace KerbinMaps.Core
             return t;
         }
 
-        /* Al rellenar, la tierra se lleva también el mar de hasta tres celdas de su costa (unos
-           2,8 km en Kerbin): el mapa de color y el de alturas no siempre ponen la costa en el mismo
-           sitio, y así el territorio llega hasta la que se vea. */
+        /* When filling, the land also takes the sea up to three cells off its coast (about 2.8 km
+           on Kerbin): the color map and the height map don't always put the coast in the same
+           place, and this way the territory reaches whichever one is shown. */
         const int Orla = 3;
 
         public bool EsTierra(double lat, double lon) => tierra == null || tierra[Fila(lat) * Ancho + Columna(lon)] > 0;
 
-        /* ------------------------------------------------------------ cambios */
+        /* ------------------------------------------------------------ changes */
 
         sealed class Cambio { public int[] Idx; public byte[] Antes, Despues; }
 
@@ -129,10 +129,10 @@ namespace KerbinMaps.Core
 
         public void LimpiarSucio() { SucioY0 = int.MaxValue; SucioY1 = -1; }
 
-        /* Una pincelada (o un relleno, o un polígono) es una sola cosa para deshacer. */
+        /* A stroke (or a fill, or a polygon) is a single thing to undo. */
         public void EmpezarTrazo() => TerminarTrazo();
 
-        /* Devuelve true si la pincelada cambió algo. */
+        /* Returns true if the stroke changed anything. */
         public bool TerminarTrazo()
         {
             if (tIdx.Count == 0) return false;
@@ -146,7 +146,7 @@ namespace KerbinMaps.Core
             tIdx.Clear();
             tAntes.Clear();
             deshacer.Add(c);
-            // hasta 40 pasos, y sin pasar de unos 8 millones de celdas apuntadas (unos 50 MB)
+            // up to 40 steps, and without going over about 8 million recorded cells (about 50 MB)
             long total = deshacer.Sum(d => (long)d.Idx.Length);
             while (deshacer.Count > 1 && (deshacer.Count > MaxDeshacer || total > Ancho * Alto))
             {
@@ -180,8 +180,8 @@ namespace KerbinMaps.Core
 
         public void OlvidarHistoria() { TerminarTrazo(); deshacer.Clear(); rehacer.Clear(); }
 
-        /* ¿Se puede poner `id` en la celda? Respetando, no se pisa lo que ya es de otra facción;
-           borrando (id 0), solo se borra lo de `propia`. */
+        /* Can `id` be put in the cell? When respecting, what already belongs to another faction
+           isn't overwritten; when erasing (id 0), only what belongs to `propia` is erased. */
         bool Admite(int i, byte id, bool respetar, byte propia)
         {
             byte c = Celdas[i];
@@ -189,9 +189,9 @@ namespace KerbinMaps.Core
             return !respetar || c == 0 || c == id;
         }
 
-        /* ------------------------------------------------------------ herramientas */
+        /* ------------------------------------------------------------ tools */
 
-        /* Un círculo de radioM metros alrededor del punto, medido sobre la esfera. */
+        /* A circle of radioM meters around the point, measured on the sphere. */
         public void Pincel(double lat, double lon, double radioM, byte id, bool respetar, byte propia)
         {
             double R = Body.Radius;
@@ -215,7 +215,7 @@ namespace KerbinMaps.Core
             }
         }
 
-        /* El pincel arrastrado de a a b, por el gran círculo, sin dejar huecos. */
+        /* The brush dragged from a to b, along the great circle, without leaving gaps. */
         public void Trazo(LatLon a, LatLon b, double radioM, byte id, bool respetar, byte propia)
         {
             double d = Geo.Distance(a.Lat, a.Lon, b.Lat, b.Lon);
@@ -224,9 +224,9 @@ namespace KerbinMaps.Core
             for (int k = 1; k < pts.Count; k++) Pincel(pts[k].Lat, pts[k].Lon, radioM, id, respetar, propia);
         }
 
-        /* Rellena la tierra unida al punto que tenga el mismo dueno que él: una isla entera, o el
-           hueco que queda dentro de una frontera. Devuelve cuántas celdas ha cambiado (0 si el
-           punto es mar o ya era de esa facción). */
+        /* Fills the land connected to the point that has the same owner as it: a whole island, or
+           the gap left inside a border. Returns how many cells it changed (0 if the point is sea
+           or already belonged to that faction). */
         public int Rellenar(double lat, double lon, byte id, bool respetar, byte propia)
         {
             int i0 = Fila(lat) * Ancho + Columna(lon);
@@ -260,12 +260,12 @@ namespace KerbinMaps.Core
                     cola.Enqueue(j);
                 }
             }
-            // la orla de mar de la costa (celdas sin tierra junto a la tierra) va con lo rellenado
+            // the sea fringe along the coast (landless cells next to land) goes with what was filled
             if (tierra != null)
                 foreach (int i in hechas)
                 {
                     int x = i % Ancho, y = i / Ancho;
-                    // solo desde la costa: lo de dentro no tiene mar al lado
+                    // only from the coast: what's inside has no sea next to it
                     if (tierra[i] == 255) continue;
                     for (int dy = -Orla; dy <= Orla; dy++)
                     {
@@ -281,8 +281,8 @@ namespace KerbinMaps.Core
             return tIdx.Count - antes;
         }
 
-        /* Rellena el interior de un polígono de vértices en lat/lon (lados rectos en el mapa).
-           Las longitudes se desenvuelven a partir del primer vértice. */
+        /* Fills the inside of a polygon with vertices in lat/lon (straight sides on the map).
+           Longitudes are unwrapped starting from the first vertex. */
         public int Poligono(IReadOnlyList<LatLon> vertices, byte id, bool respetar, byte propia)
         {
             if (vertices == null || vertices.Count < 3) return 0;
@@ -318,7 +318,7 @@ namespace KerbinMaps.Core
             return tIdx.Count - antes;
         }
 
-        /* ------------------------------------------------------------ facciones */
+        /* ------------------------------------------------------------ factions */
 
         static readonly string[] Paleta =
         {
@@ -344,7 +344,7 @@ namespace KerbinMaps.Core
             return nueva;
         }
 
-        /* Quita la facción y su territorio. No se puede deshacer: la historia se olvida. */
+        /* Removes the faction and its territory. It can't be undone: the history is forgotten. */
         public void Borrar(Faccion f)
         {
             if (f == null) return;
@@ -355,10 +355,10 @@ namespace KerbinMaps.Core
             Version++;
         }
 
-        /* ------------------------------------------------------------ medidas */
+        /* ------------------------------------------------------------ measurements */
 
-        /* Superficie de tierra de cada facción, en km² (las celdas de costa cuentan por la
-           tierra que tienen). Va con una copia de las celdas: puede ir en segundo plano. */
+        /* Land area of each faction, in km² (coastal cells count by the land they have). Works
+           on a copy of the cells: it can run in the background. */
         public static Dictionary<int, double> AreasDe(byte[] celdas, byte[] tierra, double radio)
         {
             var suma = new double[256];
@@ -384,7 +384,7 @@ namespace KerbinMaps.Core
 
         public Dictionary<int, double> Areas() => AreasDe(Celdas, tierra, Body.Radius);
 
-        /* Toda la tierra del cuerpo, en km² (con la máscara; sin ella, la esfera entera). */
+        /* All the land of the body, in km² (with the mask; without it, the whole sphere). */
         public static double AreaTierra(byte[] tierra, double radio)
         {
             if (tierra == null) return 4 * Math.PI * radio * radio / 1e6;
@@ -398,9 +398,9 @@ namespace KerbinMaps.Core
             return s / 1e6;
         }
 
-        /* Dónde rotular cada facción: el punto más alejado de la frontera (y de la costa) de cada
-           uno de sus territorios grandes. Se calcula a un cuarto de la resolución, con una copia
-           de las celdas, así que puede ir en segundo plano. */
+        /* Where to label each faction: the point farthest from the border (and from the coast) of
+           each of its large territories. Computed at a quarter of the resolution, on a copy of
+           the cells, so it can run in the background. */
         public static List<EtiquetaFaccion> Etiquetas(byte[] celdas, byte[] tierra, double radio)
         {
             const int F = 4, W = Ancho / F, H = Alto / F;
@@ -413,7 +413,7 @@ namespace KerbinMaps.Core
                     dueno[y * W + x] = celdas[i];
                 }
 
-            // territorios: trozos unidos de la misma facción
+            // territories: connected pieces of the same faction
             var comp = new int[W * H];
             var areas = new List<double>();
             var duenos = new List<byte>();
@@ -448,8 +448,8 @@ namespace KerbinMaps.Core
             }
             if (areas.Count == 0) return new List<EtiquetaFaccion>();
 
-            /* Distancia al borde de su territorio (chaflán en dos pasadas): en horizontal, una
-               celda mide cos(lat) de lo que mide en vertical. */
+            /* Distance to the edge of its territory (two-pass chamfer): horizontally, a cell
+               measures cos(lat) of what it measures vertically. */
             var dist = new float[W * H];
             for (int i = 0; i < W * H; i++) dist[i] = comp[i] == 0 ? 0 : 1e9f;
             float Cx(int y) => (float)Math.Max(0.02, Math.Cos((90 - (y + 0.5) * 180.0 / H) * Geo.D2R));
@@ -484,7 +484,7 @@ namespace KerbinMaps.Core
                 }
             }
 
-            // el punto más hondo de cada territorio
+            // the deepest point of each territory
             var mejor = new int[areas.Count + 1];
             for (int i = 0; i < W * H; i++)
             {
@@ -493,7 +493,7 @@ namespace KerbinMaps.Core
                 if (mejor[c] == 0 || dist[i] > dist[mejor[c] - 1]) mejor[c] = i + 1;
             }
 
-            // por facción, el territorio más grande y los que sean al menos la cuarta parte (hasta 4)
+            // per faction, the largest territory and those at least a quarter of its size (up to 4)
             var r = new List<EtiquetaFaccion>();
             double celdaM = Math.PI * radio / H;
             foreach (var grupo in Enumerable.Range(1, areas.Count).GroupBy(c => duenos[c - 1]))
@@ -512,7 +512,7 @@ namespace KerbinMaps.Core
 
         public byte[] Tierra => tierra;
 
-        /* ------------------------------------------------------------ disco */
+        /* ------------------------------------------------------------ disk */
 
         sealed class Guardado
         {
@@ -532,7 +532,7 @@ namespace KerbinMaps.Core
             return JsonSerializer.Serialize(g, Store.Json);
         }
 
-        /* Lee un mapa guardado o exportado. Si su rejilla es de otro tamaño, se reescala. */
+        /* Reads a saved or exported map. If its grid has a different size, it's rescaled. */
         public static MapaPolitico FromJson(string json)
         {
             var g = JsonSerializer.Deserialize<Guardado>(json, Store.Json);
@@ -541,7 +541,7 @@ namespace KerbinMaps.Core
             foreach (var f in g.Facciones ?? new List<Faccion>())
                 if (f != null && f.Id >= 1 && f.Id <= MaxFacciones && m.Facciones.All(o => o.Id != f.Id))
                 {
-                    // un fichero editado a mano puede traer cualquier cosa
+                    // a hand-edited file can contain anything
                     if (!ColorValido(f.Color)) f.Color = Paleta[(f.Id - 1) % Paleta.Length];
                     if (string.IsNullOrWhiteSpace(f.Nombre)) f.Nombre = "#" + f.Id;
                     m.Facciones.Add(f);

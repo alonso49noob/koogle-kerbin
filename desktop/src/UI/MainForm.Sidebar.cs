@@ -6,7 +6,7 @@ using KerbinMaps.Core;
 
 namespace KerbinMaps.UI
 {
-    /* El panel lateral, sección por sección, con los mismos textos que index.html. */
+    /* The sidebar, section by section, with the same texts as index.html. */
     public sealed partial class MainForm
     {
         Section globeSection;
@@ -59,8 +59,8 @@ namespace KerbinMaps.UI
             return t;
         }
 
-        /* Las secciones abiertas se recuerdan entre sesiones: con una docena de ellas,
-           volver a abrir las mismas cada vez cansa. */
+        /* Open sections are remembered between sessions: with a dozen of them, reopening the
+           same ones every time gets tiring. */
         Section AddSection(string title, bool open)
         {
             if (state.Sections != null && state.Sections.TryGetValue(title, out bool guardado)) open = guardado;
@@ -74,20 +74,20 @@ namespace KerbinMaps.UI
             return s;
         }
 
-        /* ------------------------------------------------------- Calidad gráfica */
+        /* ------------------------------------------------------- Graphics quality */
 
-        /* Un atajo para todo lo que cuesta dibujar: el relieve y las texturas del vuelo,
-           los scatters de Parallax, las nubes, los edificios de Kerbal Konstructs y las
-           naves posadas, más hasta dónde se ve cada cosa. No guarda sus propios números:
-           lo que hace es tocar los controles de siempre («Vuelo», «Vista 3D», «Edificios»),
-           que ya saben avisar al globo y guardar. Tocar cualquiera de ellos a mano después
-           pasa el preset a «Personalizado» (MarcarGraficosPersonalizado). */
+        /* A shortcut for everything that's costly to draw: the flight relief and textures,
+           Parallax scatters, clouds, Kerbal Konstructs buildings and landed vessels, plus how
+           far each thing is visible. It doesn't keep its own numbers: what it does is touch the
+           usual controls («Vuelo», «Vista 3D», «Edificios»), which already know how to notify
+           the globe and save. Touching any of them by hand afterwards switches the preset to
+           «Personalizado» (MarcarGraficosPersonalizado). */
         void BuildGraphicsQualitySection()
         {
             var s = AddSection("Calidad gráfica", true);
             qualityCombo = new DarkCombo();
             qualityCombo.SetItems(new[] { ("bajo", "Bajo"), ("medio", "Medio"), ("alto", "Alto"), ("personalizado", "Personalizado") });
-            // quien actualiza tiene «alto» por defecto aunque haya tocado sus ajustes
+            // whoever updates gets «alto» by default even if they've touched their settings
             if (state.GraphicsPreset != "personalizado" && !CoincidePreset(state.GraphicsPreset)) state.GraphicsPreset = "personalizado";
             qualityCombo.SelectedId = state.GraphicsPreset;
             qualityCombo.SelectedChanged += (o, e) =>
@@ -117,13 +117,13 @@ namespace KerbinMaps.UI
                        "solo a «Personalizado»."));
         }
 
-        /* bajo/medio/alto, de menos a más: qué tan lejos se dibuja y cuánto de lo opcional
-           (texturas de Parallax, scatters con su densidad, viento, relieve de detalle,
-           nubes, edificios) se enciende. El relieve del terreno no se apaga nunca: cuesta
-           poco y sin él el vuelo se ve mal en cualquier equipo. */
-        /* Lo que pone cada preset. «Alto» reproduce exactamente el ajuste de siempre (25 km,
-           todo encendido), para que a quien actualiza no le cambie nada sin pedirlo; «Medio»
-           y «Bajo» son los que de verdad aligeran, para equipos más justos. */
+        /* low/medium/high, from least to most: how far things are drawn and how much of the
+           optional stuff (Parallax textures, scatters with their density, wind, detail relief,
+           clouds, buildings) is turned on. Terrain relief is never turned off: it's cheap and
+           without it flight looks bad on any machine. */
+        /* What each preset sets. «Alto» reproduces exactly the usual setting (25 km, everything
+           on), so nothing changes for whoever updates without asking; «Medio» and «Bajo» are
+           the ones that really lighten the load, for tighter machines. */
         static (bool Detalle, bool Parallax, bool Variacion, bool Scatters, int Densidad, bool Viento, bool Teselas,
                 bool Nubes, bool Nubes3D, bool Edificios, int DistanciaKm) ValoresPreset(string id)
         {
@@ -169,8 +169,8 @@ namespace KerbinMaps.UI
             RequestRender();
         }
 
-        /* Cualquier control que el preset toca llama aquí al cambiar; si el cambio viene
-           del propio preset (aplicandoPresetGrafico) no cuenta. */
+        /* Every control the preset touches calls here when it changes; if the change comes from
+           the preset itself (aplicandoPresetGrafico) it doesn't count. */
         void MarcarGraficosPersonalizado()
         {
             if (aplicandoPresetGrafico || state.GraphicsPreset == "personalizado") return;
@@ -183,11 +183,11 @@ namespace KerbinMaps.UI
         {
             sideStack.SuspendLayout();
 
-            /* ------------------------------------------------------- Calidad gráfica */
+            /* ------------------------------------------------------- Graphics quality */
             BuildGraphicsQualitySection();
 
-            /* ---------------------------------------------------------------- Capas */
-            /* ------------------------------------------------------- Cuerpo celeste */
+            /* ---------------------------------------------------------------- Layers */
+            /* ------------------------------------------------------- Celestial body */
             var cuerpo = secCuerpo = AddSection("Cuerpo celeste", true);
             bodyCombo = new DarkCombo { Icons = BodyIcon.Get };
             bodyCombo.SelectedChanged += (s, e) => SetBody(bodyCombo.SelectedId);
@@ -206,7 +206,7 @@ namespace KerbinMaps.UI
             RenderBodyList();
             RenderBodyInfo();
 
-            /* --------------------------------------------------- SCANsat y progreso */
+            /* --------------------------------------------------- SCANsat and progress */
             var sscan = secScan = AddSection("SCANsat y progreso", false);
             chkProgresion = new DarkCheck("Modo progresión", state.Progresion);
             chkProgresion.CheckedChanged += (s, e) => SetProgresion(chkProgresion.Checked);
@@ -271,7 +271,7 @@ namespace KerbinMaps.UI
             chkNight2D.CheckedChanged += (s, e) => SetDayNight(chkNight2D.Checked);
             capas.Add(Checks(chkNight2D));
 
-            /* -------------------------------------------------------- Datos del mapa */
+            /* -------------------------------------------------------- Map data */
             var datos = AddSection("Datos del mapa", true);
             datos.Add(Hint("Los mapas precargados no son del proyecto: derivan de las texturas del juego. " +
                            "El desplegable de abajo cambia entre los del catálogo (<code>data/maps.json</code>). " +
@@ -320,7 +320,7 @@ namespace KerbinMaps.UI
                            "La casilla de grados de cada fila gira el mapa en longitud: no todos los que circulan por ahí " +
                            "usan el meridiano de origen de KSP. Si cargas color y bioma, el botón de arriba calcula el desfase solo."));
 
-            /* --------------------------------------------------------------- Biomas */
+            /* --------------------------------------------------------------- Biomes */
             var biomas = AddSection("Biomas", false);
             var scan = new DarkButton("Leer la leyenda del mapa");
             scan.Click += (s, e) => ScanBiomes();
@@ -338,7 +338,7 @@ namespace KerbinMaps.UI
                             "no adivina ninguno. Pincha una fila para ponerle nombre. Se guardan en tu equipo y puedes " +
                             "exportarlos para reutilizarlos."));
 
-            /* --------------------------------------------------------------- Altura */
+            /* --------------------------------------------------------------- Height */
             var altura = AddSection("Altura (opcional)", false);
             altura.Add(Hint("El terreno de Kerbin stock es <b>procedural</b>: lo genera el PQS con ruido, no hay ninguna " +
                             "textura de alturas dentro del juego que extraer. Esto solo sirve si consigues un heightmap en " +
@@ -366,7 +366,7 @@ namespace KerbinMaps.UI
                             "el juego al posarte ahí) y escríbela. Repite con B en un punto de altitud bien distinta y el " +
                             "rango se ajusta solo."));
 
-            /* -------------------------------------------------- Filtro de altimetría */
+            /* -------------------------------------------------- Altimetry filter */
             var altim = secAltim = AddSection("Filtro de altimetría", false);
             chkAlt = new DarkCheck("Filtrar por altura", state.AltFilter);
             chkAlt.CheckedChanged += (s, e) => SetAltFilter(chkAlt.Checked);
@@ -395,7 +395,7 @@ namespace KerbinMaps.UI
                            "de grises a metros es la de arriba, o la que SCANsat tiene tabulada para ese cuerpo."));
             RenderAltInfo();
 
-            /* ------------------------------------------------------- Transferencias */
+            /* ------------------------------------------------------- Transfers */
             var trans = secTransfer = AddSection("Transferencias y ventanas", false);
             trDestino = new DarkCombo { Icons = BodyIcon.Get };
             trDestino.SelectedChanged += (s, e) => { state.TransferTo = trDestino.SelectedId; SaveSettings(); RenderTransferInfo(); };
@@ -425,7 +425,7 @@ namespace KerbinMaps.UI
             RenderDestinos();
             RenderTransferInfo();
 
-            /* ---------------------------------------------------------- Aterrizaje */
+            /* ---------------------------------------------------------- Landing */
             var aterr = secAterrizaje = AddSection("Aterrizaje", false);
             var landAqui = new DarkButton("Objetivo en el centro");
             landAqui.Click += (s, e) => FijarObjetivoAqui();
@@ -448,7 +448,7 @@ namespace KerbinMaps.UI
                            "es el mando para ajustarlo."));
             RenderLandingInfo();
 
-            /* --------------------------------------------------------------- Vuelo */
+            /* --------------------------------------------------------------- Flight */
             var vuelo = secVuelo = AddSection("Vuelo", false);
             vuelo.Add(Hint("Cámara libre a ras de suelo. <b>W/S</b> adelante y atrás, <b>A/D</b> de lado, <b>R/F</b> o " +
                            "espacio y control para subir y bajar, arrastrar para mirar, la rueda es el acelerador y " +
@@ -530,10 +530,10 @@ namespace KerbinMaps.UI
                            "igual, solo que el suelo de cerca queda liso, sin vegetación y sin nubes."));
             RenderVueloInfo();
 
-            /* --------------------------------------------- Edificios de Kerbal Konstructs */
+            /* --------------------------------------------- Kerbal Konstructs buildings */
             BuildKonstructsSection();
 
-            /* ------------------------------------------------------------- Vista 3D */
+            /* ------------------------------------------------------------- 3D view */
             globeSection = AddSection("Vista 3D", true);
             chkLight = new DarkCheck("Día y noche (luz del Sol)", state.DayNight);
             chkAtm = new DarkCheck("Atmósfera", true);
@@ -568,10 +568,10 @@ namespace KerbinMaps.UI
                                   "solos al pasar tras el horizonte."));
             Vis.Set(globeSection, false);
 
-            /* ------------------------------------------------------- Vista del cielo */
+            /* ------------------------------------------------------- Sky view */
             BuildSkySection();
 
-            /* --------------------------------------------------------- Herramientas */
+            /* --------------------------------------------------------- Tools */
             var tools = AddSection("Herramientas", false);
             toolMeasure = new DarkButton("Medir distancia");
             toolFootprint = new DarkButton("Huella / horizonte");
@@ -585,10 +585,10 @@ namespace KerbinMaps.UI
             tools.Add(new BtnRow(toolClear));
             toolHint = tools.Add(Hint("Ninguna herramienta activa."));
 
-            /* --------------------------------------------------------------- Rutas */
+            /* --------------------------------------------------------------- Routes */
             BuildRutasSection();
 
-            /* ---------------------------------------------------------------- Órbita */
+            /* ---------------------------------------------------------------- Orbit */
             var orbita = AddSection("Órbita · traza terrestre", false);
             orbPe = Num(100); orbAp = Num(100); orbInc = Num(0); orbLan = Num(0); orbArgp = Num(0); orbN = Num(4);
             orbita.Add(new Row2(Field("Periapsis (km)", orbPe), Field("Apoapsis (km)", orbAp)));
@@ -601,7 +601,7 @@ namespace KerbinMaps.UI
             orbita.Add(new BtnRow(orbDraw, orbClear));
             orbOut = orbita.Add(Readout());
 
-            /* ------------------------------------------------------ Naves de una partida */
+            /* ------------------------------------------------------ Vessels from a save */
             var naves = secNaves = AddSection("Naves de una partida", false);
             var svDrop = new DropZone("Arrastra aquí", " un persistent.sfs", "saves / <tu partida> /");
             svDrop.FilesDropped += async files => { foreach (var f in files) { await CargarSave(f); break; } };
@@ -638,7 +638,7 @@ namespace KerbinMaps.UI
                            "hacia atrás ves dónde habría estado cada nave según su órbita actual, sin maniobras, y una órbita " +
                            "que roce la atmósfera no frena. El ajuste de longitud corrige todas las naves a la vez; normalmente no hace falta."));
 
-            /* ----------------------------------------------------------- Marcadores */
+            /* ----------------------------------------------------------- Markers */
             var marcadores = secMarcadores = AddSection("Marcadores", false);
             var mkAdd = new DarkButton("Añadir en el centro");
             var mkExport = new DarkButton("Exportar", ButtonVariant.Ghost);
@@ -662,12 +662,15 @@ namespace KerbinMaps.UI
                                 "copia de seguridad del .sfs antes de tocarlo. Las anomalías se mandan desde su propia sección."));
             RenderWaypointInfo();
 
-            /* ---------------------------------------------------- Países y facciones */
+            /* ---------------------------------------------------- Countries and factions */
             BuildFaccionesSection();
 
-            /* --------------------------------------------------------------- Cuerpo */
+            /* --------------------------------------------------------------- Body */
 
-            /* ------------------------------------------------------------- Idioma */
+            /* ---------------------------------------------------------- Appearance */
+            BuildAparienciaSection();
+
+            /* ------------------------------------------------------------- Language */
             var idioma = AddSection("Idioma · Language", false);
             var comboIdioma = new DarkCombo();
             var idiomas = new List<(string, string)>();

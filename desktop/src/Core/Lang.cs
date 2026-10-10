@@ -7,18 +7,18 @@ using System.Text.Json;
 
 namespace KerbinMaps.Core
 {
-    /* Idioma de la interfaz.
+    /* Interface language.
 
-       Los textos se escriben en español dentro del código y se traducen al vuelo: la
-       clave es el propio texto en español y la traducción sale de data/i18n/<idioma>.json.
-       Lo que no esté traducido se queda en español, que es peor pero nunca rompe nada.
+       Texts are written in Spanish inside the code and translated on the fly: the key is the
+       Spanish text itself and the translation comes from data/i18n/<language>.json. Whatever
+       isn't translated stays in Spanish, which is worse but never breaks anything.
 
-       La traducción se aplica al crear los controles (botones, casillas, secciones,
-       ayudas, HUD...), así que cambiar de idioma reinicia la aplicación.
+       The translation is applied when controls are created (buttons, checkboxes, sections,
+       hints, HUD...), so changing language restarts the application.
 
-       Con la variable de entorno KOOGLE_I18N_LOG=1 se apunta en
-       %LOCALAPPDATA%\KoogleKerbin\i18n-faltan.txt cada texto sin traducir, que es como se
-       arma el fichero de traducción sin copiar los textos a mano. */
+       With the environment variable KOOGLE_I18N_LOG=1, every untranslated text is logged to
+       %LOCALAPPDATA%\KoogleKerbin\i18n-faltan.txt, which is how the translation file is put
+       together without copying texts by hand. */
     public static class Lang
     {
         public static readonly (string Code, string Name)[] Available =
@@ -33,7 +33,7 @@ namespace KerbinMaps.Core
         static readonly HashSet<string> missing = new(StringComparer.Ordinal);
         static readonly bool logMissing = Environment.GetEnvironmentVariable("KOOGLE_I18N_LOG") == "1";
 
-        /* El idioma guardado, o el del sistema la primera vez. */
+        /* The saved language, or the system's the first time. */
         public static string Detect(string saved)
         {
             if (!string.IsNullOrEmpty(saved)) return saved;
@@ -62,7 +62,7 @@ namespace KerbinMaps.Core
             }
         }
 
-        /* El texto en el idioma actual. */
+        /* The text in the current language. */
         public static string T(string es)
         {
             if (string.IsNullOrEmpty(es) || Code == "es") return es;
@@ -71,7 +71,7 @@ namespace KerbinMaps.Core
             return es;
         }
 
-        /* Igual, con huecos: la traducción conserva los {0}, {1}... */
+        /* Same, with placeholders: the translation keeps the {0}, {1}... */
         public static string F(string es, params object[] args)
         {
             try { return string.Format(T(es), args); }

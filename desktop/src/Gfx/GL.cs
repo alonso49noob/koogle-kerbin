@@ -10,11 +10,11 @@ namespace KerbinMaps.Gfx
         public GlException(string msg) : base(msg) { }
     }
 
-    /* Enlaces mínimos a OpenGL 3.3 core, sin paquetes externos.
+    /* Minimal OpenGL 3.3 core bindings, with no external packages.
 
-       Las funciones de GL 1.1 salen de opengl32.dll; las modernas (shaders, VAO...)
-       solo existen en el controlador y hay que pedírselas con wglGetProcAddress una
-       vez hay un contexto activo. Se guardan como punteros a función. */
+       GL 1.1 functions come from opengl32.dll; the modern ones (shaders, VAO...) only exist in
+       the driver and have to be requested with wglGetProcAddress once there's an active
+       context. They're kept as function pointers. */
     public static unsafe class GL
     {
         public const uint COLOR_BUFFER_BIT = 0x4000, DEPTH_BUFFER_BIT = 0x0100;
@@ -22,7 +22,7 @@ namespace KerbinMaps.Gfx
         public const uint BLEND = 0x0BE2, DEPTH_TEST = 0x0B71, CULL_FACE = 0x0B44, SCISSOR_TEST = 0x0C11,
                           MULTISAMPLE = 0x809D, PROGRAM_POINT_SIZE = 0x8642;
         public const uint ZERO = 0, ONE = 1, SRC_ALPHA = 0x0302, ONE_MINUS_SRC_ALPHA = 0x0303;
-        // segunda salida del fragment shader como factor de mezcla (GL 3.3): luz añadida y transmitancia a la vez
+        // second fragment shader output as blend factor (GL 3.3): added light and transmittance at once
         public const uint SRC1_COLOR = 0x88F9;
         public const uint FRONT = 0x0404, BACK = 0x0405;
         public const uint TEXTURE_2D = 0x0DE1, TEXTURE0 = 0x84C0;
@@ -221,7 +221,7 @@ namespace KerbinMaps.Gfx
         {
             fixed (byte* p = data) _texImage2D(target, level, internalFormat, w, h, 0, format, type, p);
         }
-        /* Sube un trozo de la textura: filas de `data` a partir de `offset` bytes. */
+        /* Uploads a piece of the texture: rows of `data` starting at `offset` bytes. */
         public static void TexSubImage2D(uint target, int level, int x, int y, int w, int h, uint format, uint type, byte[] data, int offset)
         {
             fixed (byte* p = data) _texSubImage2D(target, level, x, y, w, h, format, type, p + offset);

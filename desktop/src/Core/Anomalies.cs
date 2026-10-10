@@ -12,17 +12,17 @@ namespace KerbinMaps.Core
         public string Body, Name;
         public double Lat, Lon;
 
-        /* Estado según la partida cargada. */
-        public bool Detectada;              // la celda tiene el sensor de anomalías
-        public bool Identificada;           // y además el de detalle: en el juego sale su nombre
-        public double? DistanciaNave;       // a la nave más cercana posada, en metros
+        /* State according to the loaded save. */
+        public bool Detectada;              // the cell has the anomaly sensor
+        public bool Identificada;           // and the detail one too: in the game its name shows
+        public double? DistanciaNave;       // to the nearest landed vessel, in meters
 
         public string Estado => Identificada ? "identificada" : Detectada ? "detectada" : "sin detectar";
     }
 
-    /* Catálogo de anomalías (data/anomalies.json) cruzado con la cobertura de SCANsat de
-       la partida: el juego las enseña cuando el escáner de anomalías ha pasado por encima,
-       y da el nombre cuando además ha pasado el de detalle. Aquí se hace lo mismo. */
+    /* Anomaly catalog (data/anomalies.json) crossed with the save's SCANsat coverage: the game
+       shows them once the anomaly scanner has passed over, and gives the name when the detail
+       scanner has passed too. Here we do the same. */
     public static class Anomalies
     {
         static List<Anomaly> all;
@@ -35,8 +35,8 @@ namespace KerbinMaps.Core
 
         public static IEnumerable<string> Bodies() => All.Select(a => a.Body).Distinct();
 
-        /* Marca cuáles están detectadas con la cobertura del cuerpo. Sin partida o sin
-           SCANsat quedan todas sin detectar. */
+        /* Marks which ones are detected with the body's coverage. Without a save or without
+           SCANsat, all of them stay undetected. */
         public static void Aplicar(IEnumerable<Anomaly> lista, ScanCoverage cov)
         {
             foreach (var a in lista)

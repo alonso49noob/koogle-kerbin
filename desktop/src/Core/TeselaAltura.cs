@@ -2,26 +2,26 @@ using System;
 
 namespace KerbinMaps.Core
 {
-    /* Alturas de detalle bajo la cámara: teselas.
+    /* Detail heights under the camera: tiles.
 
-       El mapa de alturas del cuerpo se carga entero a una resolución que quepa en memoria
-       (en Kerbin, el de SCANsat de 2048: 1,8 km por texel). Parallax trae el de Kerbin a
-       8192 (460 m por texel), pero subirlo entero serían 128 MB en RGBA. Así que se guarda
-       su versión cruda (R8, 1 byte por texel, con todos sus niveles de mipmap) y de ella se
-       recorta una ventana alrededor de la cámara: una tesela de N×N texeles de un nivel que
-       depende de la altura (más de cerca, más detalle). La ventana se rehace en segundo
-       plano cuando la cámara se aleja de su centro o cambia de nivel.
+       The body's height map is loaded whole at a resolution that fits in memory (on Kerbin,
+       SCANsat's 2048 one: 1.8 km per texel). Parallax ships Kerbin's at 8192 (460 m per texel),
+       but uploading it whole would be 128 MB in RGBA. So its raw version is kept (R8, 1 byte
+       per texel, with all its mipmap levels) and from it a window around the camera is cropped:
+       a tile of N×N texels from a level that depends on the height (closer, more detail). The
+       window is rebuilt in the background when the camera moves away from its center or changes
+       level.
 
-       La tesela se lee igual en la CPU y en el shader del suelo (curva quíntica entre los
-       cuatro texeles vecinos, como grisSuave) y se funde con el mapa base en su borde, para
-       que no haya escalón al entrar o salir de ella. */
+       The tile is read the same way on the CPU and in the ground shader (quintic curve between
+       the four neighboring texels, like grisSuave) and is blended with the base map at its
+       edge, so there's no step when entering or leaving it. */
     public sealed class FuenteAltura
     {
-        public byte[] Datos;                      // R8, todos los niveles, la primera fila abajo
+        public byte[] Datos;                      // R8, all levels, first row at the bottom
         public int Ancho, Alto, Mips;
-        public bool Espejo;                       // espejo horizontal (como los mapas de Parallax)
-        public double Offset;                     // desfase de longitud, en grados
-        public double Min, Max;                   // metros del gris 0 y del 255
+        public bool Espejo;                       // horizontal mirror (like Parallax's maps)
+        public double Offset;                     // longitude offset, in degrees
+        public double Min, Max;                   // meters for gray 0 and gray 255
 
         public int AnchoNivel(int n) => Math.Max(1, Ancho >> n);
         public int AltoNivel(int n) => Math.Max(1, Alto >> n);
@@ -33,7 +33,7 @@ namespace KerbinMaps.Core
             return o;
         }
 
-        /* Un texel del nivel `n` en la orientación del visor (fila 0 al norte, sin espejo). */
+        /* A texel of level `n` in the viewer's orientation (row 0 at the north, no mirror). */
         internal byte Texel(long inicio, int w, int h, int x, int y)
         {
             x = ((x % w) + w) % w;
@@ -44,7 +44,7 @@ namespace KerbinMaps.Core
             return i < Datos.Length ? Datos[i] : (byte)0;
         }
 
-        /* Desenfoque gaussiano separable; el borde de `r` texeles queda sin usar. */
+        /* Separable Gaussian blur; the edge of `r` texels is left unused. */
         static float[] Desenfocar(float[] src, int w, int h, double sigma, int r)
         {
             int kr = Math.Min(r, (int)Math.Ceiling(sigma * 3));
@@ -71,7 +71,7 @@ namespace KerbinMaps.Core
             return o;
         }
 
-        /* La tesela de `lado`×`lado` texeles del nivel `n` centrada en un punto. */
+        /* The `lado`×`lado` texel tile of level `n` centered on a point. */
         public TeselaAltura Tesela(int n, double lat, double lon, int lado)
         {
             n = Math.Clamp(n, 0, Math.Max(0, Mips - 1));
@@ -83,11 +83,10 @@ namespace KerbinMaps.Core
             x0 = ((x0 % w) + w) % w;
             long ini = Inicio(n);
             if (ini + (long)w * h > Datos.Length) return null;
-            /* El gris es de 8 bits: en Kerbin, escalones de 32 m. A 460 m por texel se ven
-               como terrazas en las laderas suaves, donde cada escalón ocupa varios texeles.
-               Se suaviza según el relieve de alrededor: donde apenas hay dos o tres grises
-               distintos (llano, que es donde salen las terrazas) con σ = 2 texeles; donde hay
-               relieve de verdad, nada, y el detalle de las montañas se conserva. Se guarda a 16 bits para que las rampas no vuelvan a escalonarse. */
+            /* The gray is 8-bit: on Kerbin, steps of 32 m. At 460 m per texel they show as terraces on gentle slopes, where each step spans several
+               texels. It's smoothed according to the surrounding relief: where there are barely two or three distinct grays (flat ground, which is
+               where terraces appear) with σ = 2 texels; where there's real relief, not at all, and the mountains' detail is kept. It's stored at 16
+               bits so the ramps don't step again. */
             const int R = 9;
             int ew = tw + 2 * R, eh = th + 2 * R;
             var crudo = new float[ew * eh];
@@ -96,7 +95,7 @@ namespace KerbinMaps.Core
                     crudo[y * ew + x] = Texel(ini, w, h, x0 + x - R, y0 + y - R);
             var fino = crudo;
             var grueso = Desenfocar(crudo, ew, eh, 2.0, R);
-            // variación de gris en una ventana de 7×7 (mínimo y máximo separables)
+            // gray variation in a 7×7 window (separable min and max)
             var mn = new float[ew * eh]; var mx = new float[ew * eh];
             for (int y = 0; y < eh; y++)
                 for (int x = 0; x < ew; x++)
@@ -134,12 +133,12 @@ namespace KerbinMaps.Core
     public sealed class TeselaAltura
     {
         public readonly FuenteAltura Fuente;
-        public readonly int Nivel, W, H;          // tamaño del nivel entero
-        public readonly int X0, Y0, Tw, Th;       // la ventana, en texeles del nivel
-        public readonly float[] Metros;           // alturas ya en metros, suavizadas
+        public readonly int Nivel, W, H;          // size of the whole level
+        public readonly int X0, Y0, Tw, Th;       // the window, in texels of the level
+        public readonly float[] Metros;           // heights already in meters, smoothed
         public readonly double CentroLat, CentroLon;
 
-        /* Ancho del fundido con el mapa base, en texeles desde el borde. */
+        /* Width of the blend with the base map, in texels from the edge. */
         public double Margen => Math.Max(8, Math.Min(Tw, Th) / 8.0);
 
         public double Offset => Fuente.Offset;
@@ -152,11 +151,10 @@ namespace KerbinMaps.Core
             CentroLat = lat; CentroLon = lon;
         }
 
-        /* Metros por texel en el ecuador. */
+        /* Meters per texel at the equator. */
         public double MetrosPorTexel(double radio) => 2 * Math.PI * radio / W;
 
-        /* Coordenadas dentro de la ventana (en texeles, con el mismo medio texel que el
-           shader). */
+        /* Coordinates inside the window (in texels, with the same half-texel as the shader). */
         (double X, double Y) Local(double lat, double lon)
         {
             double u = (Geo.WrapLon(lon + Offset) + 180) / 360, v = (90 - lat) / 180;
@@ -166,11 +164,11 @@ namespace KerbinMaps.Core
             return (tx, ty);
         }
 
-        /* Altura en metros y cuánto pesa la tesela ahí (1 dentro, 0 fuera, fundido en el
-           borde). Interpolación Catmull-Rom entre los 4×4 texeles vecinos: pasa por los
-           valores de los texeles y la pendiente es continua. La quíntica del mapa base se
-           queda plana en cada texel y, a 460 m por texel, eso se ve como bandas en la luz de
-           las laderas. */
+        /* Height in meters and how much the tile weighs there (1 inside, 0 outside, blended at
+           the edge). Catmull-Rom interpolation between the 4×4 neighboring texels: it passes
+           through the texel values and the slope is continuous. The base map's quintic goes
+           flat at each texel and, at 460 m per texel, that shows as bands in the lighting of
+           the slopes. */
         public bool Altura(double lat, double lon, out double h, out double peso)
         {
             h = 0; peso = 0;
@@ -204,12 +202,12 @@ namespace KerbinMaps.Core
             w[3] = (-f2 + f3) / 2;
         }
 
-        /* Si un punto está lo bastante cerca del centro como para no rehacerla. */
+        /* Whether a point is close enough to the center not to rebuild it. */
         public bool Cubre(double lat, double lon)
         {
             var (tx, ty) = Local(lat, lon);
             double mx = Tw / 4.0, my = Th / 4.0;
-            // cerca de los polos la ventana no se mueve en latitud: basta con que esté dentro
+            // near the poles the window doesn't move in latitude: it's enough for it to be inside
             bool bordeY = Y0 == 0 || Y0 + Th >= H;
             return tx > mx && tx < Tw - mx && (bordeY ? ty > 0 && ty < Th - 1 : ty > my && ty < Th - my);
         }

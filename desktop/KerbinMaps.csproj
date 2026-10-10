@@ -16,13 +16,13 @@
     <AssemblyTitle>Koogle Kerbin</AssemblyTitle>
     <Description>Visor de superficie y órbitas de Kerbin (KSP stock)</Description>
     <Version>1.6.11</Version>
-    <!-- WFO1000 es para el diseñador de formularios, que aquí no se usa: la interfaz se monta en código -->
+    <!-- WFO1000 is about the forms designer, which isn't used here: the interface is built in code -->
     <NoWarn>$(NoWarn);WFO1000</NoWarn>
     <ApplicationIcon Condition="Exists('assets\app.ico')">assets\app.ico</ApplicationIcon>
   </PropertyGroup>
 
-  <!-- Los mapas y catálogos van en una carpeta data/ junto al .exe, igual que en la
-       versión web: se pueden cambiar sin recompilar. Las imágenes de prueba no. -->
+  <!-- The maps and catalogs go in a data/ folder next to the .exe, as in the web
+       version: they can be changed without recompiling. Test images don't. -->
   <ItemGroup>
     <None Include="..\data\**\*" Exclude="..\data\test-*;..\data\_tmp*" LinkBase="data"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -34,7 +34,12 @@
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- El instalador es otro programa (installer/construir.ps1), no parte de la app. -->
+  <!-- The logo in the sidebar header. -->
+  <ItemGroup>
+    <EmbeddedResource Include="assets\app.png" LogicalName="app.png" />
+  </ItemGroup>
+
+  <!-- The installer is a separate program (installer/construir.ps1), not part of the app. -->
   <ItemGroup>
     <Compile Remove="installer\**" />
     <None Remove="installer\**" />

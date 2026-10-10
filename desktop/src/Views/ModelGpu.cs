@@ -5,9 +5,9 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.Views
 {
-    /* Las mallas y texturas de los modelos del juego ya subidas a la GPU: las de la nave
-       enfocada y las de los edificios. Cada malla se sube una vez y cada textura también;
-       la copia en memoria de la textura se suelta en cuanto está en la GPU. */
+    /* The meshes and textures of the game's models already uploaded to the GPU: those of the
+       focused vessel and those of the buildings. Each mesh is uploaded once and each texture
+       too; the in-memory copy of the texture is released as soon as it's on the GPU. */
     public sealed class ModelGpu : IDisposable
     {
         public sealed class GpuMesh
@@ -90,7 +90,7 @@ namespace KerbinMaps.Views
             GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.REPEAT);
             if (GL.MaxAnisotropy > 0) GL.TexParameter(GL.TEXTURE_2D, GL.TEXTURE_MAX_ANISOTROPY, Math.Min(8f, GL.MaxAnisotropy));
             GL.BindTexture(GL.TEXTURE_2D, 0);
-            a.Textures.Remove(path);              // ya está en la GPU: la copia en memoria sobra
+            a.Textures.Remove(path);              // it's already on the GPU: the in-memory copy is redundant
             return textures[path] = id;
         }
 

@@ -9,18 +9,19 @@ using KerbinMaps.Ksp;
 
 namespace KerbinMaps.UI
 {
-    /* Editor de edificios de Kerbal Konstructs.
+    /* Kerbal Konstructs building editor.
 
-       Con «Editar edificios» activado, un clic sobre un edificio en el vuelo o en el cielo
-       lo elige (se ve resaltado). Se mueve respecto a hacia dónde mira la cámara, se gira
-       alrededor de la vertical, se escala, se baja al suelo, se duplica o se borra; y se
-       pueden poner modelos nuevos delante de la cámara. Nada toca el disco hasta pulsar
-       «Guardar en los .cfg», que cambia solo las líneas necesarias y deja una copia de
-       cada fichero antes (ver KonstructsWriter). Mejor con KSP cerrado: KK reescribe sus
-       ficheros al guardar desde el juego.
+       With «Editar edificios» on, a click on a building in flight or sky view selects it (it
+       shows highlighted). It moves relative to where the camera is looking, rotates around the
+       vertical, scales, drops to the ground, is duplicated or deleted; and new models can be
+       placed in front of the camera. Nothing touches the disk until you press «Guardar en los
+       .cfg», which changes only the necessary lines and leaves a copy of each file first (see
+       KonstructsWriter). Better with KSP closed: KK rewrites its files when saving from the
+       game.
 
-       Teclas con un edificio elegido: I/K adelante y atrás, J/L a los lados, U/O bajar y
-       subir, Q/E girar, Supr borrar, Esc soltar. */
+       Keys with a building selected: W/S forward and back, A/D sideways, R/F up and down (the
+       same keys as flying, which take over the building while it's selected; I/K, J/L and U/O
+       still work), Shift for ten steps, Q/E rotate, Del delete, Esc release. */
     public sealed partial class MainForm
     {
         bool kkEditando;
@@ -29,6 +30,7 @@ namespace KerbinMaps.UI
         DarkCheck chkKKEditar;
         RichLabel kkSelInfo, kkCambiosInfo;
         DarkCombo kkPaso, kkGiro;
+        FieldHeader kkEscalaHeader;
         DrawList kkModelList;
         DarkTextBox kkFiltro;
         KkModel kkModeloElegido;
@@ -42,7 +44,8 @@ namespace KerbinMaps.UI
 
             T Ed<T>(T c) where T : Control { kkEditControles.Add(c); return s.Add(c); }
 
-            kkSelInfo = Ed(Readout());
+            // shown only while editing, not whenever they get text (Readout would show itself)
+            kkSelInfo = Ed(new RichLabel(RichMode.Readout) { HideWhenEmpty = false });
             kkPaso = new DarkCombo();
             kkPaso.SetItems(new[] { ("0.1", "Paso 0,1 m"), ("1", "Paso 1 m"), ("10", "Paso 10 m"), ("100", "Paso 100 m") });
             kkPaso.SelectedId = "1";
@@ -57,13 +60,27 @@ namespace KerbinMaps.UI
                 b.Click += (o, e) => a();
                 return b;
             }
-            Ed(new BtnRow(B("Adelante", () => MoverKK(1, 0, 0)), B("Atrás", () => MoverKK(-1, 0, 0)),
-                          B("Izquierda", () => MoverKK(0, -1, 0)), B("Derecha", () => MoverKK(0, 1, 0))));
-            Ed(new BtnRow(B("Subir", () => MoverKK(0, 0, 1)), B("Bajar", () => MoverKK(0, 0, -1)), B("Al suelo", AlSueloKK),
-                          B("Girar ⟲", () => GirarKK(-1)), B("Girar ⟳", () => GirarKK(1))));
-            Ed(new BtnRow(B("Más grande", () => EscalarKK(1.1)), B("Más pequeño", () => EscalarKK(1 / 1.1)),
-                          B("Duplicar", DuplicarKK), B("Borrar", BorrarKK), B("Soltar", () => SeleccionarKK(null))));
+            /* The pad laid out like the keys: rotate on either side of forward, the three
+               directions below it; then height, size and what's done with the building. */
+            var mover = new StackPanel(6) { BackColor = Theme.Bg2 };
+            mover.Controls.Add(new FieldHeader("Mover", Lang.T("W A S D · Q/E gira")));
+            mover.Controls.Add(new EqualRow(B("⟲ Girar", () => GirarKK(-1)), B("Adelante", () => MoverKK(1, 0, 0)), B("Girar ⟳", () => GirarKK(1))));
+            mover.Controls.Add(new EqualRow(B("Izquierda", () => MoverKK(0, -1, 0)), B("Atrás", () => MoverKK(-1, 0, 0)), B("Derecha", () => MoverKK(0, 1, 0))));
+            Ed(mover);
+            var altura = new StackPanel(6) { BackColor = Theme.Bg2 };
+            altura.Controls.Add(new FieldHeader("Altura", "R / F"));
+            altura.Controls.Add(new EqualRow(B("Subir", () => MoverKK(0, 0, 1)), B("Bajar", () => MoverKK(0, 0, -1)), B("Al suelo", AlSueloKK)));
+            Ed(altura);
+            var tamano = new StackPanel(6) { BackColor = Theme.Bg2 };
+            kkEscalaHeader = new FieldHeader("Tamaño");
+            tamano.Controls.Add(kkEscalaHeader);
+            tamano.Controls.Add(new EqualRow(B("Más pequeño", () => EscalarKK(1 / 1.1)), B("Más grande", () => EscalarKK(1.1))));
+            Ed(tamano);
+            Ed(new EqualRow(B("Duplicar", DuplicarKK), B("Borrar", BorrarKK), B("Soltar", () => SeleccionarKK(null))));
 
+            Ed(BuildKKSitio(B));
+
+            Ed(new FieldHeader("Añadir un edificio"));
             kkFiltro = Ed(new DarkTextBox { Placeholder = "Buscar modelo para añadir..." });
             kkFiltro.Edited += (o, e) => RenderKKModelos();
             kkModelList = Ed(new DrawList(180));
@@ -72,12 +89,13 @@ namespace KerbinMaps.UI
             kkModelList.IsSelected = item => item == kkModeloElegido;
             Ed(new BtnRow(B("Poner delante de la cámara", PonerKK)));
 
-            kkCambiosInfo = Ed(Readout());
+            kkCambiosInfo = Ed(new RichLabel(RichMode.Readout) { HideWhenEmpty = false });
             Ed(new BtnRow(B("Guardar en los .cfg", GuardarKK, ButtonVariant.Primary), B("Descartar cambios", DescartarKK)));
             Ed(Hint("Los cambios no tocan el disco hasta <b>Guardar</b>, que modifica solo las líneas de cada edificio y " +
                     "antes copia el fichero a <code>%LOCALAPPDATA%\\KoogleKerbin\\kk-copias</code>. Guarda con KSP cerrado: " +
-                    "KK reescribe sus ficheros desde el juego. Teclas: <b>I/K</b> adelante y atrás, <b>J/L</b> a los lados, " +
-                    "<b>U/O</b> bajar y subir, <b>Q/E</b> girar, <b>Supr</b> borrar, <b>Esc</b> soltar."));
+                    "KK reescribe sus ficheros desde el juego. Con un edificio elegido: <b>W/S</b> adelante y atrás, <b>A/D</b> a los lados, " +
+                    "<b>R/F</b> subir y bajar (con <b>Mayús</b>, diez pasos), <b>Q/E</b> girar, <b>Supr</b> borrar, " +
+                    "<b>Esc</b> soltar y volver a volar con WASD."));
             foreach (var c in kkEditControles) Vis.Set(c, false);
         }
 
@@ -88,6 +106,7 @@ namespace KerbinMaps.UI
             if (!on) SeleccionarKK(null);
             RenderKKModelos();
             RenderKKSel();
+            CargarKKSitio();
         }
 
         void SeleccionarKK(KkInstance i)
@@ -95,10 +114,11 @@ namespace KerbinMaps.UI
             kkSel = i;
             globe.StaticSelected = i;
             RenderKKSel();
+            CargarKKSitio();
             RequestRender();
         }
 
-        /* ------------------------------------------------------------ cambios */
+        /* ------------------------------------------------------------ changes */
 
         double PasoKK => double.TryParse(kkPaso?.SelectedId, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : 1;
         double GiroKK => double.TryParse(kkGiro?.SelectedId, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : 15;
@@ -113,7 +133,7 @@ namespace KerbinMaps.UI
             return true;
         }
 
-        /* adelante/atrás y a los lados según hacia dónde mira la cámara; arriba, la vertical */
+        /* forward/back and sideways according to where the camera looks; up, the vertical */
         void MoverKK(double adelante, double lado, double arriba)
         {
             if (!PuedeEditar(kkSel)) return;
@@ -166,7 +186,7 @@ namespace KerbinMaps.UI
             SyncGlobe();
         }
 
-        /* Un modelo nuevo a 60 m delante de la cámara, sobre el suelo, de espaldas a ella. */
+        /* A new model 60 m in front of the camera, on the ground, with its back to it. */
         void PonerKK()
         {
             if (kk == null) return;
@@ -218,19 +238,21 @@ namespace KerbinMaps.UI
             Flash("Cambios descartados: los edificios vuelven a estar como en los .cfg.");
         }
 
-        /* ------------------------------------------------------------ teclas */
+        /* ------------------------------------------------------------ keys */
 
         bool KKKeyDown(KeyEventArgs e)
         {
             if (!kkEditando || kkSel == null || !VistaDeSuelo || FocusInText()) return false;
+            // with a building selected, WASD moves it instead of the flight camera; Shift, ten steps at once
+            double k = e.Shift ? 10 : 1;
             switch (e.KeyCode)
             {
-                case Keys.I: MoverKK(1, 0, 0); break;
-                case Keys.K: MoverKK(-1, 0, 0); break;
-                case Keys.J: MoverKK(0, -1, 0); break;
-                case Keys.L: MoverKK(0, 1, 0); break;
-                case Keys.O: MoverKK(0, 0, 1); break;
-                case Keys.U: MoverKK(0, 0, -1); break;
+                case Keys.W: case Keys.I: MoverKK(k, 0, 0); break;
+                case Keys.S: case Keys.K: MoverKK(-k, 0, 0); break;
+                case Keys.A: case Keys.J: MoverKK(0, -k, 0); break;
+                case Keys.D: case Keys.L: MoverKK(0, k, 0); break;
+                case Keys.R: case Keys.O: MoverKK(0, 0, k); break;
+                case Keys.F: case Keys.U: MoverKK(0, 0, -k); break;
                 case Keys.Q: GirarKK(-1); break;
                 case Keys.E: GirarKK(1); break;
                 case Keys.Delete: BorrarKK(); break;
@@ -238,10 +260,12 @@ namespace KerbinMaps.UI
                 default: return false;
             }
             e.Handled = true;
+            // F would also toggle following the vessel through KeyPress
+            e.SuppressKeyPress = true;
             return true;
         }
 
-        /* Clic en el vuelo o el cielo con el editor activo: el edificio bajo el ratón. */
+        /* Click in flight or sky view with the editor active: the building under the mouse. */
         bool KKClick(int x, int y)
         {
             if (!kkEditando || !VistaDeSuelo) return false;
@@ -251,11 +275,13 @@ namespace KerbinMaps.UI
             return true;
         }
 
-        /* ------------------------------------------------------------ textos */
+        /* ------------------------------------------------------------ texts */
 
         void RenderKKSel()
         {
             if (kkSelInfo == null) return;
+            if (kkEscalaHeader != null) kkEscalaHeader.Value = kkSel == null ? "" : "×" + Geo.F(kkSel.Scale, 2);
+            RenderKKSitioEstado();
             if (kkSel == null)
                 kkSelInfo.SetText(Lang.T("Ningún edificio elegido. Haz clic en uno en el vuelo o en el cielo."));
             else

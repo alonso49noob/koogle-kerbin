@@ -4,26 +4,26 @@ using KerbinMaps.Gfx;
 
 namespace KerbinMaps.Views
 {
-    /* El mapa político dibujado encima del suelo, igual en el mapa 2D, en el globo y en el suelo
-       de cerca (ver MapaPolitico).
+    /* The political map drawn over the ground, the same on the 2D map, the globe and the nearby
+       ground (see MapaPolitico).
 
-       La rejilla se lee sin filtrar y cada píxel mira las cuatro celdas que lo rodean: con los
-       pesos de la interpolación bilineal, gana la facción que más pesa, y la frontera es donde
-       empatan las dos que más pesan. Como esa mezcla es lineal dentro de cada celda, su gradiente
-       da la distancia a la frontera en celdas, y con lo que mide una celda en pantalla, en
-       píxeles: la raya sale del mismo grosor a cualquier zoom y sin escalones de celda. Cada lado
-       de la raya va con el color de su facción, un poco más oscuro, y el relleno se intensifica
-       junto a ella, como en los mapas políticos de toda la vida.
+       The grid is read unfiltered and each pixel looks at the four cells around it: with the
+       bilinear interpolation weights, the faction that weighs most wins, and the border is where
+       the two heaviest tie. Since that blend is linear within each cell, its gradient gives the
+       distance to the border in cells, and with how big a cell is on screen, in pixels: the line
+       comes out the same thickness at any zoom and without cell steps. Each side of the line
+       takes its faction's color, a bit darker, and the fill intensifies next to it, like in
+       classic political maps.
 
-       Quien lo usa recorta por la costa: multiplica lo que devuelve por la tierra que hay. */
+       The caller clips at the coast: it multiplies what this returns by the amount of land. */
     public static class FaccionesGlsl
     {
         public const string Codigo = @"
-uniform sampler2D uFacTex;      // número de facción por celda (R8), sin filtrar
-uniform vec4 uFacCol[64];       // color de cada facción y si se ve (alfa)
+uniform sampler2D uFacTex;      // faction number per cell (R8), unfiltered
+uniform vec4 uFacCol[64];       // each faction's color and whether it's shown (alpha)
 uniform vec2 uFacSize;
-uniform float uFacRelleno;      // opacidad del relleno
-uniform float uFacBorde;        // grosor de la frontera, en píxeles
+uniform float uFacRelleno;      // fill opacity
+uniform float uFacBorde;        // border thickness, in pixels
 uniform int uFacOn;
 
 int facId(ivec2 p) {
@@ -33,8 +33,8 @@ int facId(ivec2 p) {
   return int(texelFetch(uFacTex, p, 0).r * 255.0 + 0.5);
 }
 
-/* El territorio en uv (la u da la vuelta), con px celdas por píxel de pantalla. Devuelve el
-   color premultiplicado por su opacidad. */
+/* The territory at uv (u wraps around), with px cells per screen pixel. Returns the color
+   premultiplied by its opacity. */
 vec4 faccionEn(vec2 uv, float px) {
   vec2 t = vec2(fract(uv.x), clamp(uv.y, 0.0, 1.0)) * uFacSize - 0.5;
   ivec2 i = ivec2(floor(t));
@@ -48,7 +48,7 @@ vec4 faccionEn(vec2 uv, float px) {
   w[1] = f.x * (1.0 - f.y);         g[1] = vec2(1.0 - f.y, -f.x);
   w[2] = (1.0 - f.x) * f.y;         g[2] = vec2(-f.y, 1.0 - f.x);
   w[3] = f.x * f.y;                 g[3] = vec2(f.y, f.x);
-  // las dos (contando «nadie») que más pesan aquí
+  // the two (counting «nobody») that weigh most here
   int a = -1, b = -1;
   float wa = -1.0, wb = -1.0;
   vec2 ga = vec2(0.0), gb = vec2(0.0);
@@ -61,14 +61,14 @@ vec4 faccionEn(vec2 uv, float px) {
     if (W > wa) { b = a; wb = wa; gb = ga; a = id; wa = W; ga = G; }
     else if (W > wb) { b = id; wb = W; gb = G; }
   }
-  // distancia a la frontera entre las dos, en píxeles
+  // distance to the border between the two, in pixels
   float dist = 1e4;
   if (b >= 0) dist = (wa - wb) / max(length(ga - gb), 1e-3) / max(px, 1e-6);
   vec4 ca = a > 0 ? uFacCol[a] : vec4(0.0);
   vec4 cb = b > 0 ? uFacCol[b] : vec4(0.0);
   float rel = min(ca.a * uFacRelleno * (1.0 + 0.9 * (1.0 - smoothstep(0.0, 16.0, dist))), 0.9);
   vec4 fill = vec4(ca.rgb * rel, rel);
-  // la raya: cada mitad del color de su lado; fuera de un territorio, del de al lado
+  // the line: each half in its side's color; outside a territory, the neighbor's
   vec4 cr = a > 0 ? ca : cb;
   float media = uFacBorde * 0.5;
   float raya = (1.0 - smoothstep(media - 0.7, media + 0.7, dist)) * cr.a * 0.95;
@@ -79,7 +79,7 @@ vec4 faccionEn(vec2 uv, float px) {
 
         static readonly string[] NombresCol = System.Linq.Enumerable.Range(0, 64).Select(i => "uFacCol[" + i + "]").ToArray();
 
-        /* Los colores de las facciones para el vector del shader (64 × rgba). */
+        /* The faction colors for the shader's vector (64 × rgba). */
         public static float[] Colores(MapaPolitico m)
         {
             var c = new float[64 * 4];

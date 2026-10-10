@@ -17,19 +17,19 @@ namespace KerbinMaps.Core
         public long Size;
     }
 
-    /* Actualizaciones automáticas.
+    /* Automatic updates.
 
-       Mira la última release del repositorio en GitHub; si trae una versión más nueva
-       que la que corre, baja su instalador (KoogleKerbin-Setup-<versión>.exe), comprueba
-       su SHA-256 contra el que publica GitHub y lo lanza con /update: el instalador espera
-       a que esta aplicación se cierre, se instala en la misma carpeta, respeta los accesos
-       directos que hubiera y vuelve a abrir la aplicación.
+       Checks the latest release of the repository on GitHub; if it has a newer version than the
+       one running, downloads its installer (KoogleKerbin-Setup-<version>.exe), checks its
+       SHA-256 against the one GitHub publishes and launches it with /update: the installer
+       waits for this application to close, installs into the same folder, keeps whatever
+       shortcuts there were and opens the application again.
 
-       Solo se instala sola si esta copia salió del instalador (hay un instalacion.txt junto
-       al .exe). Una copia suelta o de desarrollo avisa de la versión nueva y abre la página
-       de la release, pero no se toca a sí misma.
+       It only installs on its own if this copy came from the installer (there's an
+       instalacion.txt next to the .exe). A loose or development copy announces the new version
+       and opens the release page, but doesn't touch itself.
 
-       Con KOOGLE_UPDATE_CURRENT=<versión> se hace pasar por esa versión, para probar. */
+       With KOOGLE_UPDATE_CURRENT=<version> it pretends to be that version, for testing. */
     public static class Updater
     {
         const string Repo = "alonso49noob/koogle-kerbin";
@@ -58,17 +58,17 @@ namespace KerbinMaps.Core
             }
         }
 
-        // 1.5 y 1.5.0.0 son la misma versión; el cuarto número (1.6.5.1) solo cuenta si no es 0
+        // 1.5 and 1.5.0.0 are the same version; the fourth number (1.6.5.1) only counts if it isn't 0
         static Version Norm(Version v) => v.Revision > 0
             ? new(Math.Max(v.Major, 0), Math.Max(v.Minor, 0), Math.Max(v.Build, 0), v.Revision)
             : new(Math.Max(v.Major, 0), Math.Max(v.Minor, 0), Math.Max(v.Build, 0));
 
-        /* ¿Salió esta copia del instalador? Solo entonces puede actualizarse sola. */
+        /* Did this copy come from the installer? Only then can it update itself. */
         public static bool CanSelfUpdate => File.Exists(Path.Combine(AppContext.BaseDirectory, ManifestName));
 
         static string TempDir => Path.Combine(Path.GetTempPath(), "KoogleKerbin-Update");
 
-        /* La última release, o null si no hay nada más nuevo. Lanza si no se pudo consultar. */
+        /* The latest release, or null if there's nothing newer. Throws if it couldn't check. */
         public static async Task<UpdateInfo> CheckAsync(CancellationToken ct = default)
         {
             using var resp = await http.GetAsync(ApiUrl, ct);
@@ -88,7 +88,7 @@ namespace KerbinMaps.Core
                     string name = Str(a, "name"), url = Str(a, "browser_download_url");
                     if (!name.StartsWith("KoogleKerbin-Setup-", StringComparison.OrdinalIgnoreCase) ||
                         !name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) continue;
-                    // solo se baja de las releases de este repositorio, pase lo que pase en el JSON
+                    // only download from this repository's releases, whatever the JSON says
                     if (!url.StartsWith(DownloadPrefix, StringComparison.Ordinal)) continue;
                     info.AssetName = name;
                     info.AssetUrl = url;
@@ -103,10 +103,10 @@ namespace KerbinMaps.Core
         static string Str(JsonElement e, string name) =>
             e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() ?? "" : "";
 
-        /* ¿Se puede instalar sin intervención? Hace falta el instalador y su huella. */
+        /* Can it be installed without intervention? It needs the installer and its hash. */
         public static bool CanInstall(UpdateInfo u) => CanSelfUpdate && u?.AssetUrl != null && !string.IsNullOrEmpty(u.Sha256);
 
-        /* Baja el instalador a %TEMP% y lo verifica. Devuelve su ruta. */
+        /* Downloads the installer to %TEMP% and verifies it. Returns its path. */
         public static async Task<string> DownloadAsync(UpdateInfo u, Action<long, long> progress, CancellationToken ct = default)
         {
             Directory.CreateDirectory(TempDir);
@@ -145,8 +145,8 @@ namespace KerbinMaps.Core
             }
         }
 
-        /* Lanza el instalador y devuelve true; la aplicación tiene que cerrarse justo después,
-           que es lo que él espera para poder reemplazar los ficheros. */
+        /* Launches the installer and returns true; the application has to close right
+           afterwards, which is what the installer waits for so it can replace the files. */
         public static bool Launch(string installer)
         {
             try
@@ -162,11 +162,11 @@ namespace KerbinMaps.Core
             }
         }
 
-        /* Los instaladores de actualizaciones anteriores, que ya no hacen falta. */
+        /* Installers from previous updates, which are no longer needed. */
         public static void Cleanup()
         {
             try { if (Directory.Exists(TempDir)) Directory.Delete(TempDir, true); }
-            catch { /* puede estar en uso por un instalador en marcha: se borra la próxima vez */ }
+            catch { /* may be in use by a running installer: it'll be deleted next time */ }
         }
     }
 }

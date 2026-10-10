@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace KerbinMaps.Gfx
 {
-    /* Dibujo 2D en píxeles de pantalla: rectángulos, líneas con grosor, círculos y
-       texturas (texto incluido). Todo va a un único búfer que se vacía cuando cambia
-       la textura o se llena. Los colores se pasan normales y se premultiplican aquí. */
+    /* 2D drawing in screen pixels: rectangles, thick lines, circles and textures (text
+       included). Everything goes into a single buffer that's flushed when the texture changes
+       or it fills up. Colors are passed straight and premultiplied here. */
     public sealed class Batch2D : IDisposable
     {
         const int Stride = 8;
@@ -147,7 +147,7 @@ void main() { frag = vCol * texture(uTex, vUv); }";
             double hw = width / 2;
             double ux = dx / len, uy = dy / len;
             double nx = -uy * hw, ny = ux * hw;
-            // un poco de prolongación tapa las rendijas en las esquinas de las polilíneas
+            // a little extension covers the cracks at polyline corners
             double ex = ux * hw * 0.5, ey = uy * hw * 0.5;
             float ax = (float)(x1 - ex), ay = (float)(y1 - ey), bx = (float)(x2 + ex), by = (float)(y2 + ey);
             UseTex(null); Ensure(6);
@@ -157,8 +157,8 @@ void main() { frag = vCol * texture(uTex, vUv); }";
             V(ax + fnx, ay + fny, 0, 0, c); V(bx - fnx, by - fny, 0, 0, c); V(ax - fnx, ay - fny, 0, 0, c);
         }
 
-        /* Línea discontinua; `fase` lleva la cuenta entre tramos para que el patrón
-           no vuelva a empezar en cada vértice. */
+        /* Dashed line; `fase` keeps count between segments so the pattern doesn't restart at
+           each vertex. */
         public void DashedLine(double x1, double y1, double x2, double y2, double width, ColorF color, double dash, double gap, ref double fase)
         {
             double dx = x2 - x1, dy = y2 - y1;
