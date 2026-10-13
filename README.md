@@ -194,7 +194,7 @@ or check out the `web-v1.6.10` tag.
 
 Koogle Kerbin is free software, licensed under the **GNU General Public License
 v3.0 only** (GPL-3.0-only). The full text is in [LICENSE](LICENSE) (shipped as
-`license.txt` in the desktop download). Copyright (C) 2026 alonso cardenas.
+`license.txt` in the desktop download). Copyright (C) 2026 Alonso Bastian Cardenas Valdes; AKA alonso cardenas; AKA perritoinfame; AKA Alonso49noob.
 
 Third-party components and their licenses are listed in
 [THIRD-PARTY.md](THIRD-PARTY.md). Kerbal Space Program, its textures and any
