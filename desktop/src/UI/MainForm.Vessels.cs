@@ -107,6 +107,7 @@ namespace KerbinMaps.UI
             tOrb.Click += (s, e) => ToggleOrbitInfo();
             tbar.Controls.AddRange(new Control[] { tNow, tBack, tPlay, tFwd, tWarp, tFecha, tFollow, tOrb });
             orbHud = new HudPanel { Visible = false };
+            BuildInstrumentos();
         }
 
         /* ------------------------------------------------------------ orbital info */
@@ -116,7 +117,11 @@ namespace KerbinMaps.UI
         void RenderOrbitInfo()
         {
             if (orbHud == null) return;
+            // a flight replay, when it's the one selected, takes this panel
+            if (RenderReplayInfo()) return;
             bool show = state.ShowOrbitInfo && HasVessels && sv.Sel?.Orbit != null;
+            // the navball or the telemetry take the list's place when chosen
+            if (RenderInstrumentos(show)) show = false;
             if (Vis.Shown(orbHud) != show) Vis.Set(orbHud, show);
             if (!show) return;
 
@@ -176,7 +181,7 @@ namespace KerbinMaps.UI
 
         void ToggleOrbitInfo()
         {
-            if (sv.Sel == null) { Flash("Pincha una nave o un satélite para ver los datos de su órbita."); return; }
+            if (sv.Sel == null && !(rep != null && repSel)) { Flash("Pincha una nave o un satélite para ver los datos de su órbita."); return; }
             state.ShowOrbitInfo = !state.ShowOrbitInfo;
             SaveSettings();
             RenderOrbitInfo();
@@ -211,6 +216,8 @@ namespace KerbinMaps.UI
                 x0 += w + gap;
             }
             tbar.SetBounds((mapArea.Width - total) / 2, mapArea.Height - Theme.S(16) - (bh + padY * 2), total, bh + padY * 2);
+            PlaceRelojesPartidas();
+            PlaceInstrumentos();
         }
 
         void CambiarWarp(int paso)
@@ -235,7 +242,8 @@ namespace KerbinMaps.UI
 
         void VolverAlGuardado()
         {
-            sim.T = sv.Ut;
+            // in a replay, back to its start
+            sim.T = rep != null ? rep.Inicio : sv.Ut;
             sim.Dirty = true;
             RenderReloj();
             RequestRender();
@@ -246,10 +254,16 @@ namespace KerbinMaps.UI
             tPlay.Text = sim.Running ? Theme.Glyph.Pause : Theme.Glyph.Play;
             tWarp.Text = (sim.Warp < 0 ? "◀ ×" : "▶ ×") + Geo.FmtIntEs((long)Math.Abs(sim.Warp)) + (sim.Running ? "" : Lang.T(" · pausa"));
             double dt = sim.T - sv.Ut;
-            tFecha.Text = Lang.F("{0}  ({1}{2} desde el guardado)", Geo.FechaKerbal(sim.T), dt < 0 ? "−" : "+", Geo.FmtTime(Math.Abs(dt)));
-            if (Vis.Shown(tFollow) != (sv.Sel != null)) Vis.Set(tFollow, sv.Sel != null);
+            tFecha.Text = rep != null
+                ? Lang.F("Repetición  T+{0} de {1}", Geo.FmtTime(Math.Clamp(sim.T - rep.Inicio, 0, rep.Duracion)), Geo.FmtTime(rep.Duracion)) + (rep.Cerrada ? "" : Lang.T(" · en curso"))
+                : partidas.Count > 1
+                ? Lang.F("UNI {0}{1}  ·  {2} partidas", dt < 0 ? "−" : "", Geo.FmtTime(Math.Abs(dt)), partidas.Count)
+                : Lang.F("{0}  ({1}{2} desde el guardado)", Geo.FechaKerbal(sim.T), dt < 0 ? "−" : "+", Geo.FmtTime(Math.Abs(dt)));
+            RenderRelojesPartidas();
+            bool haySel = sv.Sel != null || (rep != null && repSel);
+            if (Vis.Shown(tFollow) != haySel) Vis.Set(tFollow, haySel);
             tFollow.Active = sim.Follow;
-            if (Vis.Shown(tOrb) != (sv.Sel != null)) Vis.Set(tOrb, sv.Sel != null);
+            if (Vis.Shown(tOrb) != haySel) Vis.Set(tOrb, haySel);
             tOrb.Active = state.ShowOrbitInfo;
             LayoutTimeBar();
         }
@@ -290,6 +304,7 @@ namespace KerbinMaps.UI
                 if (m.V == sv.Sel) posSel = p;
             }
             globe.SetOrbitShift(360 * ((sim.T - sv.Ut) / Body.SiderealDay));
+            ReplayTick();
 
             if (sim.Follow && posSel.HasValue)
             {
@@ -346,7 +361,7 @@ namespace KerbinMaps.UI
 
         /* restoring: the saved copy is read at startup, which isn't copied again and keeps the
            time on the time bar when it was closed. */
-        async Task CargarSave(string path, bool restoring = false)
+        async Task CargarSave(string path, bool restoring = false, bool añadir = false)
         {
             SaveData d;
             SaveExtras nuevosExtras = null;
@@ -373,9 +388,21 @@ namespace KerbinMaps.UI
                 return;
             }
 
+            // another save joins the ones already loaded, on the unified clock (see MainForm.Partidas)
+            if (añadir && partidas.Count > 0)
+            {
+                AñadirPartida(path, texto, d, nuevosExtras, restoring);
+                return;
+            }
+
+            partidas.Clear();
+            partidas.Add(new PartidaCargada { Nombre = Path.GetFileName(path), Ruta = path, Texto = texto, Data = d, Extras = nuevosExtras, Ut = d.Ut.Value });
+            if (!restoring) state.PartidasExtra = null;
             sv.Data = d;
             sv.Ut = d.Ut.Value;
             sv.Nombre = restoring ? Lang.F("{0} · copia guardada", Path.GetFileName(state.SavePath ?? path)) : Path.GetFileName(path);
+            if (restoring && state.SavePath != null) partidas[0].Nombre = Path.GetFileName(Path.GetDirectoryName(state.SavePath) ?? "") is string carpeta && carpeta.Length > 0 ? carpeta : partidas[0].Nombre;
+            else partidas[0].Nombre = NombrePartida(path);
             sim.T = sv.Ut; sim.Warp = 1; sim.Running = false; sim.Follow = false; sim.Dirty = true; sim.Last = 0;
             if (restoring && state.SimT is double tCierre && tCierre >= 0) sim.T = tCierre;
             else if (!restoring) GuardarCopia(path, texto);
@@ -388,6 +415,7 @@ namespace KerbinMaps.UI
             SetModelStatus(null);
 
             AplicarExtras(nuevosExtras, proponerModo: !restoring);
+            RenderPartidas();
             ActualizarEstadosSecciones();
             FiltrarNavesDelCuerpo();
             Vis.Set(tbar, true);
@@ -408,7 +436,8 @@ namespace KerbinMaps.UI
             int otras = d.Vessels.Count - deAqui.Count;
 
             sv.Naves = deAqui;
-            sv.Calib = SaveFile.CalibrarRotacion(delCuerpo, sv.Ut);
+            // the rotation is measured with the reference save only: the others' positions are from their own clocks
+            sv.Calib = SaveFile.CalibrarRotacion(delCuerpo.Where(v => v.Partida == PartidaRef), sv.Ut);
             sv.Rot = sv.Calib.N > 0 ? sv.Calib.Rot : Sun.DefaultRotation(sv.Ut);
             sv.Sel = null;
             sim.Follow = false;
@@ -608,6 +637,12 @@ namespace KerbinMaps.UI
         {
             var v = (Vessel)item;
             int x = r.X + Theme.S(7);
+            if (partidas.Count > 1)
+            {
+                // which save it comes from
+                DibujarLetraPartida(g, v.Partida, x - Theme.S(2), r.Y + r.Height / 2);
+                x += Theme.S(20);
+            }
             DrawDot(g, Theme.Hex(ColorDe(v.Type)), x, r.Y + r.Height / 2, Theme.S(8));
             x += Theme.S(15);
             string alt = sv.PorNave.TryGetValue(v, out var m) ? Geo.F(m.P.Alt / 1000, 0) + " km" : "";
@@ -621,6 +656,8 @@ namespace KerbinMaps.UI
            it. */
         void SeleccionarNave(Vessel v)
         {
+            // a vessel of the save takes the place of the replay in the data panel
+            if (rep != null) repSel = false;
             bool nueva = sv.Sel != v;
             if (!nueva) Seguir(false);
             sv.Sel = nueva ? v : null;
@@ -645,6 +682,7 @@ namespace KerbinMaps.UI
         /* Position of the selected vessel in the globe's frame, in Kerbin radii. */
         double[] SelPos()
         {
+            if (sv.Sel == null && rep != null) return PosReplay(rep.En(sim.T));
             var p = SaveFile.PosicionEn(sv.Sel.Orbit, sim.T, sv.Ut, RotBase());
             return GlobeView.Sph(p.Lat, p.Lon, (Body.Radius + p.Alt) / Body.Radius);
         }
@@ -654,7 +692,7 @@ namespace KerbinMaps.UI
            flat map the map recenters on the vessel and dragging cancels it. */
         void Seguir(bool on)
         {
-            sim.Follow = on && sv.Sel != null;
+            sim.Follow = on && (sv.Sel != null || (rep != null && repSel));
             if (is3D)
             {
                 if (sim.Follow) globe.EnterFocus(SelPos());
@@ -695,7 +733,9 @@ namespace KerbinMaps.UI
         {
             if (!glOk || !surface.MakeCurrent()) return;
             // the vessel already has its ring: of its track only the ground footprint is painted
-            if (sv.TrackPts != null) globe.SetTrack(sv.TrackPts, space: false);
+            // a replay's path, at its real altitude, has priority
+            if (rep != null && repTrack != null) globe.SetTrack(repTrack);
+            else if (sv.TrackPts != null) globe.SetTrack(sv.TrackPts, space: false);
             else globe.SetTrack(lastTrack);
             RequestRender();
         }

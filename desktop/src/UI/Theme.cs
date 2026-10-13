@@ -70,7 +70,7 @@ namespace KerbinMaps.UI
         /* Segoe Fluent Icons / MDL2 Assets glyphs (both share code points). */
         public static class Glyph
         {
-            public const string Menu = "", Search = "", ChevronDown = "", ChevronRight = "",
+            public const string Menu = "", Search = "", ChevronDown = "", ChevronRight = "", ChevronUp = "",
                                 Close = "", Check = "", Theme = "", Play = "", Pause = "",
                                 Rewind = "", Forward = "";
         }

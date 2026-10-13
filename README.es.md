@@ -30,6 +30,14 @@ documentación detallada está en **[desktop/README.md](desktop/README.md)**.
     <td width="50%"><img src="docs/screenshots/relief.jpg" alt="Relieve de detalle: una tesela del mapa de alturas de Parallax a resolución completa alrededor de la cámara."><br><sub>Relieve de detalle: una tesela del mapa de alturas de Parallax a resolución completa alrededor de la cámara.</sub></td>
     <td width="50%"><img src="docs/screenshots/coast.jpg" alt="Las costas: aguas someras, espuma y arena mojada donde la tierra toca el mar."><br><sub>Las costas: aguas someras, espuma y arena mojada donde la tierra toca el mar.</sub></td>
   </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/vessel-model-navball.jpg" alt="Una nave de tu partida con sus piezas de verdad y el navball estilo KSP."><br><sub>Una nave de tu partida con sus piezas de verdad y el navball estilo KSP.</sub></td>
+    <td width="50%"><img src="docs/screenshots/merged-saves-telemetry.jpg" alt="Dos partidas unidas en la hora UNI, con la telemetría estilo retransmisión y la fecha de cada partida junto a la barra de tiempo."><br><sub>Dos partidas unidas en la hora UNI, con la telemetría estilo retransmisión y la fecha de cada partida junto a la barra de tiempo.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/merged-saves-navball.jpg" alt="Una estación de una partida unida sobre Kerbin, con la Mun y el navball."><br><sub>Una estación de una partida unida sobre Kerbin, con la Mun y el navball.</sub></td>
+    <td width="50%"></td>
+  </tr>
 </table>
 
 *Capturas hechas por la propia aplicación, con KSP y los mods Parallax, Kerbal Konstructs, KSC Extended, Tundra Space Center y Stock Volumetric Clouds instalados.*

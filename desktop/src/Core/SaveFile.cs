@@ -39,6 +39,23 @@ namespace KerbinMaps.Core
         public double[] Rot = { 0, 0, 0, 1 };      // orientation relative to the rotating planet
         public double[] CoM = { 0, 0, 0 };         // center of mass in the vessel's frame
         public readonly List<PartSnapshot> Parts = new();
+        public int Partida;                        // which of the merged saves it comes from (0 with a single one)
+
+        /* The same vessel from another save, put on the reference save's clock: its orbit's
+           epoch moves by `desfase` seconds, so at reference time T it's where it was at its own
+           save's time T − desfase. Landed vessels don't depend on time and stay as they are. */
+        public Vessel EnOtraHora(double desfase, int partida)
+        {
+            var v = (Vessel)MemberwiseClone();
+            v.Partida = partida;
+            if (Orbit != null)
+            {
+                var o = Orbit;
+                v.Orbit = new Elements { Sma = o.Sma, Ecc = o.Ecc, Inc = o.Inc, Lpe = o.Lpe, Lan = o.Lan, Mna = o.Mna,
+                                         Eph = o.Eph + desfase, HasMna = o.HasMna, HasEph = o.HasEph };
+            }
+            return v;
+        }
     }
 
     public sealed class SaveData
@@ -371,6 +388,28 @@ namespace KerbinMaps.Core
                 Geo.WrapLon(Math.Atan2(d.Y, d.X) * Geo.R2D - rot),
                 d.R - Body.Radius,
                 t);
+        }
+
+        /* Position (m) and velocity (m/s) in the body's inertial frame (Z north) at time t:
+           what the navball needs to find prograde and the vertical speed. */
+        public static (double[] R, double[] V) Vectores(Elements e, double t)
+        {
+            double mu = Body.Mu, ecc = e.Ecc;
+            double n = Math.Sqrt(mu / Math.Pow(e.Sma, 3));
+            double M = e.Mna + n * (t - e.Eph);
+            double E = ManualOrbit.EccentricAnomaly(M, ecc, 1e-13);
+            double nu = 2 * Math.Atan2(Math.Sqrt(1 + ecc) * Math.Sin(E / 2), Math.Sqrt(1 - ecc) * Math.Cos(E / 2));
+            double p = e.Sma * (1 - ecc * ecc), r = p / (1 + ecc * Math.Cos(nu));
+            double h = Math.Sqrt(mu / p);
+            // perifocal frame, then the same three rotations as DirInercial (LAN, inclination, argument)
+            double[] rp = { r * Math.Cos(nu), r * Math.Sin(nu) }, vp = { -h * Math.Sin(nu), h * (ecc + Math.Cos(nu)) };
+            double O = e.Lan * Geo.D2R, I = e.Inc * Geo.D2R, w = e.Lpe * Geo.D2R;
+            double cO = Math.Cos(O), sO = Math.Sin(O), cI = Math.Cos(I), sI = Math.Sin(I), cw = Math.Cos(w), sw = Math.Sin(w);
+            double[] P = { cO * cw - sO * sw * cI, sO * cw + cO * sw * cI, sw * sI };
+            double[] Q = { -cO * sw - sO * cw * cI, -sO * sw + cO * cw * cI, cw * sI };
+            var R = new double[3]; var V = new double[3];
+            for (int k = 0; k < 3; k++) { R[k] = rp[0] * P[k] + rp[1] * Q[k]; V[k] = vp[0] * P[k] + vp[1] * Q[k]; }
+            return (R, V);
         }
 
         public static double Periodo(Elements e) => 2 * Math.PI / Math.Sqrt(Body.Mu / Math.Pow(e.Sma, 3));

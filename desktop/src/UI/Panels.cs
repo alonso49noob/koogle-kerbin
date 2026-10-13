@@ -14,14 +14,25 @@ namespace KerbinMaps.UI
     public static class Vis
     {
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> hidden = new();
+        // hidden by the sidebar search: kept apart so clearing the search restores what the app had hidden
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> filtered = new();
 
-        public static bool Shown(Control c) => !hidden.TryGetValue(c, out _);
+        public static bool Shown(Control c) => !hidden.TryGetValue(c, out _) && !filtered.TryGetValue(c, out _);
+
+        /* Whether the app wants it shown, ignoring the search filter. */
+        public static bool Wanted(Control c) => !hidden.TryGetValue(c, out _);
 
         public static void Set(Control c, bool on)
         {
             if (on) hidden.Remove(c); else hidden.AddOrUpdate(c, null);
-            c.Visible = on;
+            c.Visible = Shown(c);
             c.Parent?.PerformLayout();
+        }
+
+        public static void Filter(Control c, bool filteredOut)
+        {
+            if (filteredOut) filtered.AddOrUpdate(c, null); else filtered.Remove(c);
+            c.Visible = Shown(c);
         }
     }
 
@@ -39,6 +50,16 @@ namespace KerbinMaps.UI
 
         protected override void OnControlAdded(ControlEventArgs e) { if (!orden.Contains(e.Control)) orden.Add(e.Control); base.OnControlAdded(e); }
         protected override void OnControlRemoved(ControlEventArgs e) { orden.Remove(e.Control); base.OnControlRemoved(e); }
+
+        /* Puts the children in this order; any not named keep their place at the end. */
+        public void Reordenar(IEnumerable<Control> nuevo)
+        {
+            var lista = nuevo.Where(c => c.Parent == this).Distinct().ToList();
+            lista.AddRange(orden.Where(c => !lista.Contains(c)));
+            orden.Clear();
+            orden.AddRange(lista);
+            PerformLayout();
+        }
 
         public StackPanel(int gap = 10)
         {

@@ -67,10 +67,14 @@ namespace KerbinMaps.UI
             var s = new Section(title, open);
             s.ExpandedChanged += (o, e) =>
             {
+                // opened by the search, not by the user: not remembered
+                if (abriendoPorBusqueda) return;
+                abiertasPorBusqueda.Remove(s);
                 (state.Sections ??= new Dictionary<string, bool>())[title] = s.Expanded;
                 SaveSettings();
             };
             sideStack.Controls.Add(s);
+            secciones[title] = s;
             return s;
         }
 
@@ -84,7 +88,7 @@ namespace KerbinMaps.UI
            «Personalizado» (MarcarGraficosPersonalizado). */
         void BuildGraphicsQualitySection()
         {
-            var s = AddSection("Calidad gráfica", true);
+            var s = AddSection("Calidad gráfica", false);
             qualityCombo = new DarkCombo();
             qualityCombo.SetItems(new[] { ("bajo", "Bajo"), ("medio", "Medio"), ("alto", "Alto"), ("personalizado", "Personalizado") });
             // whoever updates gets «alto» by default even if they've touched their settings
@@ -272,7 +276,7 @@ namespace KerbinMaps.UI
             capas.Add(Checks(chkNight2D));
 
             /* -------------------------------------------------------- Map data */
-            var datos = AddSection("Datos del mapa", true);
+            var datos = AddSection("Datos del mapa", false);
             datos.Add(Hint("Los mapas precargados no son del proyecto: derivan de las texturas del juego. " +
                            "El desplegable de abajo cambia entre los del catálogo (<code>data/maps.json</code>). " +
                            "Para usar otros, suéltalos en la zona de arrastre o déjalos en <code>data/</code>."));
@@ -604,10 +608,12 @@ namespace KerbinMaps.UI
             /* ------------------------------------------------------ Vessels from a save */
             var naves = secNaves = AddSection("Naves de una partida", false);
             var svDrop = new DropZone("Arrastra aquí", " un persistent.sfs", "saves / <tu partida> /");
-            svDrop.FilesDropped += async files => { foreach (var f in files) { await CargarSave(f); break; } };
+            // several files at once: the first one replaces what there was and the rest join it
+            svDrop.FilesDropped += async files => { for (int k = 0; k < files.Length; k++) await CargarSave(files[k], añadir: k > 0); };
             svDrop.Click += async (s, e) => await PickSaveFile();
             naves.Add(svDrop);
             svInfo = naves.Add(Readout());
+            BuildPartidasControls(naves);
             var recargar = new DarkButton("Recargar del juego", ButtonVariant.Ghost, small: true) { Tip = "Vuelve a leer el persistent.sfs original, por si has jugado desde que lo cargaste" };
             recargar.Click += async (s, e) =>
             {
@@ -628,6 +634,7 @@ namespace KerbinMaps.UI
             svRot.Committed += (s, e) => OnSvRotCommitted();
             naves.Add(Field("Ajuste de longitud (°)", svRot));
             BuildModelControls(naves);
+            BuildVistaNaveControl(naves);
             svList = naves.Add(new DrawList(260));
             svList.DrawItem = DrawVesselRow;
             svList.ItemClick = (item, pt, r) => SeleccionarNave((Vessel)item);
@@ -637,6 +644,9 @@ namespace KerbinMaps.UI
                            "traza y pulsa «Seguir» (F) para que la cámara no la pierda; arrastrar lo cancela. Es Kepler puro: " +
                            "hacia atrás ves dónde habría estado cada nave según su órbita actual, sin maniobras, y una órbita " +
                            "que roce la atmósfera no frena. El ajuste de longitud corrige todas las naves a la vez; normalmente no hace falta."));
+
+            /* ------------------------------------------------------- Flight recordings */
+            BuildGrabacionesSection();
 
             /* ----------------------------------------------------------- Markers */
             var marcadores = secMarcadores = AddSection("Marcadores", false);
@@ -688,6 +698,7 @@ namespace KerbinMaps.UI
             searchList.ItemClick = (item, pt, r) => SearchRowClick(item);
 
             ActualizarEstadosSecciones();
+            OrdenarSecciones();
             sideStack.ResumeLayout(true);
         }
 

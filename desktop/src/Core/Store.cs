@@ -52,7 +52,11 @@ namespace KerbinMaps.Core
         public double SkyAz = 90, SkyEl = 25, SkyFov = 70;
         public bool SkyGrid = true, SkyForceNight;
         public string Lang;                       // «es», «en»; if missing, the system's
-        public string Theme;                      // the interface palette (UI.Theme.Palettes); if missing, «clasico»
+        public string Theme;
+        public bool BienvenidaVista;              // the «getting started» card was dismissed
+        public List<string> PartidasExtra;        // saves merged with the main one (original paths; copies in the local folder)
+        public double? SimUni;                    // the time bar's offset from the reference save when closing
+        public string VistaNave;                  // selected vessel's data: «lista», «navball» or «telemetria»                      // the interface palette (UI.Theme.Palettes); if missing, «clasico»
         public string BodyName;                   // the body being viewed; if missing, Kerbin
         public bool DayNight = true;              // sunlight at the time on the time bar
         public bool ShowOrbitInfo = true;         // panel with the selected vessel's orbit

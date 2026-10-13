@@ -130,6 +130,7 @@ namespace KerbinMaps.UI
 
                 // same as when changing language: what's there is saved before closing
                 state.SimT = HasVessels ? sim.T : null;
+                state.SimUni = HasVessels ? sim.T - sv.Ut : null;
                 SaveView();
                 if (!Updater.Launch(exe)) throw new InvalidOperationException(Lang.T("No se pudo abrir el instalador."));
                 updInfo.SetText(Lang.T("Instalando… el visor se reabrirá solo."));

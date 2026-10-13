@@ -145,6 +145,7 @@ namespace KerbinMaps.UI
             sideStack = new StackPanel(0) { BackColor = Theme.Bg2, Padding = new Padding(0, 0, 0, Theme.S(32)) };
             sideScroll = new ScrollHost(sideStack) { Dock = DockStyle.Fill, BackColor = Theme.Bg2 };
             sidebar.Controls.Add(sideScroll);
+            sidebar.Controls.Add(BuildFiltroSecciones());
             sidebar.Controls.Add(new SidebarHeader { Dock = DockStyle.Top });
             Controls.Add(viewCol);
             Controls.Add(sidebar);
@@ -176,7 +177,7 @@ namespace KerbinMaps.UI
             surface.LostFocus += (s, e) => teclas.Clear();
             mapArea.Controls.Add(surface);
 
-            map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, landLayer, rutaLayer, toolLayer, observerLayer, anomalyLayer, kkLayer, vesselLayer, markerLayer });
+            map.Layers.AddRange(new[] { allLayer, orbitLayer, trackLayer, replayLayer, landLayer, rutaLayer, toolLayer, observerLayer, anomalyLayer, kkLayer, vesselLayer, markerLayer });
             map.SetView(state.CenterLat, state.CenterLon, state.Zoom);
 
             // top bar
@@ -224,7 +225,7 @@ namespace KerbinMaps.UI
             BuildTimeBar();
 
             toolbar.Controls.AddRange(new Control[] { sbToggle, viewGroup, search, btnTema });
-            foreach (Control c in new Control[] { searchBox, hud, orbHud, banner, tbar, popup })
+            foreach (Control c in new Control[] { searchBox, hud, orbHud, relojes, navball, telemetria, banner, tbar, popup })
             {
                 mapArea.Controls.Add(c);
                 c.BringToFront();
@@ -382,6 +383,7 @@ namespace KerbinMaps.UI
             if (MessageBox.Show(this, Lang.T("El idioma se aplica al reiniciar el visor. ¿Reiniciar ahora?"),
                     "Koogle Kerbin", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             state.SimT = HasVessels ? sim.T : null;
+            state.SimUni = HasVessels ? sim.T - sv.Ut : null;
             SaveView();
             Application.Restart();
             Close();
@@ -414,6 +416,7 @@ namespace KerbinMaps.UI
             if (WindowState == FormWindowState.Normal) { state.WinX = Left; state.WinY = Top; state.WinW = Width; state.WinH = Height; }
             // the save has been copied since it was loaded; what's missing is the time it was left at
             state.SimT = HasVessels ? sim.T : null;
+            state.SimUni = HasVessels ? sim.T - sv.Ut : null;
             SaveView();
             GuardarFacciones();
             Application.Idle -= OnIdle;
@@ -814,7 +817,7 @@ namespace KerbinMaps.UI
                     if (state.GlobeClouds) _ = CargarNubes();
                     ConstruirAnillos();
                     PushTrack();
-                    if (Following && sv.Sel != null) globe.EnterFocus(SelPos());
+                    if (Following && (sv.Sel != null || (rep != null && repSel))) globe.EnterFocus(SelPos());
                     else globe.ExitFocus();
                     break;
                 default:

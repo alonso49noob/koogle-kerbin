@@ -37,6 +37,14 @@ reads your game files where they already are.
     <td width="50%"><img src="docs/screenshots/relief.jpg" alt="Detailed relief: a full-resolution Parallax height tile streamed around the camera."><br><sub>Detailed relief: a full-resolution Parallax height tile streamed around the camera.</sub></td>
     <td width="50%"><img src="docs/screenshots/coast.jpg" alt="Shores: shallows, foam and wet sand where land meets the sea."><br><sub>Shores: shallows, foam and wet sand where land meets the sea.</sub></td>
   </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/vessel-model-navball.jpg" alt="A vessel from your save with its real parts, and the KSP-style navball."><br><sub>A vessel from your save with its real parts, and the KSP-style navball.</sub></td>
+    <td width="50%"><img src="docs/screenshots/merged-saves-telemetry.jpg" alt="Two saves merged on the UNI clock, with webcast-style telemetry and each save's date by the time bar."><br><sub>Two saves merged on the UNI clock, with webcast-style telemetry and each save's date by the time bar.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/merged-saves-navball.jpg" alt="A station from a merged save over Kerbin, with the Mun and the navball."><br><sub>A station from a merged save over Kerbin, with the Mun and the navball.</sub></td>
+    <td width="50%"></td>
+  </tr>
 </table>
 
 *Screenshots rendered by the app itself, with KSP and the Parallax, Kerbal Konstructs, KSC Extended, Tundra Space Center and Stock Volumetric Clouds mods installed.*
@@ -112,6 +120,16 @@ What it does:
   by part from the game's `.mu` files — including the pose each part was saved in:
   deployed solar panels and antennas, extended landing gear, jettisoned engine
   shrouds, packed or open parachutes, built fairings.
+- **Several saves at once.** Load other people's saves next to yours and see every vessel
+  without loading them into KSP. They run on a unified clock (UNI 0 is each save's own
+  moment) and each save's date is shown next to the time bar; the merge can be exported as
+  a new save at the latest time, with epochs, IDs and crew made consistent. The selected
+  vessel's data can be a list, a KSP-style navball or webcast-style telemetry.
+- **Flight replays.** With the separate [Koogle Recorder](recorder/) mod in your KSP, every
+  flight of the active vessel is recorded as you play, and the viewer replays it on the
+  time bar: its path on the map and the globe, its model (changing as it stages), followed
+  by the camera, with its data as a list, navball or telemetry. The viewer offers to
+  install the mod; it doesn't need it otherwise.
 - **Any celestial body.** The 17 stock bodies are built in, and if you have
   Kopernicus installed it reads the planet pack straight from
   `ModuleManager.ConfigCache` — OPM, RSS, JNSQ or whatever else you run — with the

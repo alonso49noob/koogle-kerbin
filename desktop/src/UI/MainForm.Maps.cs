@@ -129,6 +129,7 @@ namespace KerbinMaps.UI
             globe.Pins.AddRange(PinesKK());
             globe.Pins.Add(new GlobePin { Lat = state.ObsLat, Lon = state.ObsLon, Name = Lang.T("Observador"), Color = ColorF.Hex("#ffb454") });
             globe.Pins.AddRange(VesselPins());
+            globe.Pins.AddRange(PinesReplay());
             bool hasHeight = MapImg("height") != null;
             Vis.Set(reliefWrap, hasHeight);
             Vis.Set(reliefHint, !hasHeight);
@@ -869,7 +870,7 @@ namespace KerbinMaps.UI
             foreach (var a in startArgs)
                 if (File.Exists(a) && Path.GetExtension(a).ToLowerInvariant() is ".sfs" or ".loadmeta") abreSfs = true;
             if (!abreSfs && File.Exists(Store.SaveCopyPath))
-                try { await CargarSave(Store.SaveCopyPath, restoring: true); }
+                try { await CargarSave(Store.SaveCopyPath, restoring: true); await RestaurarPartidasExtra(); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine("[inicio] partida: " + ex.Message); }
 
             foreach (var a in startArgs)
