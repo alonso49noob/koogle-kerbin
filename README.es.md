@@ -82,8 +82,7 @@ o usa la etiqueta `web-v1.6.10`.
 
 ## Licencia
 
-Koogle Kerbin es software libre, bajo la **Licencia Pública General de GNU v3.0
-únicamente** (GPL-3.0-only). El texto completo está en [LICENSE](LICENSE) (en la
+Koogle Kerbin es software libre, bajo la **Licencia MIT**. El texto completo está en [LICENSE](LICENSE) (en la
 descarga de escritorio se llama `license.txt`). Copyright (C) 2026 alonso cardenas.
 
 Los componentes de terceros y sus licencias están en

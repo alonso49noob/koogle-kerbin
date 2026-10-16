@@ -24,7 +24,7 @@ namespace KerbinMaps.UI
        written is reread every couple of seconds, so a flight can be followed almost live. */
     public sealed partial class MainForm
     {
-        const string UrlMod = "https://github.com/alonso49noob/koogle-recorder/releases/latest/download/KoogleRecorder.zip";
+        const string UrlMod = "https://github.com/alonso49noob/kooglerecorder/releases/latest/download/KoogleRecorder.zip";
         const string UrlReleases = "https://github.com/alonso49noob/koogle-kerbin/releases";
 
         Section secGrabaciones;

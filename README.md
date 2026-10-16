@@ -125,7 +125,7 @@ What it does:
   moment) and each save's date is shown next to the time bar; the merge can be exported as
   a new save at the latest time, with epochs, IDs and crew made consistent. The selected
   vessel's data can be a list, a KSP-style navball or webcast-style telemetry.
-- **Flight replays.** With the separate [Koogle Recorder](https://github.com/alonso49noob/koogle-recorder) mod in your KSP, every
+- **Flight replays.** With the separate [Koogle Recorder](https://github.com/alonso49noob/kooglerecorder) mod in your KSP, every
   flight of the active vessel is recorded as you play, and the viewer replays it on the
   time bar: its path on the map and the globe, its model (changing as it stages), followed
   by the camera, with its data as a list, navball or telemetry. The viewer offers to
@@ -192,8 +192,7 @@ or check out the `web-v1.6.10` tag.
 
 ## License
 
-Koogle Kerbin is free software, licensed under the **GNU General Public License
-v3.0 only** (GPL-3.0-only). The full text is in [LICENSE](LICENSE) (shipped as
+Koogle Kerbin is free software, licensed under the **MIT License**. The full text is in [LICENSE](LICENSE) (shipped as
 `license.txt` in the desktop download). Copyright (C) 2026 Alonso Bastian Cardenas Valdes; AKA alonso cardenas; AKA perritoinfame; AKA Alonso49noob.
 
 Third-party components and their licenses are listed in

@@ -1,13 +1,13 @@
 # Third-party components
 
-Koogle Kerbin itself is GPL-3.0-only (see `LICENSE`). It includes or uses the
-following components under their own licenses, all compatible with GPL-3.0.
+Koogle Kerbin itself is MIT-licensed (see `LICENSE`). It includes or uses the
+following components under their own licenses.
 
 ## Kerbal Space Program assets (`data/`)
 
 The images in `data/` (e.g. `Kerbin_Color.png`, `Kerbin_Height.png`,
 `Kerbin_Biome.png`) are derived from Kerbal Space Program, which belongs to
-Squad and Take-Two Interactive. They are NOT covered by the GPL and are included
+Squad and Take-Two Interactive. They are NOT covered by the MIT license and are included
 for use with the game only. This is a fan project with no affiliation to them.
 
 ## Other
