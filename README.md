@@ -125,7 +125,7 @@ What it does:
   moment) and each save's date is shown next to the time bar; the merge can be exported as
   a new save at the latest time, with epochs, IDs and crew made consistent. The selected
   vessel's data can be a list, a KSP-style navball or webcast-style telemetry.
-- **Flight replays.** With the separate [Koogle Recorder](recorder/) mod in your KSP, every
+- **Flight replays.** With the separate [Koogle Recorder](https://github.com/alonso49noob/koogle-recorder) mod in your KSP, every
   flight of the active vessel is recorded as you play, and the viewer replays it on the
   time bar: its path on the map and the globe, its model (changing as it stages), followed
   by the camera, with its data as a list, navball or telemetry. The viewer offers to

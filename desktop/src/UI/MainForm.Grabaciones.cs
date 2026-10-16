@@ -13,7 +13,7 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Flight recordings: the Koogle Recorder mod (recorder/ in this repository) writes them
+    /* Flight recordings: the Koogle Recorder mod (its own repository, koogle-recorder) writes them
        from inside KSP, and the viewer replays them.
 
        The mod is separate on purpose: the viewer doesn't need it. This section says whether
@@ -24,7 +24,7 @@ namespace KerbinMaps.UI
        written is reread every couple of seconds, so a flight can be followed almost live. */
     public sealed partial class MainForm
     {
-        const string UrlMod = "https://github.com/alonso49noob/koogle-kerbin/releases/latest/download/KoogleRecorder.zip";
+        const string UrlMod = "https://github.com/alonso49noob/koogle-recorder/releases/latest/download/KoogleRecorder.zip";
         const string UrlReleases = "https://github.com/alonso49noob/koogle-kerbin/releases";
 
         Section secGrabaciones;
