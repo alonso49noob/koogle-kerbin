@@ -13,7 +13,7 @@ using KerbinMaps.Views;
 
 namespace KerbinMaps.UI
 {
-    /* Flight recordings: the Koogle Recorder mod (its own repository, koogle-recorder) writes them
+    /* Flight recordings: the Koogle Recorder mod (its own repository, kooglerecorder) writes them
        from inside KSP, and the viewer replays them.
 
        The mod is separate on purpose: the viewer doesn't need it. This section says whether

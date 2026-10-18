@@ -7,9 +7,9 @@ using System.Text;
 
 namespace KerbinMaps.Core
 {
-    /* A flight recorded by the Koogle Recorder mod (its own repository, koogle-recorder): samples of
+    /* A flight recorded by the Koogle Recorder mod (its own repository, kooglerecorder): samples of
        position, orientation and velocities, copies of the vessel each time its parts change,
-       and events. The format is described in koogle-recorder/src/KoogleRecorder.cs. */
+       and events. The format is described in kooglerecorder/src/KoogleRecorder.cs. */
     public sealed class Grabacion
     {
         public sealed class Muestra
