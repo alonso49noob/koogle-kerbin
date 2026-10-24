@@ -15,7 +15,7 @@
     <Product>Koogle Kerbin</Product>
     <AssemblyTitle>Koogle Kerbin</AssemblyTitle>
     <Description>Visor de superficie y órbitas de Kerbin (KSP stock)</Description>
-    <Version>1.6.11</Version>
+    <Version>1.6.12</Version>
     <!-- WFO1000 is about the forms designer, which isn't used here: the interface is built in code -->
     <NoWarn>$(NoWarn);WFO1000</NoWarn>
     <ApplicationIcon Condition="Exists('assets\app.ico')">assets\app.ico</ApplicationIcon>
